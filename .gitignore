@@ -1,0 +1,67 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Installer logs
+
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Type checkers
+
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Ruff
+
+.ruff_cache/
+
+# IDEs
+
+.vscode/
+.idea/
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+# Jupyter (if you use later)
+
+.ipynb_checkpoints/
+
+# Data files (IMPORTANT for your project)
+
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep folder structure
+
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
