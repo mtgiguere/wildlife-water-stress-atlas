@@ -8,6 +8,7 @@ on:
 
 jobs:
   test-lint-audit:
+    name: test-lint-audit
     runs-on: ubuntu-latest
 
     steps:
