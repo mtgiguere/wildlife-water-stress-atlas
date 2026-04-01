@@ -1,4 +1,3 @@
-
 from wildlife_water_stress_atlas.ingest.gbif import fetch_occurrences
 
 

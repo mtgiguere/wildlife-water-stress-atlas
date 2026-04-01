@@ -6,7 +6,6 @@ Fetch species occurrence data from GBIF API.
 
 import requests
 
-
 GBIF_API_URL = "https://api.gbif.org/v1/occurrence/search"
 
 
