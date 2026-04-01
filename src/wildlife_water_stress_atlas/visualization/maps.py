@@ -8,16 +8,21 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 
 
-def plot_elephants_and_rivers(elephants: gpd.GeoDataFrame, rivers: gpd.GeoDataFrame) -> None:
-    """
-    Plot elephant occurrence points over river centerlines.
-    """
+def plot_elephants_and_rivers(elephants, water):
     fig, ax = plt.subplots(figsize=(12, 8))
 
-    rivers.plot(ax=ax, linewidth=0.4, color="blue")
-    elephants.plot(ax=ax, markersize=10, color="red")
+    # Plot water (lakes + rivers)
+    water.plot(ax=ax, color="blue", linewidth=0.5, alpha=0.5)
 
-    ax.set_title("Elephant Occurrences and Rivers")
+    # Plot elephants colored by distance
+    elephants.plot(
+        ax=ax,
+        column="distance_to_water",
+        markersize=10,
+        legend=True,
+    )
+
+    ax.set_title("Elephants and Water (Rivers + Lakes)")
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
 
