@@ -1,8 +1,7 @@
 import geopandas as gpd
-import pandas as pd
 
-from wildlife_water_stress_atlas.ingest.gbif import fetch_occurrences
-from wildlife_water_stress_atlas.ingest.gbif import occurrences_to_gdf
+from wildlife_water_stress_atlas.ingest.gbif import fetch_occurrences, occurrences_to_gdf
+
 
 def test_occurrences_to_gdf_returns_geodataframe():
     records = [

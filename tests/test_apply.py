@@ -48,7 +48,6 @@ def test_apply_water_stress_score_returns_copy(sample_gdf):
     assert "water_stress_score" in result.columns
     assert result is not sample_gdf
 
-    import pytest
 
 
 def test_apply_water_stress_score_raises_for_missing_species(sample_gdf):
@@ -74,8 +73,9 @@ def test_apply_water_stress_score_raises_for_missing_distance_to_water(sample_gd
         apply_water_stress_score(bad_gdf, fake_score)
 
 def test_apply_water_stress_score_handles_nan_distance(sample_gdf):
-    from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
     import numpy as np
+
+    from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 
     gdf = sample_gdf.copy()
     gdf.loc[0, "distance_to_water"] = np.nan

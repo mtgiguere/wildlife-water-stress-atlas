@@ -1,14 +1,12 @@
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
 
-def combine_water_layers(
-    rivers: gpd.GeoDataFrame,
-    lakes: gpd.GeoDataFrame,
-) -> gpd.GeoDataFrame:
+
+def combine_water_layers(*layers: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
-    Combine river and lake layers into a single water layer.
+    Combine multiple water types layers into a single water layer.
     """
-    combined = pd.concat([rivers, lakes], ignore_index=True)
+    combined = pd.concat(layers, ignore_index=True)
 
     return gpd.GeoDataFrame(combined, crs="EPSG:4326")
 

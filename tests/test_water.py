@@ -1,9 +1,8 @@
 import geopandas as gpd
 from shapely.geometry import LineString, Polygon
 
-from wildlife_water_stress_atlas.ingest.water import load_rivers
-from wildlife_water_stress_atlas.ingest.water import load_lakes
-from wildlife_water_stress_atlas.ingest.water import combine_water_layers
+from wildlife_water_stress_atlas.ingest.water import combine_water_layers, load_lakes, load_rivers
+
 
 def test_load_lakes_from_natural_earth_file():
     gdf = load_lakes("data/raw/water/lakes/ne_10m_lakes.shp")
