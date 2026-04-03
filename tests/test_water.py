@@ -88,3 +88,33 @@ def test_combine_water_layers_merges_rivers_and_lakes():
 
     assert len(combined) == 2
     assert combined.crs.to_string() == "EPSG:4326"
+
+def test_combine_water_layers_preserves_water_type_column():
+    from wildlife_water_stress_atlas.ingest.water import combine_water_layers
+
+    rivers = gpd.GeoDataFrame(
+        {"type": ["river"]},
+        geometry=[LineString([(0, 0), (1, 1)])],
+        crs="EPSG:4326",
+    )
+
+    lakes = gpd.GeoDataFrame(
+        {"type": ["lake"]},
+        geometry=[Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])],
+        crs="EPSG:4326",
+    )
+
+    result = combine_water_layers(rivers, lakes)
+
+    assert "type" in result.columns
+    assert set(result["type"]) == {"river", "lake"}
+
+def test_get_water_type_weights_returns_species_specific_weights():
+    from wildlife_water_stress_atlas.analytics.water_access import (
+        get_water_type_weights,
+    )
+
+    result = get_water_type_weights("Loxodonta africana")
+
+    assert result["river"] == 1.0
+    assert result["lake"] == 1.0

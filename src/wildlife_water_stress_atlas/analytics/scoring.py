@@ -55,3 +55,19 @@ def water_stress_score(distance_meters: float, species: str) -> float:
     score = min(distance_meters / max_distance, 1.0)
 
     return score
+
+def classify_stress_level(score: float) -> str:
+    """
+    Classify a normalized water stress score into a simple risk category.
+
+    Args:
+        score: Normalized stress score between 0 and 1.
+
+    Returns:
+        "low", "moderate", or "high"
+    """
+    if score >= 0.8:
+        return "high"
+    if score >= 0.4:
+        return "moderate"
+    return "low"

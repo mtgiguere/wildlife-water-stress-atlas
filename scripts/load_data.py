@@ -13,7 +13,9 @@ from wildlife_water_stress_atlas.ingest.water import (
     load_rivers,
 )
 from wildlife_water_stress_atlas.visualization.maps import plot_elephants_and_rivers
-
+from wildlife_water_stress_atlas.analytics.water_access import (
+    filter_accessible_water,
+)
 
 def main():
     records = fetch_occurrences("Loxodonta africana", limit=200)
@@ -22,6 +24,8 @@ def main():
     #load rivers and lakes
     rivers = load_rivers("data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp")
     lakes = load_lakes("data/raw/water/lakes/ne_10m_lakes.shp")
+    rivers["type"] = "river"
+    lakes["type"] = "lake"
     #then combine them
 
     water_layers = {
@@ -29,7 +33,12 @@ def main():
         "lakes": lakes,
     }
 
-    accessible_water = combine_water_layers(*water_layers.values())
+    all_water = combine_water_layers(*water_layers.values())
+
+    accessible_water = filter_accessible_water(
+        all_water,
+        species="Loxodonta africana",
+    )
 
     elephants_with_distance = add_distance_to_water(elephants, accessible_water)
 
