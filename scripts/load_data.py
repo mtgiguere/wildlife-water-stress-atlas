@@ -3,6 +3,9 @@
 import matplotlib.pyplot as plt
 
 from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
+from wildlife_water_stress_atlas.analytics.water_access import (
+    filter_accessible_water,
+)
 from wildlife_water_stress_atlas.ingest.gbif import (
     fetch_occurrences,
     occurrences_to_gdf,
@@ -13,9 +16,7 @@ from wildlife_water_stress_atlas.ingest.water import (
     load_rivers,
 )
 from wildlife_water_stress_atlas.visualization.maps import plot_elephants_and_rivers
-from wildlife_water_stress_atlas.analytics.water_access import (
-    filter_accessible_water,
-)
+
 
 def main():
     records = fetch_occurrences("Loxodonta africana", limit=200)

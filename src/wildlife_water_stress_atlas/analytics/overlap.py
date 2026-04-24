@@ -8,25 +8,33 @@ import geopandas as gpd
 
 
 def add_distance_to_water(
-    elephants: gpd.GeoDataFrame,
-    rivers: gpd.GeoDataFrame,
+    occurrences: gpd.GeoDataFrame,
+    water: gpd.GeoDataFrame,
 ) -> gpd.GeoDataFrame:
     """
-    Add distance-to-water values for each elephant occurrence.
+    Add distance-to-nearest-water values for each occurrence point.
 
     Args:
-        elephants: GeoDataFrame of elephant occurrence points.
-        rivers: GeoDataFrame of river geometries.
+        occurrences: GeoDataFrame of species occurrence points (any species).
+        water: GeoDataFrame of water source geometries (any type — rivers,
+               lakes, pans, wetlands, floodplains, etc.). The caller is
+               responsible for passing all relevant water types combined,
+               typically via combine_water_layers() from ingest/water.py.
 
     Returns:
-        GeoDataFrame with a distance_to_water column.
-    """
-    elephants_projected = elephants.to_crs(epsg=3857)
-    rivers_projected = rivers.to_crs(epsg=3857)
+        GeoDataFrame with a distance_to_water column (meters, EPSG:4326).
 
-    result = elephants_projected.copy()
+    Note:
+        Distance is computed in EPSG:3857 (Web Mercator) for metric accuracy,
+        then the result is re-projected back to EPSG:4326 for consistency
+        with the rest of the pipeline.
+    """
+    occurrences_projected = occurrences.to_crs(epsg=3857)
+    water_projected = water.to_crs(epsg=3857)
+
+    result = occurrences_projected.copy()
     result["distance_to_water"] = result.geometry.apply(
-        lambda point: rivers_projected.distance(point).min()
+        lambda point: water_projected.distance(point).min()
     )
 
     return result.to_crs(epsg=4326)

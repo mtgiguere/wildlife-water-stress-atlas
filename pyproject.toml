@@ -12,6 +12,7 @@ dependencies = [
     "requests",
     "pytest",
     "geopandas",
+    "rasterio",
 ]
 
 [tool.setuptools]
