@@ -307,59 +307,148 @@ class GLWDWetlands(WaterSource):
     Loads wetland, pan, and floodplain geometries from the Global Lakes
     and Wetlands Database v2 (GLWD v2) GeoTIFF.
 
-    GLWD v2 is a raster dataset where each pixel has a class value (1–12)
-    describing the wetland type. We vectorize the pixels we care about into
-    polygons using rasterio.features.shapes(), which traces the outlines of
-    adjacent same-value pixels into geometries.
+    GLWD v2 has 33 classes. We vectorize the classes relevant to wildlife
+    water access into polygons using rasterio.features.shapes().
 
-    CLASSES WE USE:
-    ---------------
-    Class 4 — Floodplains       : Seasonal inundation along river systems
-    Class 7 — Pans / Playas     : Etosha, Makgadikgadi, Sua — critical for
-                                  elephants but invisible in the current data
-    Class 9 — Wetlands          : Intermittent wetlands, seasonally flooded
+    CLASS MAP (GLWD v2):
+    --------------------
+    2  = Saline lake         → saline_lake     (permanent, reliability 0.4)
+    6  = Other permanent     → permanent_water  (permanent, reliability 0.9)
+    8  = Lacustrine forested → wetland          (seasonal,  reliability 0.7)
+    9  = Lacustrine non-for  → wetland          (seasonal,  reliability 0.6)
+    10 = Riverine reg. flood forested   → floodplain (seasonal, 0.8)
+    11 = Riverine reg. flood non-for    → floodplain (seasonal, 0.8)
+    12 = Riverine seas. flood forested  → floodplain (seasonal, 0.7)
+    13 = Riverine seas. flood non-for   → floodplain (seasonal, 0.7)
+    16 = Palustrine reg. flood forested → wetland    (seasonal, 0.7)
+    17 = Palustrine reg. flood non-for  → wetland    (seasonal, 0.7)
+    18 = Palustrine seas. sat. forested → wetland    (seasonal, 0.5)
+    19 = Palustrine seas. sat. non-for  → wetland    (seasonal, 0.5)
+    21 = Ephemeral non-forested         → pan        (ephemeral, 0.3)
+    32 = Salt pan, saline/brackish      → pan        (seasonal,  0.5)
 
-    These three classes are what fix the phantom thirst bug — elephants near
-    Etosha Pan appear high-stress because class 7 pans don't exist in the
-    current shapefile-only data.
+    EXCLUDED FROM DEFAULTS:
+    -----------------------
+    Class 1 (Freshwater lake) — Natural Earth lakes already cover this
+    Class 4 (Large river)     — Natural Earth rivers as lines are
+                                geometrically better for distance calc
 
-    RELIABILITY VALUES:
+    PHANTOM THIRST FIX:
     -------------------
-    These are heuristic placeholders, honest about being estimates:
-    - Floodplains (4): reliability=0.7, months_water=6
-    - Pans (7):        reliability=0.6, months_water=4
-    - Wetlands (9):    reliability=0.5, months_water=3
+    Etosha Pan = class 2 (saline lake) + class 32 (salt pan) around edges
+    Makgadikgadi/Sua Pan = class 32 (salt pan, saline/brackish wetland)
+    These were completely invisible in the old v1 class mapping {4, 7, 9}.
 
     Args:
         water_classes : Set of GLWD class integers to include.
-                        None → use defaults {4, 7, 9}
+                        None → use DEFAULT_WATER_CLASSES
                         Empty set → raises ValueError immediately
     """
 
-    # Maps GLWD class integer → normalized schema values for that class.
-    # This is the single place to update if reliability estimates are revised.
     CLASS_MAP: dict[int, dict] = {
-        4: {
+        2: {
+            "water_type":   "saline_lake",
+            "mechanism":    WaterMechanism.PERMANENT_SURFACE,
+            "permanence":   "permanent",
+            "reliability":  0.4,
+            "months_water": 12,
+        },
+        6: {
+            "water_type":   "permanent_water",
+            "mechanism":    WaterMechanism.PERMANENT_SURFACE,
+            "permanence":   "permanent",
+            "reliability":  0.9,
+            "months_water": 12,
+        },
+        8: {
+            "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.7,
+            "months_water": 8,
+        },
+        9: {
+            "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.6,
+            "months_water": 6,
+        },
+        10: {
             "water_type":   "floodplain",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.8,
+            "months_water": 8,
+        },
+        11: {
+            "water_type":   "floodplain",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.8,
+            "months_water": 8,
+        },
+        12: {
+            "water_type":   "floodplain",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
             "permanence":   "seasonal",
             "reliability":  0.7,
             "months_water": 6,
         },
-        7: {
-            "water_type":   "pan",
+        13: {
+            "water_type":   "floodplain",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
             "permanence":   "seasonal",
-            "reliability":  0.6,
-            "months_water": 4,
+            "reliability":  0.7,
+            "months_water": 6,
         },
-        9: {
+        16: {
             "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.7,
+            "months_water": 8,
+        },
+        17: {
+            "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.7,
+            "months_water": 8,
+        },
+        18: {
+            "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
             "permanence":   "seasonal",
             "reliability":  0.5,
-            "months_water": 3,
+            "months_water": 4,
+        },
+        19: {
+            "water_type":   "wetland",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.5,
+            "months_water": 4,
+        },
+        21: {
+            "water_type":   "pan",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "ephemeral",
+            "reliability":  0.3,
+            "months_water": 2,
+        },
+        32: {
+            "water_type":   "pan",
+            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
+            "permanence":   "seasonal",
+            "reliability":  0.5,
+            "months_water": 4,
         },
     }
 
-    DEFAULT_WATER_CLASSES = {4, 7, 9}
+    # Classes 1 (freshwater lake) and 4 (large river) intentionally excluded
+    # — covered by Natural Earth sources which have better geometry types
+    DEFAULT_WATER_CLASSES = {2, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 21, 32}
 
     def __init__(
         self,
@@ -371,22 +460,15 @@ class GLWDWetlands(WaterSource):
     ):
         super().__init__(filepath, bbox, region, month)
 
-        # Validate water_classes before storing — fail loudly at construction
-        # time rather than silently at load() time
         if water_classes is not None and len(water_classes) == 0:
             raise ValueError(
                 "water_classes must not be empty. "
-                "Pass None to use the defaults {4, 7, 9}."
+                "Pass None to use the defaults."
             )
 
-        # None means "use the defaults" — we resolve it here so the rest of
-        # the class can always treat self.water_classes as a plain set
         self.water_classes = water_classes if water_classes is not None else self.DEFAULT_WATER_CLASSES
 
         if month is not None:
-            # Month-aware loading is planned for Phase 2 but not yet
-            # implemented for GLWD (which lacks monthly resolution).
-            # We log rather than raise so pipelines don't break.
             logger.debug(
                 "GLWDWetlands: month=%d provided but monthly filtering is not "
                 "yet implemented for GLWD. Returning static data.", month
@@ -397,26 +479,27 @@ class GLWDWetlands(WaterSource):
         Load GLWD raster, vectorize requested wetland classes, and return
         a normalized GeoDataFrame.
 
-        VECTORIZATION PROCESS:
-        ----------------------
-        1. Open the GeoTIFF with rasterio
-        2. Read band 1 as a 2D numpy array of class values
-        3. For each requested class, mask the array to that class value
-        4. Use rasterio.features.shapes() to trace pixel outlines into polygons
-        5. Attach schema values for that class
-        6. Combine all classes into one GeoDataFrame
+        Uses a rasterio read window when bbox is provided — only the pixels
+        within the bbox are loaded into memory. This is critical for the
+        global GLWD raster which would otherwise exhaust RAM on a laptop.
         """
         all_features = []
 
         with rasterio.open(self.filepath) as src:
-            data      = src.read(1)       # band 1 — class values
-            transform = src.meta["transform"]
-            crs       = src.meta["crs"]
+
+            if self.bbox is not None:
+                # Convert bbox to a pixel-coordinate window —
+                # only reads the rows/cols that intersect the bbox
+                window    = src.window(*self.bbox)
+                data      = src.read(1, window=window)
+                transform = src.window_transform(window)
+            else:
+                data      = src.read(1)
+                transform = src.meta["transform"]
+
+            crs = src.meta["crs"]
 
             for glwd_class in self.water_classes:
-                # Skip classes not in our mapping — unknown values are ignored
-                # gracefully rather than raising, so future GLWD versions with
-                # new class values don't break the pipeline
                 if glwd_class not in self.CLASS_MAP:
                     logger.debug(
                         "GLWDWetlands: class %d not in CLASS_MAP, skipping.", glwd_class
@@ -424,27 +507,22 @@ class GLWDWetlands(WaterSource):
                     continue
 
                 class_meta = self.CLASS_MAP[glwd_class]
+                mask       = (data == glwd_class).astype(np.uint8)
 
-                # Create a boolean mask: True where pixel == this class
-                mask = (data == glwd_class).astype(np.uint8)
-
-                # rasterio.features.shapes() traces the outlines of contiguous
-                # regions in the mask and yields (geometry_dict, value) tuples.
-                # We only want regions where value == 1 (i.e. our class pixels).
                 for geom_dict, value in rasterio.features.shapes(mask, transform=transform):
                     if value != 1:
                         continue
 
                     all_features.append({
-                        "geometry":    shape(geom_dict),
-                        "water_type":  class_meta["water_type"],
-                        "permanence":  class_meta["permanence"],
-                        "reliability": class_meta["reliability"],
+                        "geometry":     shape(geom_dict),
+                        "water_type":   class_meta["water_type"],
+                        "mechanism":    class_meta["mechanism"],
+                        "permanence":   class_meta["permanence"],
+                        "reliability":  class_meta["reliability"],
                         "months_water": class_meta["months_water"],
                     })
 
         if not all_features:
-            # Return an empty GeoDataFrame with the correct schema
             return gpd.GeoDataFrame(
                 columns=["geometry", "source_id", "water_type", "mechanism",
                          "permanence", "reliability", "months_water", "region"],
@@ -453,19 +531,14 @@ class GLWDWetlands(WaterSource):
 
         gdf = gpd.GeoDataFrame(all_features, crs=CRS.to_epsg(crs) if crs else "EPSG:4326")
 
-        # Reproject to WGS84 if needed — GLWD v2 is distributed in WGS84
-        # but we enforce it explicitly for safety
         if gdf.crs is None or gdf.crs.to_epsg() != 4326:
             gdf = gdf.to_crs("EPSG:4326")
         else:
             gdf = gdf.set_crs("EPSG:4326")
 
-        # Apply bbox clipping if provided
         gdf = self._clip_to_bbox(gdf)
 
-        # Add the remaining normalized schema columns
         gdf["source_id"] = [f"{row['water_type']}_{i}" for i, row in enumerate(all_features[:len(gdf)])]
-        gdf["mechanism"] = WaterMechanism.SEASONAL_SURFACE
         gdf["region"]    = self.region
 
         return gdf[["geometry", "source_id", "water_type", "mechanism",

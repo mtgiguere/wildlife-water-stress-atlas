@@ -83,19 +83,21 @@ def test_elephant_water_threshold_matches_existing_scoring_module():
 
 def test_elephant_accessible_water_types_are_correct():
     assert SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"] == {
-        "river", "lake", "pan", "wetland", "floodplain", "surface_water"
+        "river", "lake", "pan", "wetland", "floodplain",
+        "surface_water", "saline_lake", "permanent_water"
     }
 
 
 def test_elephant_water_type_weights_are_correct():
     weights = SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"]
-    assert weights["river"]         == 1.0
-    assert weights["lake"]          == 1.0
-    assert weights["pan"]           == 0.8
-    assert weights["wetland"]       == 0.7
-    assert weights["floodplain"]    == 0.7
-    assert weights["surface_water"] == 0.6
-
+    assert weights["river"]           == 1.0
+    assert weights["lake"]            == 1.0
+    assert weights["pan"]             == 0.4
+    assert weights["wetland"]         == 0.7
+    assert weights["floodplain"]      == 0.7
+    assert weights["surface_water"]   == 0.6
+    assert weights["saline_lake"]     == 0.4
+    assert weights["permanent_water"] == 0.8
 
 # ---------------------------------------------------------------------------
 # Unknown species

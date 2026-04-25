@@ -32,7 +32,7 @@ def test_filter_accessible_water_returns_only_accessible_types():
     # Elephants can now access rivers, lakes, pans, wetlands, floodplains,
     # and surface_water — an unknown type like "bog" should be filtered out
     water = gpd.GeoDataFrame(
-        {"type": ["river", "lake", "pan", "bog"]},
+        {"water_type": ["river", "lake", "pan", "bog"]},
         geometry=[
             LineString([(0, 0), (1, 1)]),
             Polygon([(0, 0), (0, 1), (1, 1), (1, 0)]),
@@ -44,7 +44,7 @@ def test_filter_accessible_water_returns_only_accessible_types():
 
     result = filter_accessible_water(water, species="Loxodonta africana")
 
-    assert set(result["type"]) == {"river", "lake", "pan"}
+    assert set(result["water_type"]) == {"river", "lake", "pan"}
     assert len(result) == 3
 
 
@@ -52,7 +52,7 @@ def test_filter_accessible_water_returns_only_accessible_types():
 def test_filter_accessible_water_returns_empty_when_no_match():
     # Only truly unknown types should produce an empty result now
     water = gpd.GeoDataFrame(
-        {"type": ["bog", "creek"]},
+        {"water_type": ["bog", "creek"]},
         geometry=[
             Polygon([(0, 0), (0, 1), (1, 1), (1, 0)]),
             Polygon([(5, 5), (5, 6), (6, 6), (6, 5)]),
@@ -68,7 +68,7 @@ def test_filter_accessible_water_returns_empty_when_no_match():
 
 def test_filter_accessible_water_raises_for_unknown_species():
     water = gpd.GeoDataFrame(
-        {"type": ["river"]},
+        {"water_type": ["river"]},
         geometry=[LineString([(0, 0), (1, 1)])],
         crs="EPSG:4326",
     )
@@ -95,7 +95,7 @@ def test_filter_accessible_water_reads_from_species_config():
         SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"]["pan"] = 0.8
 
         water = gpd.GeoDataFrame(
-            {"type": ["river", "pan"]},
+            {"water_type": ["river", "pan"]},
             geometry=[
                 LineString([(0, 0), (1, 1)]),
                 Polygon([(5, 5), (5, 6), (6, 6), (6, 5)]),
@@ -106,7 +106,7 @@ def test_filter_accessible_water_reads_from_species_config():
         result = filter_accessible_water(water, species="Loxodonta africana")
 
         # Pan should now pass through the filter
-        assert "pan" in set(result["type"])
+        assert "pan" in set(result["water_type"])
         assert len(result) == 2
 
     finally:
@@ -122,8 +122,14 @@ def test_filter_accessible_water_reads_from_species_config():
 def test_get_water_type_weights_returns_correct_weights_for_elephants():
     weights = get_water_type_weights("Loxodonta africana")
 
-    assert weights["river"] == 1.0
-    assert weights["lake"] == 1.0
+    assert weights["river"]           == 1.0
+    assert weights["lake"]            == 1.0
+    assert weights["pan"]             == 0.4
+    assert weights["wetland"]         == 0.7
+    assert weights["floodplain"]      == 0.7
+    assert weights["surface_water"]   == 0.6
+    assert weights["saline_lake"]     == 0.4
+    assert weights["permanent_water"] == 0.8
 
 
 def test_get_water_type_weights_raises_for_unknown_species():
@@ -156,7 +162,7 @@ def test_filter_accessible_water_result_is_a_copy():
     # Verifies the function returns a copy, not a view of the original.
     # Modifying the result should not affect the input water GeoDataFrame.
     water = gpd.GeoDataFrame(
-        {"type": ["river", "lake"]},
+        {"water_type": ["river", "lake"]},
         geometry=[
             LineString([(0, 0), (1, 1)]),
             Polygon([(0, 0), (0, 1), (1, 1), (1, 0)]),
@@ -165,7 +171,7 @@ def test_filter_accessible_water_result_is_a_copy():
     )
 
     result = filter_accessible_water(water, species="Loxodonta africana")
-    result["type"] = "modified"
+    result["water_type"] = "modified"
 
     # Original should be untouched
-    assert list(water["type"]) == ["river", "lake"]
+    assert list(water["water_type"]) == ["river", "lake"]

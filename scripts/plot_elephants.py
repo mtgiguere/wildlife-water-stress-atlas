@@ -35,7 +35,7 @@ from wildlife_water_stress_atlas.ingest.water import load_all_water
 SPECIES = "Loxodonta africana"
 
 CELL_SIZE_METERS  = 50_000
-HIGH_RISK_THRESHOLD = 0.6
+HIGH_RISK_THRESHOLD = 0.1
 
 # Africa bounding box (min_lon, min_lat, max_lon, max_lat)
 # Covers the full continent with a small buffer
@@ -112,9 +112,25 @@ def main():
 
     high_risk_grid = grid_gdf[grid_gdf["water_stress_score"] > HIGH_RISK_THRESHOLD]
 
+
+    print(f"Occurrences scored: {len(occurrences)}")
+    print(f"Grid cells: {len(grid_gdf)}")
+    print(f"High risk cells: {len(high_risk_grid)}")
+    print(f"Score range: {occurrences['water_stress_score'].min():.3f} – {occurrences['water_stress_score'].max():.3f}")
+
     # ------------------------------------------------------------------
     # 6. Plot
     # ------------------------------------------------------------------
+
+    if high_risk_grid.empty:
+        print("No high-risk grid cells found — try lowering HIGH_RISK_THRESHOLD")
+        # Plot just the water layer so we can still see something
+        fig, ax = plt.subplots(figsize=(12, 8))
+        accessible_water.plot(ax=ax, color="blue", linewidth=0.5, alpha=0.4)
+        ax.set_title(f"Water Sources — {SPECIES} (no high-risk cells found)")
+        plt.show()
+        return
+
     fig, ax = plt.subplots(figsize=(12, 8))
 
     accessible_water.plot(ax=ax, color="blue", linewidth=0.5, alpha=0.4)
@@ -133,6 +149,7 @@ def main():
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
 
+    
     plt.show()
 
 

@@ -57,7 +57,7 @@ def filter_accessible_water(
     # same behavior as before, consistent with how scoring.py handles it
     allowed_types = SPECIES_CONFIG[species]["accessible_water_types"]
 
-    return water[water["type"].isin(allowed_types)].copy()
+    return water[water["water_type"].isin(allowed_types)].copy()
 
 
 def get_water_type_weights(species: str) -> dict[str, float]:

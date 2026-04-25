@@ -74,7 +74,10 @@ SPECIES_CONFIG: dict[str, dict] = {
         # These types are now visible to filter_accessible_water() and
         # will be included in the distance calculation once their source
         # classes are loaded in the pipeline.
-        "accessible_water_types": {"river", "lake", "pan", "wetland", "floodplain", "surface_water"},
+        "accessible_water_types": {
+            "river", "lake", "pan", "wetland", "floodplain",
+            "surface_water", "saline_lake", "permanent_water"
+        },
 
         # Permanent sources weighted at 1.0 — fully reliable year-round.
         # Seasonal sources weighted lower — less reliable in dry season.
@@ -83,10 +86,12 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_type_weights": {
             "river":         1.0,
             "lake":          1.0,
-            "pan":           0.8,   # seasonal — reliable after rain, dry otherwise
-            "wetland":       0.7,   # intermittent — less reliable than pans
-            "floodplain":    0.7,   # seasonal inundation — reliable in wet season
-            "surface_water": 0.6,   # JRC GSW derived — reliability varies by pixel
+            "pan":           0.4,
+            "wetland":       0.7,
+            "floodplain":    0.7,
+            "surface_water": 0.6,
+            "saline_lake":   0.4,
+            "permanent_water": 0.8,
         },
 
         # 50km is a commonly cited upper bound for elephant daily range.
