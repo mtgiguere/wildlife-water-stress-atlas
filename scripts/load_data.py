@@ -1,4 +1,4 @@
-'''load_data.py'''
+"""load_data.py"""
 
 import matplotlib.pyplot as plt
 
@@ -22,12 +22,12 @@ def main():
     records = fetch_occurrences("Loxodonta africana", limit=200)
     elephants = occurrences_to_gdf(records)
 
-    #load rivers and lakes
+    # load rivers and lakes
     rivers = load_rivers("data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp")
     lakes = load_lakes("data/raw/water/lakes/ne_10m_lakes.shp")
     rivers["type"] = "river"
     lakes["type"] = "lake"
-    #then combine them
+    # then combine them
 
     water_layers = {
         "rivers": rivers,

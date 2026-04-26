@@ -68,35 +68,28 @@ SPECIES_CONFIG: dict[str, dict] = {
         # aggressively in normal conditions. This is a placeholder — see
         # Section 4 of the project bible for the full gap acknowledgment.
         "water_threshold_m": 300_000,
-
         # Pans, wetlands, floodplains, and surface_water added here —
         # this is the config change that fixes the phantom thirst bug.
         # These types are now visible to filter_accessible_water() and
         # will be included in the distance calculation once their source
         # classes are loaded in the pipeline.
-        "accessible_water_types": {
-            "river", "lake", "pan", "wetland", "floodplain",
-            "surface_water", "saline_lake", "permanent_water"
-        },
-
+        "accessible_water_types": {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "saline_lake", "permanent_water"},
         # Permanent sources weighted at 1.0 — fully reliable year-round.
         # Seasonal sources weighted lower — less reliable in dry season.
         # These are heuristic placeholders, honest about being estimates.
         # Ecological validation from Save the Elephants / IUCN is a future step.
         "water_type_weights": {
-            "river":         1.0,
-            "lake":          1.0,
-            "pan":           0.4,
-            "wetland":       0.7,
-            "floodplain":    0.7,
+            "river": 1.0,
+            "lake": 1.0,
+            "pan": 0.4,
+            "wetland": 0.7,
+            "floodplain": 0.7,
             "surface_water": 0.6,
-            "saline_lake":   0.4,
+            "saline_lake": 0.4,
             "permanent_water": 0.8,
         },
-
         # 50km is a commonly cited upper bound for elephant daily range.
         "daily_range_m": 50_000,
-
         # Elephants are highly water-dependent — drinking daily is
         # non-negotiable for adults.
         "water_dependency": "high",
@@ -109,6 +102,7 @@ SPECIES_CONFIG: dict[str, dict] = {
 # These checks run once at import time — if someone adds a malformed species
 # entry, the error surfaces immediately rather than causing a silent failure
 # deep inside the scoring pipeline at runtime.
+
 
 def _validate_species_config(config: dict[str, dict]) -> None:
     """
@@ -143,17 +137,12 @@ def _validate_species_config(config: dict[str, dict]) -> None:
 
         # water_type_weights keys must exactly match accessible_water_types
         if cfg["water_type_weights"].keys() != cfg["accessible_water_types"]:
-            raise ValueError(
-                f"{species}: water_type_weights keys must exactly match accessible_water_types. "
-                f"Got {set(cfg['water_type_weights'].keys())} vs {cfg['accessible_water_types']}"
-            )
+            raise ValueError(f"{species}: water_type_weights keys must exactly match accessible_water_types. Got {set(cfg['water_type_weights'].keys())} vs {cfg['accessible_water_types']}")
 
         # All weights must be floats in (0.0, 1.0]
         for water_type, weight in cfg["water_type_weights"].items():
             if not isinstance(weight, float) or not (0.0 < weight <= 1.0):
-                raise ValueError(
-                    f"{species}/{water_type}: weight must be a float between 0 (exclusive) and 1 (inclusive)"
-                )
+                raise ValueError(f"{species}/{water_type}: weight must be a float between 0 (exclusive) and 1 (inclusive)")
 
         # daily_range_m must be a positive number
         if not isinstance(cfg["daily_range_m"], (int, float)) or cfg["daily_range_m"] <= 0:
@@ -161,10 +150,7 @@ def _validate_species_config(config: dict[str, dict]) -> None:
 
         # water_dependency must be one of the allowed values
         if cfg["water_dependency"] not in valid_dependency_values:
-            raise ValueError(
-                f"{species}: water_dependency must be one of {valid_dependency_values}, "
-                f"got '{cfg['water_dependency']}'"
-            )
+            raise ValueError(f"{species}: water_dependency must be one of {valid_dependency_values}, got '{cfg['water_dependency']}'")
 
 
 # Run validation immediately when this module is imported.

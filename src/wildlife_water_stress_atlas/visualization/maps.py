@@ -27,6 +27,7 @@ def plot_elephants_and_rivers(elephants, water):
 
     plt.show()
 
+
 def plot_water_stress(gdf, accessible_water, high_stress=None):
     """
     Plot all occurrence points with optional high-stress points highlighted.

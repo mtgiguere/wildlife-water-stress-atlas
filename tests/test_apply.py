@@ -14,6 +14,7 @@ def sample_gdf():
         crs="EPSG:4326",
     )
 
+
 def test_apply_water_stress_score_adds_column(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 
@@ -23,6 +24,7 @@ def test_apply_water_stress_score_adds_column(sample_gdf):
     result = apply_water_stress_score(sample_gdf, fake_score)
 
     assert "water_stress_score" in result.columns
+
 
 def test_apply_water_stress_score_uses_scoring_function(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
@@ -35,6 +37,7 @@ def test_apply_water_stress_score_uses_scoring_function(sample_gdf):
     expected = sample_gdf["distance_to_water"] * 0.1
 
     assert all(result["water_stress_score"] == expected)
+
 
 def test_apply_water_stress_score_returns_copy(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
@@ -49,7 +52,6 @@ def test_apply_water_stress_score_returns_copy(sample_gdf):
     assert result is not sample_gdf
 
 
-
 def test_apply_water_stress_score_raises_for_missing_species(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 
@@ -61,6 +63,7 @@ def test_apply_water_stress_score_raises_for_missing_species(sample_gdf):
     with pytest.raises(KeyError):
         apply_water_stress_score(bad_gdf, fake_score)
 
+
 def test_apply_water_stress_score_raises_for_missing_distance_to_water(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 
@@ -71,6 +74,7 @@ def test_apply_water_stress_score_raises_for_missing_distance_to_water(sample_gd
 
     with pytest.raises(KeyError):
         apply_water_stress_score(bad_gdf, fake_score)
+
 
 def test_apply_water_stress_score_handles_nan_distance(sample_gdf):
     import numpy as np
@@ -89,6 +93,7 @@ def test_apply_water_stress_score_handles_nan_distance(sample_gdf):
 
     assert result.loc[0, "water_stress_score"] == 0.0
 
+
 def test_apply_water_stress_score_propagates_scoring_errors(sample_gdf):
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 
@@ -97,6 +102,7 @@ def test_apply_water_stress_score_propagates_scoring_errors(sample_gdf):
 
     with pytest.raises(ValueError):
         apply_water_stress_score(sample_gdf, bad_score)
+
 
 def test_apply_water_stress_score_with_real_scoring():
     import geopandas as gpd

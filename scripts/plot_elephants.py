@@ -34,7 +34,7 @@ from wildlife_water_stress_atlas.ingest.water import load_all_water
 # Single place to change the species — never hardcoded below this line
 SPECIES = "Loxodonta africana"
 
-CELL_SIZE_METERS  = 50_000
+CELL_SIZE_METERS = 50_000
 HIGH_RISK_THRESHOLD = 0.1
 
 # Africa bounding box (min_lon, min_lat, max_lon, max_lat)
@@ -45,15 +45,15 @@ AFRICA_BBOX = (-20, -40, 55, 40)
 WATER_CONFIG = {
     "sources": {
         "rivers": {
-            "path":   "data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp",
+            "path": "data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp",
             "region": "africa",
         },
         "lakes": {
-            "path":   "data/raw/water/lakes/ne_10m_lakes.shp",
+            "path": "data/raw/water/lakes/ne_10m_lakes.shp",
             "region": "africa",
         },
         "glwd": {
-            "path":   "data/raw/water/glwd/GLWD_v2_0_main_class.tif",
+            "path": "data/raw/water/glwd/GLWD_v2_0_main_class.tif",
             "region": "africa",
             # water_classes defaults to {4, 7, 9} — floodplains, pans, wetlands
         },
@@ -70,7 +70,7 @@ def main():
     # ------------------------------------------------------------------
     # 1. Fetch species occurrences from GBIF
     # ------------------------------------------------------------------
-    records     = fetch_occurrences(SPECIES, limit=200)
+    records = fetch_occurrences(SPECIES, limit=200)
     occurrences = occurrences_to_gdf(records)
 
     # ------------------------------------------------------------------
@@ -98,9 +98,7 @@ def main():
     # ------------------------------------------------------------------
     occurrences = add_distance_to_water(occurrences, accessible_water)
     occurrences = apply_water_stress_score(occurrences, water_stress_score)
-    occurrences["stress_level"] = occurrences["water_stress_score"].apply(
-        classify_stress_level
-    )
+    occurrences["stress_level"] = occurrences["water_stress_score"].apply(classify_stress_level)
 
     # ------------------------------------------------------------------
     # 5. Aggregate to grid and extract high-risk cells
@@ -111,7 +109,6 @@ def main():
     )
 
     high_risk_grid = grid_gdf[grid_gdf["water_stress_score"] > HIGH_RISK_THRESHOLD]
-
 
     print(f"Occurrences scored: {len(occurrences)}")
     print(f"Grid cells: {len(grid_gdf)}")
@@ -149,7 +146,6 @@ def main():
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
 
-    
     plt.show()
 
 

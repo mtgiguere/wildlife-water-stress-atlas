@@ -28,6 +28,7 @@ from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 # filter_accessible_water
 # ---------------------------------------------------------------------------
 
+
 def test_filter_accessible_water_returns_only_accessible_types():
     # Elephants can now access rivers, lakes, pans, wetlands, floodplains,
     # and surface_water — an unknown type like "bog" should be filtered out
@@ -46,7 +47,6 @@ def test_filter_accessible_water_returns_only_accessible_types():
 
     assert set(result["water_type"]) == {"river", "lake", "pan"}
     assert len(result) == 3
-
 
 
 def test_filter_accessible_water_returns_empty_when_no_match():
@@ -119,16 +119,17 @@ def test_filter_accessible_water_reads_from_species_config():
 # get_water_type_weights
 # ---------------------------------------------------------------------------
 
+
 def test_get_water_type_weights_returns_correct_weights_for_elephants():
     weights = get_water_type_weights("Loxodonta africana")
 
-    assert weights["river"]           == 1.0
-    assert weights["lake"]            == 1.0
-    assert weights["pan"]             == 0.4
-    assert weights["wetland"]         == 0.7
-    assert weights["floodplain"]      == 0.7
-    assert weights["surface_water"]   == 0.6
-    assert weights["saline_lake"]     == 0.4
+    assert weights["river"] == 1.0
+    assert weights["lake"] == 1.0
+    assert weights["pan"] == 0.4
+    assert weights["wetland"] == 0.7
+    assert weights["floodplain"] == 0.7
+    assert weights["surface_water"] == 0.6
+    assert weights["saline_lake"] == 0.4
     assert weights["permanent_water"] == 0.8
 
 

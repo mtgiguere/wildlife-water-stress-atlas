@@ -38,6 +38,7 @@ WATER_READ_FILE = "wildlife_water_stress_atlas.ingest.water.gpd.read_file"
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_rivers_gdf():
     """A minimal rivers GeoDataFrame simulating a loaded shapefile."""
@@ -61,6 +62,7 @@ def mock_lakes_gdf():
 # ---------------------------------------------------------------------------
 # WaterMechanism enum
 # ---------------------------------------------------------------------------
+
 
 def test_water_mechanism_has_permanent_surface():
     assert WaterMechanism.PERMANENT_SURFACE
@@ -111,9 +113,7 @@ def test_shapefile_rivers_produces_normalized_schema(monkeypatch, mock_rivers_gd
     source = ShapefileRivers("dummy/path.shp")
     result = source.load()
 
-    assert REQUIRED_SCHEMA_COLUMNS.issubset(result.columns), (
-        f"Missing columns: {REQUIRED_SCHEMA_COLUMNS - set(result.columns)}"
-    )
+    assert REQUIRED_SCHEMA_COLUMNS.issubset(result.columns), f"Missing columns: {REQUIRED_SCHEMA_COLUMNS - set(result.columns)}"
 
 
 def test_shapefile_lakes_produces_normalized_schema(monkeypatch, mock_lakes_gdf):
@@ -122,14 +122,13 @@ def test_shapefile_lakes_produces_normalized_schema(monkeypatch, mock_lakes_gdf)
     source = ShapefileLakes("dummy/path.shp")
     result = source.load()
 
-    assert REQUIRED_SCHEMA_COLUMNS.issubset(result.columns), (
-        f"Missing columns: {REQUIRED_SCHEMA_COLUMNS - set(result.columns)}"
-    )
+    assert REQUIRED_SCHEMA_COLUMNS.issubset(result.columns), f"Missing columns: {REQUIRED_SCHEMA_COLUMNS - set(result.columns)}"
 
 
 # ---------------------------------------------------------------------------
 # water_type column values
 # ---------------------------------------------------------------------------
+
 
 def test_shapefile_rivers_sets_water_type_to_river(monkeypatch, mock_rivers_gdf):
     monkeypatch.setattr(WATER_READ_FILE, lambda _: mock_rivers_gdf)
@@ -153,6 +152,7 @@ def test_shapefile_lakes_sets_water_type_to_lake(monkeypatch, mock_lakes_gdf):
 # mechanism column values
 # ---------------------------------------------------------------------------
 
+
 def test_shapefile_rivers_mechanism_is_permanent_surface(monkeypatch, mock_rivers_gdf):
     monkeypatch.setattr(WATER_READ_FILE, lambda _: mock_rivers_gdf)
 
@@ -175,6 +175,7 @@ def test_shapefile_lakes_mechanism_is_permanent_surface(monkeypatch, mock_lakes_
 # CRS
 # ---------------------------------------------------------------------------
 
+
 def test_shapefile_rivers_output_is_wgs84(monkeypatch, mock_rivers_gdf):
     monkeypatch.setattr(WATER_READ_FILE, lambda _: mock_rivers_gdf)
 
@@ -196,6 +197,7 @@ def test_shapefile_lakes_output_is_wgs84(monkeypatch, mock_lakes_gdf):
 # ---------------------------------------------------------------------------
 # CRS missing / needs conversion
 # ---------------------------------------------------------------------------
+
 
 def test_shapefile_rivers_sets_crs_when_missing(monkeypatch, mock_rivers_gdf):
     # Simulate a shapefile that comes back with no CRS set
@@ -229,6 +231,7 @@ def test_shapefile_lakes_sets_crs_when_missing(monkeypatch, mock_lakes_gdf):
 # ---------------------------------------------------------------------------
 # bbox clipping
 # ---------------------------------------------------------------------------
+
 
 def test_shapefile_rivers_clips_to_bbox(monkeypatch):
     gdf = gpd.GeoDataFrame(
@@ -272,6 +275,7 @@ def test_shapefile_lakes_clips_to_bbox(monkeypatch):
 # load_all_water — registry function
 # ---------------------------------------------------------------------------
 
+
 def test_load_all_water_warns_when_no_bbox_provided(monkeypatch, mock_rivers_gdf, mock_lakes_gdf):
     monkeypatch.setattr(
         WATER_READ_FILE,
@@ -281,7 +285,7 @@ def test_load_all_water_warns_when_no_bbox_provided(monkeypatch, mock_rivers_gdf
     config = {
         "sources": {
             "rivers": {"path": "dummy/rivers.shp"},
-            "lakes":  {"path": "dummy/lakes.shp"},
+            "lakes": {"path": "dummy/lakes.shp"},
         }
     }
 
@@ -290,9 +294,7 @@ def test_load_all_water_warns_when_no_bbox_provided(monkeypatch, mock_rivers_gdf
         load_all_water(config)
 
     messages = [str(w.message) for w in caught]
-    assert any("bbox" in m.lower() for m in messages), (
-        "Expected a warning about missing bbox"
-    )
+    assert any("bbox" in m.lower() for m in messages), "Expected a warning about missing bbox"
 
 
 def test_load_all_water_returns_combined_geodataframe(monkeypatch, mock_rivers_gdf, mock_lakes_gdf):
@@ -304,7 +306,7 @@ def test_load_all_water_returns_combined_geodataframe(monkeypatch, mock_rivers_g
     config = {
         "sources": {
             "rivers": {"path": "dummy/rivers.shp"},
-            "lakes":  {"path": "dummy/lakes.shp"},
+            "lakes": {"path": "dummy/lakes.shp"},
         }
     }
 
@@ -324,7 +326,7 @@ def test_load_all_water_with_bbox_does_not_warn(monkeypatch, mock_rivers_gdf, mo
     config = {
         "sources": {
             "rivers": {"path": "dummy/rivers.shp"},
-            "lakes":  {"path": "dummy/lakes.shp"},
+            "lakes": {"path": "dummy/lakes.shp"},
         }
     }
 
@@ -345,7 +347,7 @@ def test_load_all_water_output_has_normalized_schema(monkeypatch, mock_rivers_gd
     config = {
         "sources": {
             "rivers": {"path": "dummy/rivers.shp"},
-            "lakes":  {"path": "dummy/lakes.shp"},
+            "lakes": {"path": "dummy/lakes.shp"},
         }
     }
 
@@ -370,6 +372,7 @@ def test_load_all_water_raises_for_unknown_source_type(monkeypatch, mock_rivers_
 # ---------------------------------------------------------------------------
 # Convenience functions — unchanged behavior
 # ---------------------------------------------------------------------------
+
 
 def test_load_rivers_convenience_still_works(monkeypatch, mock_rivers_gdf):
     monkeypatch.setattr(WATER_READ_FILE, lambda _: mock_rivers_gdf)

@@ -72,6 +72,7 @@ logger = logging.getLogger(__name__)
 # WaterMechanism Enum
 # ---------------------------------------------------------------------------
 
+
 class WaterMechanism(Enum):
     """
     How water arrives at or exists within a given location.
@@ -106,17 +107,19 @@ class WaterMechanism(Enum):
                         modifier on existing sources, not a source class.
                         Planned for Phase 2 (Predict) using CHIRPS data.
     """
+
     PERMANENT_SURFACE = "permanent_surface"
-    SEASONAL_SURFACE  = "seasonal_surface"
-    GROUNDWATER       = "groundwater"
-    ARTIFICIAL        = "artificial"
-    DERIVED           = "derived"
-    RAINFALL_DERIVED  = "rainfall_derived"
+    SEASONAL_SURFACE = "seasonal_surface"
+    GROUNDWATER = "groundwater"
+    ARTIFICIAL = "artificial"
+    DERIVED = "derived"
+    RAINFALL_DERIVED = "rainfall_derived"
 
 
 # ---------------------------------------------------------------------------
 # WaterSource — Abstract Base Class
 # ---------------------------------------------------------------------------
+
 
 class WaterSource(ABC):
     """
@@ -215,13 +218,13 @@ class WaterSource(ABC):
         """
         result = gdf[["geometry"]].copy()
 
-        result["source_id"]    = [f"{water_type}_{i}" for i in range(len(result))]
-        result["water_type"]   = water_type
-        result["mechanism"]    = mechanism
-        result["permanence"]   = permanence
-        result["reliability"]  = reliability
+        result["source_id"] = [f"{water_type}_{i}" for i in range(len(result))]
+        result["water_type"] = water_type
+        result["mechanism"] = mechanism
+        result["permanence"] = permanence
+        result["reliability"] = reliability
         result["months_water"] = months_water
-        result["region"]       = self.region
+        result["region"] = self.region
 
         return result
 
@@ -229,6 +232,7 @@ class WaterSource(ABC):
 # ---------------------------------------------------------------------------
 # Vector Source Classes — Shapefile-based
 # ---------------------------------------------------------------------------
+
 
 class ShapefileRivers(WaterSource):
     """
@@ -256,11 +260,11 @@ class ShapefileRivers(WaterSource):
 
         return self._normalize(
             gdf,
-            water_type   = "river",
-            mechanism    = WaterMechanism.PERMANENT_SURFACE,
-            permanence   = "permanent",
-            reliability  = 1.0,
-            months_water = 12,
+            water_type="river",
+            mechanism=WaterMechanism.PERMANENT_SURFACE,
+            permanence="permanent",
+            reliability=1.0,
+            months_water=12,
         )
 
 
@@ -290,17 +294,18 @@ class ShapefileLakes(WaterSource):
 
         return self._normalize(
             gdf,
-            water_type   = "lake",
-            mechanism    = WaterMechanism.PERMANENT_SURFACE,
-            permanence   = "permanent",
-            reliability  = 1.0,
-            months_water = 12,
+            water_type="lake",
+            mechanism=WaterMechanism.PERMANENT_SURFACE,
+            permanence="permanent",
+            reliability=1.0,
+            months_water=12,
         )
 
 
 # ---------------------------------------------------------------------------
 # Raster Source Classes
 # ---------------------------------------------------------------------------
+
 
 class GLWDWetlands(WaterSource):
     """
@@ -347,101 +352,101 @@ class GLWDWetlands(WaterSource):
 
     CLASS_MAP: dict[int, dict] = {
         2: {
-            "water_type":   "saline_lake",
-            "mechanism":    WaterMechanism.PERMANENT_SURFACE,
-            "permanence":   "permanent",
-            "reliability":  0.4,
+            "water_type": "saline_lake",
+            "mechanism": WaterMechanism.PERMANENT_SURFACE,
+            "permanence": "permanent",
+            "reliability": 0.4,
             "months_water": 12,
         },
         6: {
-            "water_type":   "permanent_water",
-            "mechanism":    WaterMechanism.PERMANENT_SURFACE,
-            "permanence":   "permanent",
-            "reliability":  0.9,
+            "water_type": "permanent_water",
+            "mechanism": WaterMechanism.PERMANENT_SURFACE,
+            "permanence": "permanent",
+            "reliability": 0.9,
             "months_water": 12,
         },
         8: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.7,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.7,
             "months_water": 8,
         },
         9: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.6,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.6,
             "months_water": 6,
         },
         10: {
-            "water_type":   "floodplain",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.8,
+            "water_type": "floodplain",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.8,
             "months_water": 8,
         },
         11: {
-            "water_type":   "floodplain",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.8,
+            "water_type": "floodplain",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.8,
             "months_water": 8,
         },
         12: {
-            "water_type":   "floodplain",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.7,
+            "water_type": "floodplain",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.7,
             "months_water": 6,
         },
         13: {
-            "water_type":   "floodplain",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.7,
+            "water_type": "floodplain",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.7,
             "months_water": 6,
         },
         16: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.7,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.7,
             "months_water": 8,
         },
         17: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.7,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.7,
             "months_water": 8,
         },
         18: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.5,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.5,
             "months_water": 4,
         },
         19: {
-            "water_type":   "wetland",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.5,
+            "water_type": "wetland",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.5,
             "months_water": 4,
         },
         21: {
-            "water_type":   "pan",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "ephemeral",
-            "reliability":  0.3,
+            "water_type": "pan",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "ephemeral",
+            "reliability": 0.3,
             "months_water": 2,
         },
         32: {
-            "water_type":   "pan",
-            "mechanism":    WaterMechanism.SEASONAL_SURFACE,
-            "permanence":   "seasonal",
-            "reliability":  0.5,
+            "water_type": "pan",
+            "mechanism": WaterMechanism.SEASONAL_SURFACE,
+            "permanence": "seasonal",
+            "reliability": 0.5,
             "months_water": 4,
         },
     }
@@ -461,18 +466,12 @@ class GLWDWetlands(WaterSource):
         super().__init__(filepath, bbox, region, month)
 
         if water_classes is not None and len(water_classes) == 0:
-            raise ValueError(
-                "water_classes must not be empty. "
-                "Pass None to use the defaults."
-            )
+            raise ValueError("water_classes must not be empty. Pass None to use the defaults.")
 
         self.water_classes = water_classes if water_classes is not None else self.DEFAULT_WATER_CLASSES
 
         if month is not None:
-            logger.debug(
-                "GLWDWetlands: month=%d provided but monthly filtering is not "
-                "yet implemented for GLWD. Returning static data.", month
-            )
+            logger.debug("GLWDWetlands: month=%d provided but monthly filtering is not yet implemented for GLWD. Returning static data.", month)
 
     def load(self) -> gpd.GeoDataFrame:
         """
@@ -486,46 +485,44 @@ class GLWDWetlands(WaterSource):
         all_features = []
 
         with rasterio.open(self.filepath) as src:
-
             if self.bbox is not None:
                 # Convert bbox to a pixel-coordinate window —
                 # only reads the rows/cols that intersect the bbox
-                window    = src.window(*self.bbox)
-                data      = src.read(1, window=window)
+                window = src.window(*self.bbox)
+                data = src.read(1, window=window)
                 transform = src.window_transform(window)
             else:
-                data      = src.read(1)
+                data = src.read(1)
                 transform = src.meta["transform"]
 
             crs = src.meta["crs"]
 
             for glwd_class in self.water_classes:
                 if glwd_class not in self.CLASS_MAP:
-                    logger.debug(
-                        "GLWDWetlands: class %d not in CLASS_MAP, skipping.", glwd_class
-                    )
+                    logger.debug("GLWDWetlands: class %d not in CLASS_MAP, skipping.", glwd_class)
                     continue
 
                 class_meta = self.CLASS_MAP[glwd_class]
-                mask       = (data == glwd_class).astype(np.uint8)
+                mask = (data == glwd_class).astype(np.uint8)
 
                 for geom_dict, value in rasterio.features.shapes(mask, transform=transform):
                     if value != 1:
                         continue
 
-                    all_features.append({
-                        "geometry":     shape(geom_dict),
-                        "water_type":   class_meta["water_type"],
-                        "mechanism":    class_meta["mechanism"],
-                        "permanence":   class_meta["permanence"],
-                        "reliability":  class_meta["reliability"],
-                        "months_water": class_meta["months_water"],
-                    })
+                    all_features.append(
+                        {
+                            "geometry": shape(geom_dict),
+                            "water_type": class_meta["water_type"],
+                            "mechanism": class_meta["mechanism"],
+                            "permanence": class_meta["permanence"],
+                            "reliability": class_meta["reliability"],
+                            "months_water": class_meta["months_water"],
+                        }
+                    )
 
         if not all_features:
             return gpd.GeoDataFrame(
-                columns=["geometry", "source_id", "water_type", "mechanism",
-                         "permanence", "reliability", "months_water", "region"],
+                columns=["geometry", "source_id", "water_type", "mechanism", "permanence", "reliability", "months_water", "region"],
                 crs="EPSG:4326",
             )
 
@@ -538,11 +535,10 @@ class GLWDWetlands(WaterSource):
 
         gdf = self._clip_to_bbox(gdf)
 
-        gdf["source_id"] = [f"{row['water_type']}_{i}" for i, row in enumerate(all_features[:len(gdf)])]
-        gdf["region"]    = self.region
+        gdf["source_id"] = [f"{row['water_type']}_{i}" for i, row in enumerate(all_features[: len(gdf)])]
+        gdf["region"] = self.region
 
-        return gdf[["geometry", "source_id", "water_type", "mechanism",
-                    "permanence", "reliability", "months_water", "region"]]
+        return gdf[["geometry", "source_id", "water_type", "mechanism", "permanence", "reliability", "months_water", "region"]]
 
 
 class JRCGlobalSurfaceWater(WaterSource):
@@ -594,10 +590,7 @@ class JRCGlobalSurfaceWater(WaterSource):
             # Monthly recurrence layer integration is planned for Phase 2.
             # When implemented, reliability will be derived from the monthly
             # layer rather than the static occurrence average.
-            logger.debug(
-                "JRCGlobalSurfaceWater: month=%d provided but monthly filtering "
-                "is not yet implemented. Returning static occurrence data.", month
-            )
+            logger.debug("JRCGlobalSurfaceWater: month=%d provided but monthly filtering is not yet implemented. Returning static occurrence data.", month)
 
     def load(self) -> gpd.GeoDataFrame:
         """
@@ -612,9 +605,9 @@ class JRCGlobalSurfaceWater(WaterSource):
         all_features = []
 
         with rasterio.open(self.filepath) as src:
-            data      = src.read(1)        # band 1 — occurrence values 0–100
+            data = src.read(1)  # band 1 — occurrence values 0–100
             transform = src.meta["transform"]
-            crs       = src.meta["crs"]
+            crs = src.meta["crs"]
 
             # Create a boolean mask of pixels at or above the threshold
             mask = (data >= self.min_occurrence).astype(np.uint8)
@@ -623,7 +616,7 @@ class JRCGlobalSurfaceWater(WaterSource):
             # one polygon. We also need the original occurrence values to set
             # reliability per feature, so we pass data as the source array.
             for geom_dict, value in rasterio.features.shapes(data, mask=mask, transform=transform):
-                occurrence  = float(value)
+                occurrence = float(value)
                 reliability = occurrence / 100.0
 
                 # Proxy for months_water until seasonality layer is available:
@@ -631,19 +624,20 @@ class JRCGlobalSurfaceWater(WaterSource):
                 # Clamp between 1 and 12
                 months_water = max(1, min(12, round(reliability * 12)))
 
-                all_features.append({
-                    "geometry":    shape(geom_dict),
-                    "water_type":  "surface_water",
-                    "mechanism":   WaterMechanism.SEASONAL_SURFACE,
-                    "permanence":  "seasonal",
-                    "reliability": reliability,
-                    "months_water": months_water,
-                })
+                all_features.append(
+                    {
+                        "geometry": shape(geom_dict),
+                        "water_type": "surface_water",
+                        "mechanism": WaterMechanism.SEASONAL_SURFACE,
+                        "permanence": "seasonal",
+                        "reliability": reliability,
+                        "months_water": months_water,
+                    }
+                )
 
         if not all_features:
             return gpd.GeoDataFrame(
-                columns=["geometry", "source_id", "water_type", "mechanism",
-                         "permanence", "reliability", "months_water", "region"],
+                columns=["geometry", "source_id", "water_type", "mechanism", "permanence", "reliability", "months_water", "region"],
                 crs="EPSG:4326",
             )
 
@@ -657,10 +651,9 @@ class JRCGlobalSurfaceWater(WaterSource):
         gdf = self._clip_to_bbox(gdf)
 
         gdf["source_id"] = [f"surface_water_{i}" for i in range(len(gdf))]
-        gdf["region"]    = self.region
+        gdf["region"] = self.region
 
-        return gdf[["geometry", "source_id", "water_type", "mechanism",
-                    "permanence", "reliability", "months_water", "region"]]
+        return gdf[["geometry", "source_id", "water_type", "mechanism", "permanence", "reliability", "months_water", "region"]]
 
 
 # ---------------------------------------------------------------------------
@@ -670,9 +663,9 @@ class JRCGlobalSurfaceWater(WaterSource):
 # Maps config dict keys to the concrete source class that handles them.
 # Add new source classes here when they're implemented.
 SOURCE_REGISTRY: dict[str, type[WaterSource]] = {
-    "rivers":  ShapefileRivers,
-    "lakes":   ShapefileLakes,
-    "glwd":    GLWDWetlands,
+    "rivers": ShapefileRivers,
+    "lakes": ShapefileLakes,
+    "glwd": GLWDWetlands,
     "jrc_gsw": JRCGlobalSurfaceWater,
 }
 
@@ -680,6 +673,7 @@ SOURCE_REGISTRY: dict[str, type[WaterSource]] = {
 # ---------------------------------------------------------------------------
 # load_all_water — Registry Function
 # ---------------------------------------------------------------------------
+
 
 def load_all_water(
     config: dict,
@@ -726,9 +720,7 @@ def load_all_water(
     """
     if bbox is None:
         warnings.warn(
-            "load_all_water() called without a bbox. This will load the entire "
-            "dataset into memory. Provide a bbox=(min_lon, min_lat, max_lon, max_lat) "
-            "to limit the spatial extent.",
+            "load_all_water() called without a bbox. This will load the entire dataset into memory. Provide a bbox=(min_lon, min_lat, max_lon, max_lat) to limit the spatial extent.",
             UserWarning,
             stacklevel=2,
         )
@@ -737,19 +729,16 @@ def load_all_water(
 
     for source_name, source_config in config["sources"].items():
         if source_name not in SOURCE_REGISTRY:
-            raise KeyError(
-                f"Unknown source type '{source_name}'. "
-                f"Available types: {list(SOURCE_REGISTRY.keys())}"
-            )
+            raise KeyError(f"Unknown source type '{source_name}'. Available types: {list(SOURCE_REGISTRY.keys())}")
 
         source_class = SOURCE_REGISTRY[source_name]
 
         # Build kwargs — start with the common parameters every source accepts
         kwargs = {
             "filepath": source_config["path"],
-            "bbox":     bbox,
-            "region":   source_config.get("region", "unknown"),
-            "month":    month,
+            "bbox": bbox,
+            "region": source_config.get("region", "unknown"),
+            "month": month,
         }
 
         # Pass through source-specific parameters if provided in config.
@@ -773,6 +762,7 @@ def load_all_water(
 # ---------------------------------------------------------------------------
 # For loading a single source type directly without the registry machinery.
 # For pipelines that need multiple source types combined, use load_all_water().
+
 
 def load_rivers(filepath: str) -> gpd.GeoDataFrame:
     """

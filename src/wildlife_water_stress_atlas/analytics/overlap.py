@@ -33,8 +33,6 @@ def add_distance_to_water(
     water_projected = water.to_crs(epsg=3857)
 
     result = occurrences_projected.copy()
-    result["distance_to_water"] = result.geometry.apply(
-        lambda point: water_projected.distance(point).min()
-    )
+    result["distance_to_water"] = result.geometry.apply(lambda point: water_projected.distance(point).min())
 
     return result.to_crs(epsg=4326)

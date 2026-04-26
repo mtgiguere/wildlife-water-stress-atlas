@@ -22,6 +22,7 @@ from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 # SCORING FUNCTIONS
 # -----------------------------------------------------------------------------
 
+
 def water_stress_score(distance_meters: float, species: str) -> float:
     """
     Convert distance to nearest water source into a normalized stress score.
