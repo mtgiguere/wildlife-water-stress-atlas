@@ -1,262 +1,142 @@
+# Wildlife Water Stress Atlas
 
-# Wildlife Water Stress Atlas 🐘🌍
-
-A geospatial decision-support platform for identifying animal populations at risk from freshwater loss, habitat degradation, and human-driven environmental pressures.
-
-This project aims to move beyond static biodiversity maps and instead provide **actionable intelligence** for conservation:
-
-* Where species are at risk
-* Why those risks are emerging
-* Where intervention is still possible
-* Where relocation or refuge planning may be required
+A geospatial decision-support platform that models wildlife survival risk
+as a function of freshwater access and environmental pressure.
 
 ---
 
-## 🌍 Problem Statement
+## What It Does
 
-All terrestrial animals depend on freshwater.
-Climate change, habitat loss, and human expansion are disrupting access to water at increasing rates.
+Maps water stress for wildlife populations by computing the distance from
+species occurrence records to the nearest accessible water source, scoring
+that distance against species-specific thresholds, and visualizing the
+results on a grid map.
 
-Current tools primarily describe:
+The current focus is African elephants (*Loxodonta africana*) across the
+African continent, using a multi-source water layer that includes rivers,
+wetlands, pans, floodplains, saline lakes, and seasonal surface water.
 
-> “Where animals are”
-
-This project aims to answer:
-
-* Where will animals **lose access to water**?
-* Which populations are **most at risk**?
-* Where can we still **intervene effectively**?
-* Where must we begin planning for **relocation or refuge**?
+This is Phase 1 of a three-phase system:
+1. **Describe** — current water stress (working)
+2. **Predict** — how water availability changes with climate (planned)
+3. **Prescribe** — conservation intervention zones and refuge viability (planned)
 
 ---
 
-## 🧠 Core Concept
+## The Map
 
-The system models **wildlife survival risk as a function of multiple geospatial layers**:
+The pipeline produces a 50km grid map of Africa showing relative water
+stress for elephant occurrence records. Blue features are water sources.
+Grid cells are colored by stress score where data exists.
 
-```text
-Risk = f(
-    freshwater availability,
-    habitat loss,
-    fragmentation,
-    climate stress,
-    human pressure,
-    (future) poaching risk
-)
+Current score range: 0.000 – 0.195 — no elephant in the current GBIF
+sample is more than ~58km from a mapped water source. This is a significant
+improvement over the previous pipeline which falsely showed elephants near
+Etosha Pan and the Botswana pans as highly stressed — those water sources
+are now correctly captured in the data layer.
+
+---
+
+## Water Data Sources
+
+| Source | Type | What It Adds |
+|---|---|---|
+| Natural Earth rivers | Shapefile (lines) | River network — kept as lines for distance calc accuracy |
+| GLWD v2 | GeoTIFF (raster) | Wetlands, pans, floodplains, saline lakes, ephemeral water |
+| JRC Global Surface Water | GeoTIFF tiles | Seasonal and ephemeral surface water by occurrence frequency |
+| GBIF API | REST API | Species occurrence records (live fetch) |
+
+GLWD v2 is the Global Lakes and Wetlands Database version 2 (Lehner et al.,
+2025), distributed under Creative Commons Attribution 4.0. It classifies
+inland water into 33 types at 500m resolution. Key classes used here include
+saline lakes (Etosha), salt pans (Makgadikgadi, Sua), floodplains, and
+seasonal wetlands.
+
+---
+
+## Architecture
+
+The pipeline is built around three core principles:
+
+**Species config is a single source of truth.**
+`config/species.py` holds all species-specific parameters — water distance
+thresholds, accessible water types, reliability weights, daily range. Adding
+a new species means adding one dict entry. No other code changes.
+
+**Water sources share a normalized schema.**
+Every source class produces the same columns: `geometry`, `source_id`,
+`water_type`, `mechanism`, `permanence`, `reliability`, `months_water`,
+`region`. Rivers, lakes, raster wetlands, and future groundwater sources
+are all interchangeable downstream.
+
+**Data gaps are insights, not failures.**
+GBIF records include imprecise coordinates, historical specimens, and
+potentially captive animals. These are intentionally preserved — they
+surface funding needs, highlight understudied populations (the Mali desert
+elephants are real and remarkable), and demonstrate the need for better
+field data collection. The Prescribe phase will expose data confidence
+scores per grid cell explicitly.
+
+---
+
+## Running the Pipeline
+
+```bash
+# Install dependencies
+pip install -e .
+
+# Run the visualization script
+python scripts/plot_elephants.py
 ```
 
----
-
-## 🎯 Project Goals
-
-### Describe
-
-* Map animal populations and movement
-* Map freshwater availability
-* Identify current overlap and dependencies
-
-### Predict
-
-* Forecast freshwater loss using climate data
-* Identify emerging habitat-water mismatches
-* Detect populations at increasing risk
-
-### Prescribe
-
-* Identify high-impact intervention zones
-* Recommend habitat protection priorities
-* Highlight viable refuge areas
-* Support relocation planning where necessary
+Data files are not committed to git (too large). Required files:
+- `data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp` — Natural Earth
+- `data/raw/water/glwd/GLWD_v2_0_main_class.tif` — HydroSHEDS GLWD v2
+- `data/raw/water/jrc_gsw/` — JRC Global Surface Water tiles (Africa)
 
 ---
 
-## 🧭 Conservation Decision Framework
+## Development
 
-The platform categorizes regions into actionable states:
+Strict TDD — tests written before implementation, always.
 
-* **Stable** → Low risk
-* **Watch** → Early warning signals
-* **Act Now** → High risk but recoverable
-* **Transition** → Likely requires managed movement
-* **Critical Loss Zone** → Collapse likely, worst-case planning
+```bash
+# Run tests
+pytest
 
----
-
-## 🧱 Architecture Overview
-
-```text
-Data Ingestion → Processing → Risk Modeling → Visualization
+# Lint
+ruff check . --fix
+ruff format .
 ```
 
-### Layers
-
-1. **Animal Data**
-
-   * Species occurrence (GBIF)
-   * Movement tracking (Movebank)
-
-2. **Freshwater Data**
-
-   * Rivers, lakes, wetlands
-   * Surface water availability
-
-3. **Environmental Data (future)**
-
-   * Vegetation (NDVI)
-   * Temperature / drought indices
-
-4. **Human Pressure (future)**
-
-   * Population density
-   * Roads, agriculture, land use
-
-5. **Risk Engine**
-
-   * Water dependency scoring
-   * Habitat suitability
-   * Multi-layer risk aggregation
+Current test coverage: **166 tests, 100% coverage**.
 
 ---
 
-## 🗂️ Project Structure
+## Project Status
 
-```text
-wildlife-water-stress-atlas/
-├── src/
-│   └── wildlife_water_stress_atlas/
-│       ├── ingest/
-│       │   ├── gbif.py
-│       │   └── water.py
-│       ├── processing/
-│       │   └── spatial.py
-│       ├── analytics/
-│       │   └── overlap.py
-│       └── visualization/
-│           └── maps.py
-├── tests/
-├── data/
-│   ├── raw/
-│   ├── interim/
-│   └── processed/
-```
+| Component | Status |
+|---|---|
+| Species config registry | ✅ Done |
+| Water source class architecture | ✅ Done |
+| GLWD v2 integration (wetlands, pans, floodplains) | ✅ Done |
+| JRC Global Surface Water (single tile) | ✅ Done |
+| Phantom thirst bug (Etosha, Botswana pans) | ✅ Fixed |
+| JRC multi-tile loading | 🔧 In progress |
+| GBIF pagination | 📋 Planned |
+| Streamlit web app | 📋 Planned |
+| CI/CD pipeline (GitHub Actions) | 📋 Planned |
+| Data confidence layer | 📋 Planned |
+| Human pressure layer (roads, fences) | 📋 Planned |
+| Phase 2 — Predict (climate modeling) | 📋 Future |
+| Phase 3 — Prescribe (intervention zones) | 📋 Future |
 
 ---
 
-## 🚀 MVP (Phase 1)
+## Citation
 
-Initial implementation focuses on:
+If using GLWD v2 data, please cite:
 
-* Species: **African elephants**
-* Region: (to be defined)
-* Data sources:
-
-  * GBIF (species occurrence)
-  * Freshwater datasets (rivers/lakes)
-
-### Output:
-
-* Map of elephant occurrences
-* Map of freshwater sources
-* Spatial overlap visualization
-
----
-
-## 📈 Roadmap
-
-### Phase 1 — Foundation
-
-* Ingest animal + water data
-* Build spatial joins
-* Basic visualization
-
-### Phase 2 — Water Stress
-
-* Add drought / water variability layers
-* Compute water dependency metrics
-
-### Phase 3 — Habitat Loss
-
-* Integrate land cover change
-* Identify habitat degradation zones
-
-### Phase 4 — Fragmentation & Human Pressure
-
-* Roads, settlements, agriculture
-* Corridor disruption analysis
-
-### Phase 5 — Climate Forecasting
-
-* Predict future freshwater availability
-* Model habitat viability shifts
-
-### Phase 6 — Poaching Risk (Advanced)
-
-* Risk modeling based on accessibility and past incidents
-* Integration with ecological stress layers
-
----
-
-## 🧪 Development Approach
-
-* Test-driven development (TDD)
-* Modular architecture (ingest → process → analyze → visualize)
-* Reproducible data pipelines
-* Scalable design for multi-species support
-
----
-
-## 🐘 Initial Focus Species
-
-The project begins with **elephants** due to:
-
-* Strong dependence on freshwater
-* Large spatial ranges
-* High conservation relevance
-* Availability of geospatial data
-
-Future expansions include:
-
-* Large herbivores (zebra, buffalo)
-* Predators (lion, wild dog)
-* Wetland-dependent birds
-* Amphibians (high sensitivity indicators)
-
----
-
-## 🌱 Long-Term Vision
-
-A global system that enables:
-
-* Real-time wildlife risk monitoring
-* Climate-driven habitat forecasting
-* Conservation prioritization
-* Data-driven intervention planning
-
----
-
-## 🤝 Why This Matters
-
-In a rapidly changing world, conservation decisions must move from:
-
-> reactive → predictive
-> descriptive → actionable
-
-This project aims to provide the tools to make those decisions with clarity and data.
-
----
-
-## 📌 Status
-
-🚧 Early development — MVP in progress
-
----
-
-## 📜 License
-
-(To be defined)
-
----
-
-## 🙌 Contributions
-
-Future contributions welcome as the project matures.
+Lehner, B., et al. (2025). Mapping the world's inland surface waters: an
+upgrade to the Global Lakes and Wetlands Database (GLWD v2). Earth System
+Science Data. https://doi.org/10.6084/m9.figshare.28519994
