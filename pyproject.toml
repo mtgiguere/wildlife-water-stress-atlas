@@ -22,8 +22,11 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=wildlife_water_stress_atlas --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=wildlife_water_stress_atlas --cov-report=term-missing --cov-fail-under=80 -m 'not integration'"
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require real data files on disk (skipped in CI)",
+]
 
 [tool.ruff]
 line-length = 200

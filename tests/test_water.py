@@ -1,4 +1,5 @@
 import geopandas as gpd
+import pytest
 from shapely.geometry import LineString, Polygon
 
 from wildlife_water_stress_atlas.ingest.water import combine_water_layers, load_lakes, load_rivers
@@ -26,7 +27,7 @@ def test_load_lakes_sets_crs_when_missing(monkeypatch):
     assert result.crs is not None
     assert result.crs.to_string() == "EPSG:4326"
 
-
+@pytest.mark.integration
 def test_load_rivers_returns_gdf():
     gdf = load_rivers("data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp")
 
