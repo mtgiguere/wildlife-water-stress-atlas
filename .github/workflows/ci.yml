@@ -37,4 +37,8 @@ jobs:
 
       - name: Vulnerability audit
         run: |
-          pip-audit
+          # CVE-2026-3219 is a vulnerability in pip itself, not in our dependencies.
+          # pip-audit flags the pip version used to run the audit — a known bootstrapping
+          # problem with no clean fix. We ignore it explicitly here rather than suppress
+          # all audit output. Re-evaluate when a patched pip version is available.
+          pip-audit --ignore-vuln CVE-2026-3219
