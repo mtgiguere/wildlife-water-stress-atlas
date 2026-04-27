@@ -13,16 +13,19 @@ dependencies = [
     "pytest",
     "geopandas",
     "rasterio",
+    "streamlit",
+    "pydeck",
 ]
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = {"" = "src", "apps" = "apps"}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "."]
+include = ["wildlife_water_stress_atlas*", "apps*"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=wildlife_water_stress_atlas --cov-report=term-missing --cov-fail-under=80 -m 'not integration'"
+addopts = "--cov=wildlife_water_stress_atlas --cov=apps --cov-report=term-missing --cov-fail-under=80 -m 'not integration'"
 testpaths = ["tests"]
 markers = [
     "integration: marks tests that require real data files on disk (skipped in CI)",

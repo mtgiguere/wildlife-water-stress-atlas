@@ -1,6 +1,6 @@
 import pytest
 
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG, _validate_species_config
 
 # ---------------------------------------------------------------------------
 # Registry structure
@@ -106,7 +106,6 @@ def test_unknown_species_raises_key_error():
 
 
 def test_missing_required_key_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -115,6 +114,7 @@ def test_missing_required_key_raises_value_error():
             "water_type_weights": {"river": 1.0},
             "daily_range_m": 50_000,
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="missing required keys"):
@@ -122,7 +122,6 @@ def test_missing_required_key_raises_value_error():
 
 
 def test_invalid_water_threshold_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -131,6 +130,7 @@ def test_invalid_water_threshold_raises_value_error():
             "water_type_weights": {"river": 1.0},
             "daily_range_m": 50_000,
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="water_threshold_m"):
@@ -138,7 +138,6 @@ def test_invalid_water_threshold_raises_value_error():
 
 
 def test_empty_accessible_water_types_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -147,6 +146,7 @@ def test_empty_accessible_water_types_raises_value_error():
             "water_type_weights": {},
             "daily_range_m": 50_000,
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="accessible_water_types"):
@@ -154,7 +154,6 @@ def test_empty_accessible_water_types_raises_value_error():
 
 
 def test_mismatched_weight_keys_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -163,6 +162,7 @@ def test_mismatched_weight_keys_raises_value_error():
             "water_type_weights": {"river": 1.0},  # missing "lake" — invalid
             "daily_range_m": 50_000,
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="water_type_weights keys"):
@@ -170,7 +170,6 @@ def test_mismatched_weight_keys_raises_value_error():
 
 
 def test_invalid_weight_value_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -179,6 +178,7 @@ def test_invalid_weight_value_raises_value_error():
             "water_type_weights": {"river": 1.5},  # > 1.0 — invalid
             "daily_range_m": 50_000,
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="weight must be a float"):
@@ -186,7 +186,6 @@ def test_invalid_weight_value_raises_value_error():
 
 
 def test_invalid_daily_range_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -195,6 +194,7 @@ def test_invalid_daily_range_raises_value_error():
             "water_type_weights": {"river": 1.0},
             "daily_range_m": 0,  # zero — invalid
             "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="daily_range_m"):
@@ -202,7 +202,6 @@ def test_invalid_daily_range_raises_value_error():
 
 
 def test_invalid_water_dependency_raises_value_error():
-    from wildlife_water_stress_atlas.config.species import _validate_species_config
 
     bad_config = {
         "Fake species": {
@@ -211,7 +210,35 @@ def test_invalid_water_dependency_raises_value_error():
             "water_type_weights": {"river": 1.0},
             "daily_range_m": 50_000,
             "water_dependency": "extreme",  # not in {"low", "moderate", "high"}
+            "icon_url": "https://example.com/icon.png",
         }
     }
     with pytest.raises(ValueError, match="water_dependency"):
+        _validate_species_config(bad_config)
+
+
+def test_all_species_have_icon_url():
+    for species, config in SPECIES_CONFIG.items():
+        assert "icon_url" in config, f"{species} is missing icon_url"
+        assert isinstance(config["icon_url"], str), f"{species}: icon_url must be a string"
+        assert config["icon_url"].startswith("https://"), f"{species}: icon_url must be a valid URL"
+
+
+def test_elephant_icon_url_is_twemoji_elephant():
+    assert SPECIES_CONFIG["Loxodonta africana"]["icon_url"] == "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png"
+
+
+def test_invalid_icon_url_raises_value_error():
+
+    bad_config = {
+        "Fake species": {
+            "water_threshold_m": 100_000,
+            "accessible_water_types": {"river"},
+            "water_type_weights": {"river": 1.0},
+            "daily_range_m": 50_000,
+            "water_dependency": "high",
+            "icon_url": "not-a-valid-url",  # missing https:// — invalid
+        }
+    }
+    with pytest.raises(ValueError, match="icon_url"):
         _validate_species_config(bad_config)

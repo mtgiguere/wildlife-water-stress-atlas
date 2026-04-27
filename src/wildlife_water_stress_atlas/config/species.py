@@ -54,6 +54,7 @@ water_dependency        : str — one of "low", "moderate", "high"
 
 SPECIES_CONFIG: dict[str, dict] = {
     "Loxodonta africana": {
+        "common_name": "African Elephant",
         # ---------------------------------------------------------------
         # African Elephant
         # ---------------------------------------------------------------
@@ -93,6 +94,7 @@ SPECIES_CONFIG: dict[str, dict] = {
         # Elephants are highly water-dependent — drinking daily is
         # non-negotiable for adults.
         "water_dependency": "high",
+        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png",
     },
 }
 
@@ -118,6 +120,7 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         "water_type_weights",
         "daily_range_m",
         "water_dependency",
+        "icon_url",
     }
     valid_dependency_values = {"low", "moderate", "high"}
 
@@ -151,6 +154,10 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         # water_dependency must be one of the allowed values
         if cfg["water_dependency"] not in valid_dependency_values:
             raise ValueError(f"{species}: water_dependency must be one of {valid_dependency_values}, got '{cfg['water_dependency']}'")
+
+        # icon_url must be a non-empty string starting with https://
+        if not isinstance(cfg["icon_url"], str) or not cfg["icon_url"].startswith("https://"):
+            raise ValueError(f"{species}: icon_url must be a valid https:// URL")
 
 
 # Run validation immediately when this module is imported.

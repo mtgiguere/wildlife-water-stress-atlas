@@ -65,3 +65,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+
+# Node / Playwright
+node_modules/
+playwright-report/
+test-results/
+.playwright/
