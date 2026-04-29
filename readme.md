@@ -26,7 +26,7 @@ This is Phase 1 of a three-phase system:
 ## The Streamlit App
 
 An interactive web app built with Streamlit and PyDeck allows users to:
-- Watch **21,900 elephant occurrence records** animate across Africa using a year slider (2005–2026)
+- Watch **21,900 elephant occurrence records** across Africa using a year slider (2005–2026)
 - See the **COVID-19 dip in 2020** — field researchers couldn't access sites, reflected in the data
 - Explore water sources including rivers, wetlands, pans, and floodplains
 - View per-year record counts and total dataset stats
@@ -123,7 +123,7 @@ Data files are not committed to git (too large). Required files:
 Strict TDD — tests written before implementation, always.
 
 ```bash
-# Run tests
+# Run unit tests
 pytest
 
 # Run integration tests (requires real data files)
@@ -133,12 +133,12 @@ pytest -m integration
 ruff check . --fix
 ruff format .
 
-# E2E tests (requires running Streamlit app)
+# E2E tests (requires Streamlit app running on localhost:8501)
+# Run in standalone PowerShell with Node.js v22
 npx playwright test
 ```
 
-Current test coverage: **230 tests, 90% coverage**
-(remaining 10% is Streamlit rendering code covered by Playwright E2E)
+**Test coverage: 230 unit tests + 14 Playwright E2E tests, 100% unit coverage**
 
 ---
 
@@ -156,10 +156,13 @@ Current test coverage: **230 tests, 90% coverage**
 | Streamlit web app with year slider | ✅ Done |
 | PyDeck interactive map (Voyager basemap) | ✅ Done |
 | CI/CD pipeline (GitHub Actions) | ✅ Done |
-| Playwright E2E testing setup | ✅ Done |
-| Playwright E2E tests | 🔧 In progress |
+| Playwright E2E tests (14 tests) | ✅ Done |
+| 100% unit test coverage | ✅ Done |
 | Species animal icons on map | 🔧 In progress |
 | Deploy to Streamlit Community Cloud | 📋 Next |
+| Year distribution chart (COVID story) | 📋 Next |
+| Auto-play animation | 📋 Next |
+| Species selector dropdown | 📋 Next |
 | Data confidence layer | 📋 Planned |
 | QGIS plugin | 📋 Planned |
 | Human pressure layer (roads, fences) | 📋 Planned |
