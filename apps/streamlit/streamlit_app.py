@@ -30,6 +30,13 @@ coordinates, and potentially captive animals alongside wild GPS-tracked
 individuals. These are intentionally preserved — data gaps and anomalies
 are insights, not errors. See project bible Section 4 for full details.
 """
+import sys
+from pathlib import Path
+
+# Add repo root to path so 'apps' and 'src' packages are importable
+# Required for Streamlit Cloud deployment where pip install -e . isn't run
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import streamlit as st
 
