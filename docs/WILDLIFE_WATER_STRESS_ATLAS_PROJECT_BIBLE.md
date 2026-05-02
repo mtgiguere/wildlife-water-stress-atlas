@@ -37,6 +37,17 @@ Aggregates point-level stress scores into a grid.
 **`scripts/plot_elephants.py`**  
 Main pipeline entry point. Uses `load_all_water()` with `WATER_CONFIG` dict. Species name in single `SPECIES` constant at top of file. Africa bbox `(-20, -40, 55, 40)` passed to all water sources.
 
+**`apps/streamlit/streamlit_app.py`**
+Main Streamlit app. Intentionally thin — orchestrates components only.
+Now includes:
+- `load_water_layer_simplified()` — loads browser-optimized water layer
+- `load_gbif_data()` — loads full GBIF cache
+- `render_sidebar()` — year slider + stats
+- `build_water_layer()` / `build_occurrences_layer()` / `build_deck()` — PyDeck map
+- `st.bar_chart(get_year_counts(all_occurrences))` — year distribution chart
+- Stats row: Elephant Records, Total Records, Water Sources Mapped
+- Data quality note + citations
+
 ### Current Data Sources
 | Layer | File | Source | Format | Notes |
 |---|---|---|---|---|
@@ -73,7 +84,9 @@ Default water classes for elephants: `{2, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 1
 Classes 1 and 4 excluded from defaults — covered by Natural Earth with better geometry types.
 
 ### Current Test Coverage
-166 tests, 100% coverage across all modules. TDD strictly enforced — tests written before implementation on every change.
+**230 unit tests, 100% coverage**
+**16 Playwright E2E tests — 14 passing, 2 pending (chart tests — correct red)
+** TDD strictly enforced — tests written before implementation on every change.
 
 Test files:
 - `test_species_config.py` — registry structure, field constraints, validation error branches
@@ -143,6 +156,11 @@ Fences, roads, settlements, and farmland block animal movement to water.
 ### Gap: Water Quality Not Modeled
 Toxic algae, high salinity, bacterial contamination make water physically present but functionally inaccessible. Salinity is partially addressed via `water_type_weights` (saline_lake weight = 0.4 for elephants) but not modeled explicitly.
 
+### Gap: Year Distribution Chart Playwright Tests
+Chart renders correctly in browser. Two Playwright E2E tests written but 
+timing out — chart loads after slow water layer. Fix: increase timeout 
+on those two specific tests to 300000ms.
+
 ---
 
 ## 5. Planned Refactoring / Next Steps
@@ -152,27 +170,27 @@ Toxic algae, high salinity, bacterial contamination make water physically presen
 - **CI/CD pipeline**: unit tests + linting + vulnerability scans minimum on every push
 - **Never hardcode species names** anywhere in library code
 
-### Priority 1: JRC GSW Multi-Tile Support ← NEXT
-Add `JRCTileDirectory` source class or GDAL pre-merge workflow so Africa JRC tiles can be loaded. This completes the core water layer.
+1. **Fix chart Playwright tests** — increase timeout to 300000ms on:
+   - `year distribution chart is visible`
+   - `year distribution chart shows COVID dip label`
+   Also fix `elephant records metric` strict mode violation — change 
+   `getByText('Elephant Records')` to `getByText('Elephant Records —')`
 
-### Priority 2: Streamlit App Scaffold
-Thin wrapper over existing pipeline. ~10 lines to wire up. Deploy to Streamlit Community Cloud (free, GitHub-connected, auto-deploy). Use `@st.cache_data` to cache GLWD and JRC vectorization — fixes the performance gap at the same time.
+2. **Auto-play animation** — year slider advances automatically
+   - `▶ Auto-play` button in sidebar
+   - `st.session_state` + `st.empty()` + `time.sleep()`
+   - Speed options: slow/medium/fast
+   - Loop back to start when reaching 2026
 
-### Priority 3: GBIF Pagination
-Add offset-based loop to `fetch_occurrences`. Currently capped at 300 records per request.
+3. **Species selector dropdown** — `st.selectbox` from `SPECIES_CONFIG.keys()`
+   - Dynamic title, icon, cache path
+   - Unlocks second species
 
-### Priority 4: Additional Water Sources
-Springs, aquifer zones, reservoirs, boreholes. See gap table above.
+4. **Add zebras** — first test of dynamic species system
 
-### Priority 5: CI/CD Pipeline
-GitHub Actions: unit tests + linting (ruff) + vulnerability scan on every push. Separate fast unit tests from integration tests (`test_water_real_data.py`).
+5. **Species animal icons** — finish IconLayer, CORS issue pending
 
-### Priority 6: Human Pressure Layer
-Fences, roads, settlements. Second pressure type after freshwater access.
-
-### Priority 7: Data Confidence Layer
-Per grid cell: `record_count`, `mean_coordinate_precision`, `confidence_tier`. Exposes data quality as insight rather than hiding it. See Section 4 Gap: Data Quality as a Story.
-
+6. **Deploy update to Streamlit Cloud** — push chart + fixes
 ---
 
 ## 6. Data Sources — Full Inventory
@@ -377,3 +395,24 @@ data gaps)
 - The developer wants to eventually reach out to **conservation organizations** (Save the Elephants, IUCN African Elephant Specialist Group) for ecological validation of stress model parameters. Future step.
 - **All reliability and threshold values are heuristic placeholders** — honest about being estimates. Ecological validation is a future step.
 - The **Mali desert elephants** (northernmost elephant population, ~17°N in Niger/Mali) appear in GBIF data. They are real and remarkable — genuinely the world's northernmost elephant population making long seasonal migrations. Not a data error.
+- **Year distribution chart** — `st.bar_chart(get_year_counts(all_occurrences))` 
+  in `streamlit_app.py`. COVID dip 2020 clearly visible. Working locally and 
+  on Streamlit Cloud.
+- **Playwright chart tests** — written but timing out. Need `timeout: 300000` 
+  on chart visibility assertions. Fix is first priority next session.
+- **`getByText('Elephant Records —')`** — use the dash to avoid strict mode 
+  violation with chart subheader.
+- **Deployed URL** — `https://wildlife-water-stress-atlas-ngvdrwg2yhzekplfeq6nvd.streamlit.app`
+- **Git LFS** — tracking `data/processed/*.gpkg`. Three files committed:
+  `gbif_loxodonta_africana.gpkg` (150MB), `water_africa.gpkg` (337MB), 
+  `water_africa_simplified.gpkg` (20MB). Long-term: migrate to AWS S3.
+- **`requirements.txt`** — minimal runtime deps only, no pinned versions 
+  for rasterio. No `packages.txt` needed — rasterio wheels bundle GDAL.
+- **`sys.path` insert** in `streamlit_app.py` — required for Streamlit Cloud, 
+  must be first code in file before any imports.
+- **`runtime.txt`** — contains `3.12`, no `python-` prefix.
+- **Standalone PowerShell** for Playwright (Node v22), VS Code terminal for 
+  everything else. nvm auto-runs via PowerShell profile.
+- **Global Nature Watch (DevSeed/WRI)** — comparable platform but focuses on 
+  land cover change not wildlife water stress. Our niche is species-first 
+  water stress modeling — they don't do this.

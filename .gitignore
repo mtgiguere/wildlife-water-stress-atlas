@@ -59,6 +59,8 @@ Thumbs.db
 data/raw/*
 data/interim/*
 data/processed/*
+!data/processed/*.gpkg
+!data/processed/.gitkeep
 
 # Keep folder structure
 

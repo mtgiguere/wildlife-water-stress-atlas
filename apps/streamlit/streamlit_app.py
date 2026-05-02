@@ -30,6 +30,7 @@ coordinates, and potentially captive animals alongside wild GPS-tracked
 individuals. These are intentionally preserved — data gaps and anomalies
 are insights, not errors. See project bible Section 4 for full details.
 """
+
 import sys
 from pathlib import Path
 
@@ -42,7 +43,7 @@ import streamlit as st
 
 from apps.streamlit.components.cache import load_gbif_data, load_water_layer_simplified
 from apps.streamlit.components.map import build_deck, build_occurrences_layer, build_water_layer
-from apps.streamlit.components.sidebar import render_sidebar
+from apps.streamlit.components.sidebar import get_year_counts, render_sidebar
 
 # ---------------------------------------------------------------------------
 # Page config — must be first Streamlit call
@@ -125,6 +126,10 @@ with col3:
 # ---------------------------------------------------------------------------
 # Data quality note
 # ---------------------------------------------------------------------------
+# Year distribution chart
+st.subheader("Elephant Records by Year")
+year_counts = get_year_counts(all_occurrences)
+st.bar_chart(year_counts)
 
 st.markdown("---")
 st.caption(

@@ -93,7 +93,7 @@ def get_year_counts(gdf: gpd.GeoDataFrame) -> dict[int, int]:
 # ---------------------------------------------------------------------------
 
 
-def render_sidebar(gdf: gpd.GeoDataFrame) -> int: # pragma: no cover
+def render_sidebar(gdf: gpd.GeoDataFrame) -> int:  # pragma: no cover
     """
     Render the sidebar year slider and stats panel.
 
