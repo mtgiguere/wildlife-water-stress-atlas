@@ -56,18 +56,120 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Main area header
+# Global styles + hero banner
 # ---------------------------------------------------------------------------
 
-st.title("🐘 Wildlife Water Stress Atlas")
-st.markdown("Tracking African elephant (*Loxodonta africana*) occurrence records against freshwater availability across Africa. Use the year slider to watch population distribution shift over time.")
-st.markdown("---")
+st.markdown(
+    """
+    <style>
+        /* --- Dark theme for whole app --- */
+        .stApp {
+            background-color: #0E1117;
+        }
+
+        /* Sidebar dark background */
+        [data-testid="stSidebar"] {
+            background-color: #161B22;
+        }
+
+        /* Sidebar text light */
+        [data-testid="stSidebar"] * {
+            color: #E0E0E0 !important;
+        }
+
+        /* Main text light */
+        .stMarkdown, .stText, p, li {
+            color: #E0E0E0;
+        }
+
+        /* Metric labels and values */
+        [data-testid="stMetricLabel"] {
+            color: #A0A0A0 !important;
+        }
+        [data-testid="stMetricValue"] {
+            color: #FFFFFF !important;
+        }
+
+        /* Subheader */
+        h2, h3 {
+            color: #FFFFFF !important;
+        }
+
+        /* Caption text */
+        .stCaption {
+            color: #888888 !important;
+        }
+
+        /* Remove default Streamlit top padding so banner sits flush */
+        .block-container {
+            padding-top: 0rem !important;
+        }
+
+        /* --- Hero banner --- */
+        .hero-banner {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background-image: url('app/static/elephants_waterhole.jpeg');
+            background-size: cover;
+            background-position: center 60%;
+            border-radius: 0 0 8px 8px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        /* Dark gradient overlay so text is always readable */
+        .hero-banner::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(0,0,0,0.15) 0%,
+                rgba(0,0,0,0.65) 100%
+            );
+        }
+
+        .hero-text {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            z-index: 10;
+            color: white;
+        }
+
+        .hero-text h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            margin: 0 0 0.3rem 0;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            color: white !important;
+        }
+
+        .hero-text p {
+            font-size: 1rem;
+            margin: 0;
+            opacity: 0.9;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+            color: white !important;
+        }
+    </style>
+
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h1>🐘 Wildlife Water Stress Atlas</h1>
+            <p>Tracking African elephant (<em>Loxodonta africana</em>) occurrence records against freshwater availability across Africa.</p>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------------------
 # Load data
 # ---------------------------------------------------------------------------
 
-# Water layer — loads from cache or builds on first run - load only the simplified version since browswer has trouble with full
+# Water layer — loads from cache or builds on first run
 water_gdf = load_water_layer_simplified()
 
 # Full GBIF dataset — loads from cache or fetches on first run
@@ -124,9 +226,9 @@ with col3:
     )
 
 # ---------------------------------------------------------------------------
-# Data quality note
-# ---------------------------------------------------------------------------
 # Year distribution chart
+# ---------------------------------------------------------------------------
+
 st.subheader("Elephant Records by Year")
 year_counts = get_year_counts(all_occurrences)
 st.bar_chart(year_counts)

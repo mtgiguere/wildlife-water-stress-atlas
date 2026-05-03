@@ -119,20 +119,19 @@ test.describe('Wildlife Water Stress Atlas', () => {
     ).toBeVisible();
   });
 
-});
-
 // ---------------------------------------------------------------------------
 // Year distribution chart
 // ---------------------------------------------------------------------------
 
-test('year distribution chart is visible', async ({ page }) => {
-    await expect(
-        page.getByText('Elephant Records by Year')
-    ).toBeVisible({ timeout: 300000 });
-});
+  test('year distribution chart is visible', async ({ page }) => {
+      await expect(
+          page.getByText('Elephant Records by Year')
+      ).toBeVisible({ timeout: 300000 });
+  });
 
-test('year distribution chart shows COVID dip label', async ({ page }) => {
-    await expect(
-        page.getByText('2020')
-    ).toBeVisible({ timeout: 300000 });
-});
+  test('year distribution chart shows COVID dip label', async ({ page }) => {
+      await expect(
+          page.getByText('2020')
+      ).toBeVisible({ timeout: 300000 });
+  });
+}); 
