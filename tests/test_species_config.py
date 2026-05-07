@@ -97,7 +97,7 @@ def test_elephant_water_type_weights_are_correct():
 
 def test_unknown_species_raises_key_error():
     with pytest.raises(KeyError):
-        _ = SPECIES_CONFIG["Panthera leo"]
+        _ = SPECIES_CONFIG["Unicornus fantasticus"]
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +242,107 @@ def test_invalid_icon_url_raises_value_error():
     }
     with pytest.raises(ValueError, match="icon_url"):
         _validate_species_config(bad_config)
+
+
+def test_species_config_contains_plains_zebra():
+    assert "Equus quagga" in SPECIES_CONFIG
+
+
+def test_all_species_have_icon_static_path():
+    for species, config in SPECIES_CONFIG.items():
+        assert "icon_static_path" in config, f"{species} is missing icon_static_path"
+        assert config["icon_static_path"].startswith("app/static/"), f"{species}: icon_static_path must start with 'app/static/'"
+
+
+def test_all_species_have_gbif_cache_file():
+    for species, config in SPECIES_CONFIG.items():
+        assert "gbif_cache_file" in config, f"{species} is missing gbif_cache_file"
+        assert config["gbif_cache_file"].endswith(".gpkg"), f"{species}: gbif_cache_file must end with .gpkg"
+
+
+def test_all_species_have_emoji():
+    for species, config in SPECIES_CONFIG.items():
+        assert "emoji" in config, f"{species} is missing emoji"
+        assert isinstance(config["emoji"], str), f"{species}: emoji must be a string"
+
+
+def test_invalid_icon_static_path_raises_value_error():
+    bad_config = {
+        "Fake species": {
+            "water_threshold_m": 100_000,
+            "accessible_water_types": {"river"},
+            "water_type_weights": {"river": 1.0},
+            "daily_range_m": 50_000,
+            "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
+            "icon_static_path": "not/a/valid/path.png",  # missing app/static/ prefix
+            "gbif_cache_file": "gbif_fake.gpkg",
+            "emoji": "🦁",
+        }
+    }
+    with pytest.raises(ValueError, match="icon_static_path"):
+        _validate_species_config(bad_config)
+
+
+def test_invalid_gbif_cache_file_raises_value_error():
+    bad_config = {
+        "Fake species": {
+            "water_threshold_m": 100_000,
+            "accessible_water_types": {"river"},
+            "water_type_weights": {"river": 1.0},
+            "daily_range_m": 50_000,
+            "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
+            "icon_static_path": "app/static/fake.png",
+            "gbif_cache_file": "not_a_gpkg_file.csv",  # wrong extension
+            "emoji": "🦁",
+        }
+    }
+    with pytest.raises(ValueError, match="gbif_cache_file"):
+        _validate_species_config(bad_config)
+
+
+def test_invalid_emoji_raises_value_error():
+    bad_config = {
+        "Fake species": {
+            "water_threshold_m": 100_000,
+            "accessible_water_types": {"river"},
+            "water_type_weights": {"river": 1.0},
+            "daily_range_m": 50_000,
+            "water_dependency": "high",
+            "icon_url": "https://example.com/icon.png",
+            "icon_static_path": "app/static/fake.png",
+            "gbif_cache_file": "gbif_fake.gpkg",
+            "emoji": 123,  # not a string
+        }
+    }
+    with pytest.raises(ValueError, match="emoji"):
+        _validate_species_config(bad_config)
+
+
+def test_species_config_contains_giraffe():
+    assert "Giraffa camelopardalis" in SPECIES_CONFIG
+
+
+def test_species_config_contains_lion():
+    assert "Panthera leo" in SPECIES_CONFIG
+
+
+def test_species_config_contains_cheetah():
+    assert "Acinonyx jubatus" in SPECIES_CONFIG
+
+
+def test_species_config_contains_nile_crocodile():
+    assert "Crocodylus niloticus" in SPECIES_CONFIG
+
+
+def test_species_config_contains_greater_flamingo():
+    assert "Phoenicopterus roseus" in SPECIES_CONFIG
+
+
+def test_species_config_contains_painted_reed_frog():
+    assert "Hyperolius marmoratus" in SPECIES_CONFIG
+
+
+def test_species_config_contains_african_clawed_frog():
+    assert "Xenopus laevis" in SPECIES_CONFIG

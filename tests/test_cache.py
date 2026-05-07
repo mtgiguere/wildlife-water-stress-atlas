@@ -165,31 +165,21 @@ def test_load_water_layer_saves_to_cache_after_pipeline_run(mock_water_gdf, tmp_
 # ---------------------------------------------------------------------------
 
 
-def test_load_gbif_data_loads_from_cache_when_file_exists(mock_gbif_gdf, tmp_path, monkeypatch):
+def test_load_gbif_data_loads_from_cache_when_file_exists(mock_gbif_gdf, tmp_path):
     cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     mock_gbif_gdf.to_file(cache_file, driver="GPKG")
 
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
-    result = load_gbif_data()
+    result = load_gbif_data(_cache_dir=tmp_path)
 
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == 5
 
 
-def test_load_gbif_data_cache_has_correct_crs(mock_gbif_gdf, tmp_path, monkeypatch):
+def test_load_gbif_data_cache_has_correct_crs(mock_gbif_gdf, tmp_path):
     cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     mock_gbif_gdf.to_file(cache_file, driver="GPKG")
 
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
-    result = load_gbif_data()
+    result = load_gbif_data(_cache_dir=tmp_path)
 
     assert result.crs.to_string() == "EPSG:4326"
 
@@ -199,46 +189,30 @@ def test_load_gbif_data_cache_has_correct_crs(mock_gbif_gdf, tmp_path, monkeypat
 # ---------------------------------------------------------------------------
 
 
-def test_load_gbif_data_filters_by_year(mock_gbif_gdf, tmp_path, monkeypatch):
-    # 2 records in 2015, 1 in 2016, 1 in 2017, 1 in 2018
+def test_load_gbif_data_filters_by_year(mock_gbif_gdf, tmp_path):
     cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     mock_gbif_gdf.to_file(cache_file, driver="GPKG")
 
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
-    result = load_gbif_data(year=2015)
+    result = load_gbif_data(year=2015, _cache_dir=tmp_path)
 
     assert len(result) == 2
     assert (result["year"] == 2015).all()
 
 
-def test_load_gbif_data_returns_all_records_when_no_year(mock_gbif_gdf, tmp_path, monkeypatch):
+def test_load_gbif_data_returns_all_records_when_no_year(mock_gbif_gdf, tmp_path):
     cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     mock_gbif_gdf.to_file(cache_file, driver="GPKG")
 
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
-    result = load_gbif_data()
+    result = load_gbif_data(_cache_dir=tmp_path)
 
     assert len(result) == 5
 
 
-def test_load_gbif_data_returns_empty_when_no_records_for_year(mock_gbif_gdf, tmp_path, monkeypatch):
+def test_load_gbif_data_returns_empty_when_no_records_for_year(mock_gbif_gdf, tmp_path):
     cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     mock_gbif_gdf.to_file(cache_file, driver="GPKG")
 
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
-    result = load_gbif_data(year=1900)
+    result = load_gbif_data(year=1900, _cache_dir=tmp_path)
 
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == 0
@@ -249,38 +223,27 @@ def test_load_gbif_data_returns_empty_when_no_records_for_year(mock_gbif_gdf, tm
 # ---------------------------------------------------------------------------
 
 
-def test_load_gbif_data_calls_fetch_when_cache_missing(mock_gbif_gdf, tmp_path, monkeypatch):
-    cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
-
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
+def test_load_gbif_data_calls_fetch_when_cache_missing(mock_gbif_gdf, tmp_path):
+    # No cache file created — triggers fetch path
     with patch(
         "apps.streamlit.components.cache.fetch_all_occurrences",
         return_value=[{"decimalLatitude": i, "decimalLongitude": i, "year": 2015, "species": "Loxodonta africana"} for i in range(5)],
     ) as mock_fetch:
-        result = load_gbif_data()
+        result = load_gbif_data(_cache_dir=tmp_path)
 
     mock_fetch.assert_called_once()
     assert isinstance(result, gpd.GeoDataFrame)
 
 
-def test_load_gbif_data_saves_to_cache_after_fetch(mock_gbif_gdf, tmp_path, monkeypatch):
-    cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
-
-    monkeypatch.setattr(
-        "apps.streamlit.components.cache.GBIF_CACHE_PATH",
-        cache_file,
-    )
-
+def test_load_gbif_data_saves_to_cache_after_fetch(mock_gbif_gdf, tmp_path):
+    # No cache file created — triggers fetch path
     with patch(
         "apps.streamlit.components.cache.fetch_all_occurrences",
         return_value=[{"decimalLatitude": i, "decimalLongitude": i, "year": 2015, "species": "Loxodonta africana"} for i in range(5)],
     ):
-        load_gbif_data()
+        load_gbif_data(_cache_dir=tmp_path)
 
+    cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
     assert cache_file.exists()
 
 
@@ -480,3 +443,18 @@ def test_load_water_layer_simplified_saves_to_cache_after_build(mock_water_gdf, 
     load_water_layer_simplified()
 
     assert cache_file.exists()
+
+
+def test_load_gbif_data_accepts_species_parameter(mock_gbif_gdf, tmp_path):
+    cache_file = tmp_path / "gbif_equus_quagga.gpkg"
+    mock_gbif_gdf.to_file(cache_file, driver="GPKG")
+
+    result = load_gbif_data(species="Equus quagga", _cache_dir=tmp_path)
+
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert len(result) == 5
+
+
+def test_load_gbif_data_raises_for_unknown_species(tmp_path):
+    with pytest.raises(ValueError, match="Unknown species"):
+        load_gbif_data(species="Unicornus fantasticus", _cache_dir=tmp_path)

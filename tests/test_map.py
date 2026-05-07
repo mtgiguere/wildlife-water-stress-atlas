@@ -17,7 +17,7 @@ We verify:
 FUNCTION COVERAGE:
 ------------------
 - build_water_layer(gdf)         — GeoJsonLayer for water sources
-- build_occurrences_layer(gdf)   — ScatterplotLayer for animal occurrences
+- build_occurrences_layer(gdf)   — IconLayer for animal occurrences
 - build_deck(water, occurrences) — pydeck.Deck combining both layers
 """
 
@@ -125,7 +125,7 @@ def test_build_occurrences_layer_returns_pydeck_layer(mock_occurrences_gdf):
 
 def test_build_occurrences_layer_uses_icon_layer_type(mock_occurrences_gdf):
     result = build_occurrences_layer(mock_occurrences_gdf)
-    assert result.type == "ScatterplotLayer"
+    assert result.type == "IconLayer"
 
 
 def test_build_occurrences_layer_is_pickable(mock_occurrences_gdf):
@@ -178,6 +178,7 @@ def test_build_deck_has_reasonable_zoom_level(mock_water_gdf, mock_occurrences_g
 
 
 def test_build_occurrences_layer_has_icon_url(mock_occurrences_gdf):
-    # IconLayer deferred — using ScatterplotLayer for now
     result = build_occurrences_layer(mock_occurrences_gdf)
-    assert result.type == "ScatterplotLayer"
+    assert result.type == "IconLayer"
+    # icon_data must be embedded in each record for deck.gl IconLayer
+    assert all("icon_data" in record for record in result.data)

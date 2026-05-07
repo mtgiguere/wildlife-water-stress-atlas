@@ -21,8 +21,8 @@ app re-renders.
 CACHE FILES:
 ------------
 data/processed/water_africa.gpkg          — vectorized water layer
-data/processed/gbif_loxodonta_africana.gpkg — all elephant occurrences
-
+data/processed/gbif_{species_name}.gpkg — per-species occurrence cache
+                                           path determined by SPECIES_CONFIG
 Year filtering for the animation slider is done IN MEMORY from the
 cached GBIF GeoDataFrame — no API calls after the first load.
 """
@@ -32,6 +32,7 @@ from pathlib import Path
 import geopandas as gpd
 import streamlit as st
 
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.ingest.gbif import fetch_all_occurrences, occurrences_to_gdf
 from wildlife_water_stress_atlas.ingest.water import load_all_water
 
@@ -42,7 +43,6 @@ from wildlife_water_stress_atlas.ingest.water import load_all_water
 
 WATER_CACHE_PATH = Path("data/processed/water_africa.gpkg")
 WATER_SIMPLIFIED_CACHE_PATH = Path("data/processed/water_africa_simplified.gpkg")
-GBIF_CACHE_PATH = Path("data/processed/gbif_loxodonta_africana.gpkg")
 
 # Africa bounding box — passed to load_all_water() to prevent
 # loading global rasters into memory
@@ -101,36 +101,50 @@ def load_water_layer() -> gpd.GeoDataFrame:
 def load_gbif_data(
     species: str = "Loxodonta africana",
     year: int | None = None,
+    _cache_dir: Path = Path("data/processed"),
 ) -> gpd.GeoDataFrame:
     """
-    Load GBIF occurrence data, using disk cache when available.
+    Load GBIF occurrence data for any species in SPECIES_CONFIG.
 
-    First run: fetches all records from GBIF API (may take several
-    minutes for 20,000+ records), saves to GBIF_CACHE_PATH.
+    Cache file path is determined by the species' gbif_cache_file
+    field in SPECIES_CONFIG — no hardcoded filenames anywhere.
+    Adding a new species to SPECIES_CONFIG is all that's needed —
+    this function picks up the new cache path automatically.
+
+    First run: fetches all records from GBIF API, saves to cache.
     Subsequent runs: loads from GeoPackage instantly.
 
-    Year filtering is done IN MEMORY from the cached dataset —
-    no API calls after the first load. This makes the animation
-    slider instant.
+    Year filtering is done IN MEMORY — no API calls after first load.
+    This makes the animation slider instant regardless of species.
 
     Args:
-        species : Scientific name of the species to load.
-                  Must match the cache filename convention.
-        year    : Optional year to filter by. None returns all records.
+        species    : Scientific name — must be a key in SPECIES_CONFIG.
+        year       : Optional year to filter by. None returns all records.
+        _cache_dir : Directory for cache files. Underscore prefix tells
+                     @st.cache_data not to hash this parameter — allows
+                     dependency injection for testing without breaking
+                     Streamlit's caching mechanism.
 
     Returns:
-        GeoDataFrame of occurrence points in EPSG:4326, filtered
-        by year if provided.
+        GeoDataFrame of occurrence points in EPSG:4326.
     """
-    if GBIF_CACHE_PATH.exists():
-        gdf = gpd.read_file(GBIF_CACHE_PATH)
+    if species not in SPECIES_CONFIG:
+        raise ValueError(f"Unknown species: {species}. Must be one of {list(SPECIES_CONFIG.keys())}")
+
+    cfg = SPECIES_CONFIG[species]
+    # Cache path derived from SPECIES_CONFIG — never hardcoded
+    cache_path = _cache_dir / cfg["gbif_cache_file"]
+
+    if cache_path.exists():
+        gdf = gpd.read_file(cache_path)
     else:
-        with st.spinner(f"Fetching {species} records from GBIF — this may take several minutes..."):
+        common_name = cfg["common_name"]
+        with st.spinner(f"Fetching {common_name} ({species}) records from GBIF..."):
             records = fetch_all_occurrences(species)
             gdf = occurrences_to_gdf(records)
 
-        GBIF_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        gdf.to_file(GBIF_CACHE_PATH, driver="GPKG")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        gdf.to_file(cache_path, driver="GPKG")
 
     # Filter by year in memory — no API calls needed
     if year is not None:

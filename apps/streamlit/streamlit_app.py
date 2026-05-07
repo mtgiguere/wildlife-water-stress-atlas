@@ -17,11 +17,18 @@ pipeline reusable outside of Streamlit.
 FLOW:
 -----
 1. Load water layer from cache (instant if cached, ~5min first run)
-2. Load full GBIF occurrence dataset from cache (instant if cached)
-3. Render sidebar — year slider returns selected year
-4. Filter occurrences by selected year in memory (instant)
-5. Build PyDeck layers from water + filtered occurrences
-6. Render map + stats
+2. Render sidebar — species selector returns selected species
+3. Load full GBIF occurrence dataset for selected species from cache
+4. Render sidebar stats with correct species data
+5. Filter occurrences by selected year in memory (instant)
+6. Build PyDeck layers from water + filtered occurrences
+7. Render map + stats + chart
+
+ADDING A NEW SPECIES:
+---------------------
+Add one entry to SPECIES_CONFIG in config/species.py.
+Run scripts/prefetch_gbif.py to cache the occurrence data.
+Nothing in this file needs to change.
 
 DATA QUALITY NOTE:
 ------------------
@@ -44,6 +51,7 @@ import streamlit as st
 from apps.streamlit.components.cache import load_gbif_data, load_water_layer_simplified
 from apps.streamlit.components.map import build_deck, build_occurrences_layer, build_water_layer
 from apps.streamlit.components.sidebar import get_year_counts, render_sidebar
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 # ---------------------------------------------------------------------------
 # Page config — must be first Streamlit call
@@ -51,7 +59,7 @@ from apps.streamlit.components.sidebar import get_year_counts, render_sidebar
 
 st.set_page_config(
     page_title="Wildlife Water Stress Atlas",
-    page_icon="🐘",
+    page_icon="🌍",
     layout="wide",
 )
 
@@ -157,8 +165,8 @@ st.markdown(
 
     <div class="hero-banner">
         <div class="hero-text">
-            <h1>🐘 Wildlife Water Stress Atlas</h1>
-            <p>Tracking African elephant (<em>Loxodonta africana</em>) occurrence records against freshwater availability across Africa.</p>
+            <h1>🌍 Wildlife Water Stress Atlas</h1>
+            <p>Tracking wildlife occurrence records against freshwater availability across Africa.</p>
         </div>
     </div>
     """,
@@ -166,50 +174,68 @@ st.markdown(
 )
 
 # ---------------------------------------------------------------------------
-# Load data
+# Load water layer — species-independent, loaded once per session
 # ---------------------------------------------------------------------------
 
-# Water layer — loads from cache or builds on first run
 water_gdf = load_water_layer_simplified()
 
-# Full GBIF dataset — loads from cache or fetches on first run
-all_occurrences = load_gbif_data()
+# ---------------------------------------------------------------------------
+# Sidebar — species selector + year slider
+#
+# Two-pass loading pattern:
+#   Pass 1: Render sidebar with elephant data to get selected_species.
+#           This is necessary because render_sidebar() needs a GeoDataFrame
+#           to compute year range — we use elephants as the default.
+#   Pass 2: If a different species was selected, reload sidebar with the
+#           correct species data so year range and stats are accurate.
+#
+# Both loads are instant after first run thanks to @st.cache_data.
+# ---------------------------------------------------------------------------
+
+# Persist species selection across reruns using session state.
+# Without this, every rerun resets the species to the default.
+if "selected_species" not in st.session_state:
+    st.session_state.selected_species = "Loxodonta africana"
+
+# Load data for currently selected species
+all_occurrences = load_gbif_data(species=st.session_state.selected_species)
+
+# Render sidebar once — never twice. Duplicate renders cause
+# StreamlitDuplicateElementId errors on the selectbox widget.
+selected_species, selected_year = render_sidebar(all_occurrences)
+
+# Persist selection for next rerun
+st.session_state.selected_species = selected_species
 
 # ---------------------------------------------------------------------------
-# Sidebar — year slider + stats
+# Filter occurrences by selected year — instant, done in memory
 # ---------------------------------------------------------------------------
 
-selected_year = render_sidebar(all_occurrences)
+year_occurrences = load_gbif_data(species=selected_species, year=selected_year)
 
 # ---------------------------------------------------------------------------
-# Filter occurrences by selected year
+# Build and render map
 # ---------------------------------------------------------------------------
 
-year_occurrences = load_gbif_data(year=selected_year)
-
-# ---------------------------------------------------------------------------
-# Build map
-# ---------------------------------------------------------------------------
+# Icon path driven by SPECIES_CONFIG — switches automatically with species
+cfg = SPECIES_CONFIG[selected_species]
+icon_path = cfg["icon_static_path"]
 
 water_layers = build_water_layer(water_gdf)
-occurrences_layer = build_occurrences_layer(year_occurrences)
+occurrences_layer = build_occurrences_layer(year_occurrences, icon_path=icon_path)
 deck = build_deck(water_layers, occurrences_layer)
-
-# ---------------------------------------------------------------------------
-# Render map
-# ---------------------------------------------------------------------------
 
 st.pydeck_chart(deck, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# Stats row below map
+# Stats row below map — dynamic labels from SPECIES_CONFIG
 # ---------------------------------------------------------------------------
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.metric(
-        label=f"Elephant Records — {selected_year}",
+        label=f"{cfg['emoji']} {cfg['common_name']} Records — {selected_year}",
         value=f"{len(year_occurrences):,}",
     )
 
@@ -226,10 +252,10 @@ with col3:
     )
 
 # ---------------------------------------------------------------------------
-# Year distribution chart
+# Year distribution chart — dynamic title from SPECIES_CONFIG
 # ---------------------------------------------------------------------------
 
-st.subheader("Elephant Records by Year")
+st.subheader(f"{cfg['emoji']} {cfg['common_name']} Records by Year")
 year_counts = get_year_counts(all_occurrences)
 st.bar_chart(year_counts)
 

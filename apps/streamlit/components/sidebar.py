@@ -28,6 +28,8 @@ This function is NOT unit tested — covered by Playwright E2E instead.
 import geopandas as gpd
 import streamlit as st
 
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+
 # ---------------------------------------------------------------------------
 # Pure data functions — fully unit testable
 # ---------------------------------------------------------------------------
@@ -93,23 +95,33 @@ def get_year_counts(gdf: gpd.GeoDataFrame) -> dict[int, int]:
 # ---------------------------------------------------------------------------
 
 
-def render_sidebar(gdf: gpd.GeoDataFrame) -> int:  # pragma: no cover
+def render_sidebar(gdf: gpd.GeoDataFrame) -> tuple[str, int]:  # pragma: no cover
     """
-    Render the sidebar year slider and stats panel.
-
-    This function is the only place Streamlit widgets are called in
-    this module. It reads from the pure data functions above and
-    wires them to Streamlit UI elements.
+    Render the sidebar species selector, year slider, and stats panel.
 
     Args:
-        gdf: Full occurrences GeoDataFrame (all years).
+        gdf: Full occurrences GeoDataFrame for the currently selected species.
 
     Returns:
-        Selected year from the slider as an integer.
+        Tuple of (selected_species, selected_year).
     """
-    st.sidebar.title("🐘 Wildlife Water Stress Atlas")
+    st.sidebar.title("🌍 Wildlife Water Stress Atlas")
     st.sidebar.markdown("---")
 
+    # Species selector — driven entirely by SPECIES_CONFIG, no hardcoding.
+    # Adding a new species to SPECIES_CONFIG automatically adds it here.
+    species_options = list(SPECIES_CONFIG.keys())
+    species_display = {k: f"{v['emoji']} {v['common_name']} ({k})" for k, v in SPECIES_CONFIG.items()}
+
+    selected_species = st.sidebar.selectbox(
+        label="Select Species",
+        options=species_options,
+        format_func=lambda k: species_display[k],
+    )
+
+    st.sidebar.markdown("---")
+
+    # Year slider
     min_year, max_year = get_year_range(gdf)
     year_counts = get_year_counts(gdf)
 
@@ -117,7 +129,7 @@ def render_sidebar(gdf: gpd.GeoDataFrame) -> int:  # pragma: no cover
         label="Select Year",
         min_value=min_year,
         max_value=max_year,
-        value=max_year,  # default to most recent year
+        value=max_year,
         step=1,
     )
 
@@ -139,6 +151,9 @@ def render_sidebar(gdf: gpd.GeoDataFrame) -> int:  # pragma: no cover
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Data sources:** GBIF, GLWD v2, Natural Earth, JRC GSW")
-    st.sidebar.markdown("**Species:** *Loxodonta africana*")
 
-    return selected_year
+    cfg = SPECIES_CONFIG[selected_species]
+    st.sidebar.markdown(f"**Species:** *{selected_species}*")
+    st.sidebar.markdown(f"**Water dependency:** {cfg['water_dependency']}")
+
+    return selected_species, selected_year
