@@ -48,10 +48,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import streamlit as st
 
-from apps.streamlit.components.cache import load_gbif_data, load_gbif_data_safe, load_water_layer_simplified
+from apps.streamlit.components.cache import load_gbif_data, load_water_layer_simplified#, load_gbif_data_safe
 from apps.streamlit.components.map import build_deck, build_occurrences_layer, build_water_layer
 from apps.streamlit.components.sidebar import get_year_counts, render_sidebar
-from apps.streamlit.components.stats import get_species_comparison, get_water_threshold_display
+from apps.streamlit.components.stats import get_water_threshold_display#,get_species_comparison
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 # ---------------------------------------------------------------------------
@@ -265,9 +265,9 @@ st.subheader(f"{cfg['emoji']} {cfg['common_name']} Records by Year")
 year_counts = get_year_counts(all_occurrences)
 st.bar_chart(year_counts)
 
-st.subheader("🌍 Species Record Counts")
-comparison_counts = {s: len(load_gbif_data_safe(species=s)) for s in SPECIES_CONFIG}
-st.bar_chart(get_species_comparison(comparison_counts))
+# st.subheader("🌍 Species Record Counts")
+# comparison_counts = {s: len(load_gbif_data_safe(species=s)) for s in SPECIES_CONFIG}
+# st.bar_chart(get_species_comparison(comparison_counts))
 
 st.markdown("---")
 st.caption(
