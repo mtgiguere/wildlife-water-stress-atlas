@@ -57,4 +57,4 @@ def test_water_stress_score_raises_for_unknown_species():
     from pytest import raises
 
     with raises(KeyError):
-        water_stress_score(100_000, "Panthera leo")
+        water_stress_score(100_000, "Unicornus fantasticus")
