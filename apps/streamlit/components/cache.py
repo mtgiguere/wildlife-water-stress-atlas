@@ -232,3 +232,36 @@ def load_water_layer_simplified() -> gpd.GeoDataFrame:
     simplified.to_file(WATER_SIMPLIFIED_CACHE_PATH, driver="GPKG")
 
     return simplified
+
+
+def load_gbif_data_safe(
+    species: str = "Loxodonta africana",
+    year: int | None = None,
+    _cache_dir: Path = Path("data/processed"),
+) -> gpd.GeoDataFrame:
+    """
+    Load GBIF occurrence data for any species, returning an empty
+    GeoDataFrame if the cache is missing or the fetch fails.
+
+    Used by the species comparison chart — a missing cache file for
+    one species should not crash the whole app. The chart simply
+    excludes that species silently until its cache is populated.
+
+    Unknown species still raises ValueError — that is a developer
+    error (misconfigured SPECIES_CONFIG), not a missing data file.
+
+    Args:
+        species    : Scientific name — must be a key in SPECIES_CONFIG.
+        year       : Optional year to filter by. None returns all records.
+        _cache_dir : Directory for cache files. See load_gbif_data().
+
+    Returns:
+        GeoDataFrame of occurrence points, or empty GeoDataFrame on error.
+    """
+    if species not in SPECIES_CONFIG:
+        raise ValueError(f"Unknown species: {species}. Must be one of {list(SPECIES_CONFIG.keys())}")
+
+    try:
+        return load_gbif_data(species=species, year=year, _cache_dir=_cache_dir)
+    except Exception:
+        return gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")

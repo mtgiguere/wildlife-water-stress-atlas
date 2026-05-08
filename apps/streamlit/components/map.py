@@ -48,8 +48,8 @@ AFRICA_ZOOM = 3
 WATER_COLOR = [0, 180, 255, 200]
 
 # Icon layer sizing
-ICON_SIZE = 64    # pixel dimensions of the source image
-ICON_SCALE = 2    # render scale multiplier — increase to make icons bigger
+ICON_SIZE = 64  # pixel dimensions of the source image
+ICON_SCALE = 2  # render scale multiplier — increase to make icons bigger
 
 
 # ---------------------------------------------------------------------------

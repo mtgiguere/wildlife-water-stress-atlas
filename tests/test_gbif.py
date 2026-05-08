@@ -282,19 +282,21 @@ def test_fetch_occurrences_page_raises_on_http_error(monkeypatch):
 
 
 def test_fetch_all_occurrences_returns_all_records(monkeypatch):
-    # Simulate 5 total records across 2 pages (300 per page limit)
-    # Page 1: offset=0, returns 300 records (full page → continue)
-    # Page 2: offset=300, returns 2 records (partial page → stop)
     page1 = make_sample_records(300, year=2015)
     page2 = make_sample_records(2, year=2016)
 
     def mock_get(url, params=None, timeout=None):
-        # Count call — limit=1
         if params.get("limit") == 1:
             return make_mock_response([], count=302)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
         offset = params.get("offset", 0)
-        records = page1 if offset == 0 else page2
-        return make_mock_response(records, count=302)
+        mock_resp.json.return_value = {
+            "endOfRecords": offset >= 300,
+            "count": 302,
+            "results": page1 if offset == 0 else page2,
+        }
+        return mock_resp
 
     monkeypatch.setattr(GBIF_MODULE, mock_get)
 
@@ -406,8 +408,6 @@ def test_fetch_all_occurrences_stops_when_page_is_empty(monkeypatch):
 
 
 def test_fetch_all_occurrences_increments_offset_across_pages(monkeypatch):
-    # Covers the offset += GBIF_PAGE_SIZE line
-    # Three pages: 300, 300, then 50 (partial — stops)
     page1 = make_sample_records(300, year=2015)
     page2 = make_sample_records(300, year=2016)
     page3 = make_sample_records(50, year=2017)
@@ -415,17 +415,154 @@ def test_fetch_all_occurrences_increments_offset_across_pages(monkeypatch):
     def mock_get(url, params=None, timeout=None):
         if params.get("limit") == 1:
             return make_mock_response([], count=650)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
         offset = params.get("offset", 0)
         if offset == 0:
-            records = page1
+            records, end = page1, False
         elif offset == 300:
-            records = page2
+            records, end = page2, False
         else:
-            records = page3
-        return make_mock_response(records, count=650)
+            records, end = page3, True
+        mock_resp.json.return_value = {
+            "endOfRecords": end,
+            "count": 650,
+            "results": records,
+        }
+        return mock_resp
 
     monkeypatch.setattr(GBIF_MODULE, mock_get)
 
     result = fetch_all_occurrences("Loxodonta africana")
 
     assert len(result) == 650
+
+
+# ---------------------------------------------------------------------------
+# fetch_all_occurrences — endOfRecords flag tests
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_all_occurrences_stops_when_end_of_records_true(monkeypatch):
+    # GBIF signals end of results via endOfRecords flag.
+    # Even if page is full (300 records), we must stop when flag is True.
+    page1 = make_sample_records(300, year=2015)
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=300)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "endOfRecords": True,
+            "count": 300,
+            "results": page1,
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert len(result) == 300
+
+
+def test_fetch_all_occurrences_continues_when_end_of_records_false(monkeypatch):
+    # When endOfRecords is False on page 1, must fetch page 2.
+    page1 = make_sample_records(300, year=2015)
+    page2 = make_sample_records(300, year=2016)
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=600)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        offset = params.get("offset", 0)
+        mock_resp.json.return_value = {
+            "endOfRecords": offset >= 300,  # False on page 1, True on page 2
+            "count": 600,
+            "results": page1 if offset == 0 else page2,
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert len(result) == 600
+
+
+def test_fetch_all_occurrences_exact_multiple_of_page_size(monkeypatch):
+    # The old partial-page heuristic breaks when total records is an exact
+    # multiple of GBIF_PAGE_SIZE — last page returns 300, loop never stops.
+    # endOfRecords flag must handle this correctly.
+    page1 = make_sample_records(300, year=2015)
+    page2 = make_sample_records(300, year=2016)
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=600)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        offset = params.get("offset", 0)
+        mock_resp.json.return_value = {
+            "endOfRecords": offset >= 300,
+            "count": 600,
+            "results": page1 if offset == 0 else page2,
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert len(result) == 600
+
+
+def test_fetch_all_occurrences_end_of_records_missing_defaults_safe(monkeypatch):
+    # If GBIF omits endOfRecords entirely, should not loop forever.
+    # Defensive default of True means we stop after one page.
+    page1 = make_sample_records(300, year=2015)
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=300)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            # endOfRecords deliberately absent
+            "count": 300,
+            "results": page1,
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert len(result) == 300
+
+
+def test_fetch_all_occurrences_stops_on_empty_page_regardless_of_flag(monkeypatch):
+    # Defensive guard: if GBIF returns an empty page but endOfRecords is False
+    # (malformed response), we must not loop forever.
+    page1 = make_sample_records(300, year=2015)
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=300)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        offset = params.get("offset", 0)
+        mock_resp.json.return_value = {
+            "endOfRecords": False,  # lying — but we should still stop
+            "count": 300,
+            "results": page1 if offset == 0 else [],
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert len(result) == 300

@@ -48,9 +48,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import streamlit as st
 
-from apps.streamlit.components.cache import load_gbif_data, load_water_layer_simplified
+from apps.streamlit.components.cache import load_gbif_data, load_gbif_data_safe, load_water_layer_simplified
 from apps.streamlit.components.map import build_deck, build_occurrences_layer, build_water_layer
 from apps.streamlit.components.sidebar import get_year_counts, render_sidebar
+from apps.streamlit.components.stats import get_species_comparison, get_water_threshold_display
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 # ---------------------------------------------------------------------------
@@ -225,13 +226,13 @@ water_layers = build_water_layer(water_gdf)
 occurrences_layer = build_occurrences_layer(year_occurrences, icon_path=icon_path)
 deck = build_deck(water_layers, occurrences_layer)
 
-st.pydeck_chart(deck, use_container_width=True)
+st.pydeck_chart(deck, width="stretch")
 
 # ---------------------------------------------------------------------------
 # Stats row below map — dynamic labels from SPECIES_CONFIG
 # ---------------------------------------------------------------------------
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
@@ -251,6 +252,11 @@ with col3:
         value=f"{len(water_gdf):,}",
     )
 
+with col4:
+    st.metric(
+        label="Water Stress Threshold",
+        value=get_water_threshold_display(selected_species),
+    )
 # ---------------------------------------------------------------------------
 # Year distribution chart — dynamic title from SPECIES_CONFIG
 # ---------------------------------------------------------------------------
@@ -258,6 +264,10 @@ with col3:
 st.subheader(f"{cfg['emoji']} {cfg['common_name']} Records by Year")
 year_counts = get_year_counts(all_occurrences)
 st.bar_chart(year_counts)
+
+st.subheader("🌍 Species Record Counts")
+comparison_counts = {s: len(load_gbif_data_safe(species=s)) for s in SPECIES_CONFIG}
+st.bar_chart(get_species_comparison(comparison_counts))
 
 st.markdown("---")
 st.caption(

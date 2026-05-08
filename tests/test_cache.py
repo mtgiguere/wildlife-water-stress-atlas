@@ -458,3 +458,50 @@ def test_load_gbif_data_accepts_species_parameter(mock_gbif_gdf, tmp_path):
 def test_load_gbif_data_raises_for_unknown_species(tmp_path):
     with pytest.raises(ValueError, match="Unknown species"):
         load_gbif_data(species="Unicornus fantasticus", _cache_dir=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# load_gbif_data_safe — graceful degradation for comparison chart
+# ---------------------------------------------------------------------------
+
+
+def test_load_gbif_data_safe_returns_geodataframe_on_success(mock_gbif_gdf, tmp_path):
+    cache_file = tmp_path / "gbif_loxodonta_africana.gpkg"
+    mock_gbif_gdf.to_file(cache_file, driver="GPKG")
+
+    from apps.streamlit.components.cache import load_gbif_data_safe
+
+    result = load_gbif_data_safe(species="Loxodonta africana", _cache_dir=tmp_path)
+
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert len(result) == 5
+
+
+def test_load_gbif_data_safe_returns_empty_gdf_when_cache_missing(tmp_path):
+    # No cache file — fetch would be called but we don't want a crash
+    from apps.streamlit.components.cache import load_gbif_data_safe
+
+    with patch("apps.streamlit.components.cache.fetch_all_occurrences", side_effect=FileNotFoundError):
+        result = load_gbif_data_safe(species="Loxodonta africana", _cache_dir=tmp_path)
+
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert len(result) == 0
+
+
+def test_load_gbif_data_safe_returns_empty_gdf_on_any_exception(tmp_path):
+    from apps.streamlit.components.cache import load_gbif_data_safe
+
+    with patch("apps.streamlit.components.cache.fetch_all_occurrences", side_effect=Exception("network error")):
+        result = load_gbif_data_safe(species="Loxodonta africana", _cache_dir=tmp_path)
+
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert len(result) == 0
+
+
+def test_load_gbif_data_safe_raises_for_unknown_species(tmp_path):
+    # Unknown species should still raise — misconfiguration is a developer
+    # error, not a graceful degradation case
+    from apps.streamlit.components.cache import load_gbif_data_safe
+
+    with pytest.raises(ValueError, match="Unknown species"):
+        load_gbif_data_safe(species="Unicornus fantasticus", _cache_dir=tmp_path)

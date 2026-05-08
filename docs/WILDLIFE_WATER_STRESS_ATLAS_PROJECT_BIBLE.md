@@ -501,3 +501,25 @@ Species selector (`st.selectbox`) added to sidebar. E2E tests not yet updated to
 - **Species narrative tiers** — Elephant (megafauna anchor) → Zebra/Giraffe (herbivore complexity) → Lion/Cheetah (circle of life) → Croc/Flamingo/Frogs (sensitive indicators). This progression is a funding conversation — shows where ecosystem is holding vs collapsing.
 - **Giraffe records are sparse** (~5,549) — this is scientifically meaningful, not a data error. Giraffes are Vulnerable IUCN, population down ~40% in 30 years. Surface this in Prescribe layer.
 - **Two frog species share the same icon** (`Creative-Tail-Animal-frog.svg.png`) — tooltip on hover distinguishes them. Acceptable for now.
+
+Ran out of Session LIMIT --->
+
+Where we stopped:
+
+stats.py created with get_water_threshold_display() ✅
+test_stats.py created with first passing test ✅
+247 passing, 100% coverage ✅
+Flamingo still fetching 🦩
+
+Next TDD steps for stats.py:
+
+test_get_water_threshold_display_reed_frog — "2 km"
+test_get_water_threshold_display_raises_for_unknown_species
+get_species_comparison() function — returns dict of species → record count
+Wire both into streamlit_app.py
+
+Also pending:
+
+Flamingo fetch + commit + push
+Deploy to Streamlit Cloud
+Playwright E2E updates for species selector
