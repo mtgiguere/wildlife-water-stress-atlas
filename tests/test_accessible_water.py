@@ -74,7 +74,7 @@ def test_filter_accessible_water_raises_for_unknown_species():
     )
 
     with pytest.raises(KeyError):
-        filter_accessible_water(water, species="Panthera leo")
+        filter_accessible_water(water, species="Unicornus fantasticus")
 
 
 def test_filter_accessible_water_reads_from_species_config():
@@ -135,7 +135,7 @@ def test_get_water_type_weights_returns_correct_weights_for_elephants():
 
 def test_get_water_type_weights_raises_for_unknown_species():
     with pytest.raises(KeyError):
-        get_water_type_weights("Panthera leo")
+        get_water_type_weights("Unicornus fantasticus")
 
 
 def test_get_water_type_weights_reads_from_species_config():
