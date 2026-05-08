@@ -319,52 +319,52 @@ SPECIES_CONFIG: dict[str, dict] = {
         "gbif_cache_file": "gbif_crocodylus_niloticus.gpkg",
         "emoji": "🐊",
     },
-    "Phoenicopterus roseus": {
-        "common_name": "Greater Flamingo",
-        # ---------------------------------------------------------------
-        # Greater Flamingo
-        # ---------------------------------------------------------------
-        # Greater flamingos are highly specialized saline lake obligates —
-        # they breed almost exclusively on large shallow saline or alkaline
-        # lakes (e.g. Lake Natron, Lake Bogoria, Lake Turkana) where their
-        # primary food source, cyanobacteria, thrives. They are among the
-        # most water-stress-sensitive species in Africa because their
-        # habitat is both highly specific and highly threatened by climate
-        # change — even small changes in lake levels can render entire
-        # breeding colonies non-viable.
-        #
-        # The 50km threshold reflects their relatively limited foraging
-        # range from breeding colonies — flamingos commute between feeding
-        # and roosting sites but rarely venture far from their saline lake
-        # habitat. A flamingo 50km from a saline lake has effectively lost
-        # its habitat entirely.
-        "water_threshold_m": 50_000,
-        # Flamingos are saline lake specialists — this is the key
-        # differentiator from all other species in the atlas. They
-        # actually PREFER saline and alkaline lakes that other species
-        # cannot use at all. They will also use large permanent lakes
-        # and river deltas for roosting and secondary foraging.
-        "accessible_water_types": {"saline_lake", "lake", "river", "permanent_water"},
-        # Saline lakes weighted highest — this is the flamingo's primary
-        # habitat and the source of their food (cyanobacteria blooms).
-        # Regular freshwater lakes weighted lower — used for drinking
-        # and secondary foraging only, not breeding habitat.
-        "water_type_weights": {
-            "saline_lake": 1.0,
-            "lake": 0.6,
-            "river": 0.4,
-            "permanent_water": 0.5,
-        },
-        # 30km typical foraging range from breeding colony.
-        "daily_range_m": 30_000,
-        # High water dependency — completely tied to specific water body
-        # types for breeding, feeding, and survival.
-        "water_dependency": "high",
-        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9a9.png",
-        "icon_static_path": "app/static/Creative-Tail-Animal-flamingo.svg.png",
-        "gbif_cache_file": "gbif_phoenicopterus_roseus.gpkg",
-        "emoji": "🦩",
-    },
+    # "Phoenicopterus roseus": {
+    #     "common_name": "Greater Flamingo",
+    #     # ---------------------------------------------------------------
+    #     # Greater Flamingo
+    #     # ---------------------------------------------------------------
+    #     # Greater flamingos are highly specialized saline lake obligates —
+    #     # they breed almost exclusively on large shallow saline or alkaline
+    #     # lakes (e.g. Lake Natron, Lake Bogoria, Lake Turkana) where their
+    #     # primary food source, cyanobacteria, thrives. They are among the
+    #     # most water-stress-sensitive species in Africa because their
+    #     # habitat is both highly specific and highly threatened by climate
+    #     # change — even small changes in lake levels can render entire
+    #     # breeding colonies non-viable.
+    #     #
+    #     # The 50km threshold reflects their relatively limited foraging
+    #     # range from breeding colonies — flamingos commute between feeding
+    #     # and roosting sites but rarely venture far from their saline lake
+    #     # habitat. A flamingo 50km from a saline lake has effectively lost
+    #     # its habitat entirely.
+    #     "water_threshold_m": 50_000,
+    #     # Flamingos are saline lake specialists — this is the key
+    #     # differentiator from all other species in the atlas. They
+    #     # actually PREFER saline and alkaline lakes that other species
+    #     # cannot use at all. They will also use large permanent lakes
+    #     # and river deltas for roosting and secondary foraging.
+    #     "accessible_water_types": {"saline_lake", "lake", "river", "permanent_water"},
+    #     # Saline lakes weighted highest — this is the flamingo's primary
+    #     # habitat and the source of their food (cyanobacteria blooms).
+    #     # Regular freshwater lakes weighted lower — used for drinking
+    #     # and secondary foraging only, not breeding habitat.
+    #     "water_type_weights": {
+    #         "saline_lake": 1.0,
+    #         "lake": 0.6,
+    #         "river": 0.4,
+    #         "permanent_water": 0.5,
+    #     },
+    #     # 30km typical foraging range from breeding colony.
+    #     "daily_range_m": 30_000,
+    #     # High water dependency — completely tied to specific water body
+    #     # types for breeding, feeding, and survival.
+    #     "water_dependency": "high",
+    #     "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9a9.png",
+    #     "icon_static_path": "app/static/Creative-Tail-Animal-flamingo.svg.png",
+    #     "gbif_cache_file": "gbif_phoenicopterus_roseus.gpkg",
+    #     "emoji": "🦩",
+    # },
     "Hyperolius marmoratus": {
         "common_name": "Painted Reed Frog",
         # ---------------------------------------------------------------
