@@ -40,7 +40,7 @@ This is Phase 1 of a three-phase system:
 
 ## The Streamlit App
 
-Live: **https://wildlife-water-stress-atlas-hqkgqyhe6avss39umvefxb.streamlit.app/**
+Live: **https://wildlife-water-stress-atlas-hqkgqyhe6avss39umvefxb.streamlit.app**
 
 An interactive web app built with Streamlit and PyDeck allows users to:
 - Select any of 9 species from the sidebar dropdown
