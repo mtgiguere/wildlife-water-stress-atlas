@@ -340,9 +340,9 @@ def test_species_config_contains_nile_crocodile():
 #     assert "Phoenicopterus roseus" in SPECIES_CONFIG
 
 
-def test_species_config_contains_painted_reed_frog():
-    assert "Hyperolius marmoratus" in SPECIES_CONFIG
+# def test_species_config_contains_painted_reed_frog():
+#     assert "Hyperolius marmoratus" in SPECIES_CONFIG
 
 
-def test_species_config_contains_african_clawed_frog():
-    assert "Xenopus laevis" in SPECIES_CONFIG
+# def test_species_config_contains_african_clawed_frog():
+#     assert "Xenopus laevis" in SPECIES_CONFIG

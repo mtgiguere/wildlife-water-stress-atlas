@@ -365,120 +365,120 @@ SPECIES_CONFIG: dict[str, dict] = {
     #     "gbif_cache_file": "gbif_phoenicopterus_roseus.gpkg",
     #     "emoji": "🦩",
     # },
-    "Hyperolius marmoratus": {
-        "common_name": "Painted Reed Frog",
-        # ---------------------------------------------------------------
-        # Painted Reed Frog
-        # ---------------------------------------------------------------
-        # Painted reed frogs are among the most water-stress-sensitive
-        # vertebrates in Africa and serve as a critical early warning
-        # indicator species for wetland degradation. As amphibians they
-        # require water at every stage of their lifecycle — eggs and
-        # tadpoles are fully aquatic, adults require high humidity and
-        # proximity to water for reproduction and skin respiration.
-        #
-        # They are the "canary in the coal mine" for this atlas —
-        # where elephants can survive 300km from water, reed frogs
-        # cannot survive more than ~2km from a wetland or water body.
-        # Their disappearance from a region signals ecosystem collapse
-        # well before megafauna are affected.
-        #
-        # The 2km threshold reflects their extremely limited dispersal
-        # ability — reed frogs are small, slow, and desiccation-prone.
-        # A reed frog 2km from water in dry season is functionally dead.
-        "water_threshold_m": 2_000,
-        # Reed frogs require seasonal and permanent wetlands for breeding.
-        # They are found in reed beds, marshes, and vegetation adjacent
-        # to water. Critically they depend on SEASONAL water — they breed
-        # in response to rainfall and seasonal flooding, making them
-        # sensitive to changes in seasonal water availability as well
-        # as permanent water loss.
-        "accessible_water_types": {"wetland", "floodplain", "river", "lake", "surface_water", "permanent_water"},
-        # Wetlands and floodplains weighted highest — reed beds and
-        # emergent vegetation are essential breeding habitat.
-        # Rivers and lakes used for dispersal corridors between wetlands.
-        # All values are heuristic placeholders — amphibian ecological
-        # validation is a future step with herpetology collaborators.
-        "water_type_weights": {
-            "wetland": 1.0,
-            "floodplain": 0.9,
-            "river": 0.6,
-            "lake": 0.5,
-            "surface_water": 0.8,
-            "permanent_water": 0.7,
-        },
-        # 2km typical dispersal range — reed frogs are extremely
-        # sedentary compared to megafauna. This tight range means
-        # grid cell sizing needs to be much finer for amphibians
-        # than for elephants — a future Phase 2 consideration.
-        "daily_range_m": 2_000,
-        # Highest water dependency of any species in the atlas —
-        # amphibians require water for respiration, reproduction,
-        # and temperature regulation. No water = no reed frogs.
-        "water_dependency": "high",
-        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
-        "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
-        "gbif_cache_file": "gbif_hyperolius_marmoratus.gpkg",
-        "emoji": "🐸",
-    },
-    "Xenopus laevis": {
-        "common_name": "African Clawed Frog",
-        # ---------------------------------------------------------------
-        # African Clawed Frog
-        # ---------------------------------------------------------------
-        # The African clawed frog is the most scientifically studied
-        # amphibian in the world — it was the first vertebrate cloned
-        # and has been used in laboratories globally since the 1930s.
-        # This gives it an exceptionally large and well-documented GBIF
-        # dataset, making it an ideal indicator species for the atlas.
-        #
-        # Unlike the painted reed frog which lives IN vegetation adjacent
-        # to water, Xenopus laevis is fully aquatic — it spends its entire
-        # life in water, only leaving during drought to aestivate in mud
-        # or disperse to new water bodies. It is a permanent water obligate
-        # in the truest sense.
-        #
-        # The 5km threshold reflects its limited overland dispersal ability
-        # during drought-driven migration. A Xenopus more than 5km from
-        # permanent water during dry season is in severe stress — it will
-        # desiccate rapidly without water for skin respiration.
-        #
-        # NOTE: Xenopus laevis is also an invasive species outside Africa —
-        # GBIF records include European and American populations from
-        # escaped laboratory specimens. These are intentionally preserved
-        # in the dataset — they are a data quality story, not noise.
-        # The Prescribe layer will flag non-African records as low-confidence.
-        "water_threshold_m": 5_000,
-        # Xenopus is fully aquatic — it requires permanent standing water.
-        # Unlike reed frogs it does not use seasonal floodplains for
-        # breeding — it needs year-round water bodies deep enough to
-        # remain after seasonal drying. Highly tolerant of turbid,
-        # low-oxygen water but not saline sources.
-        "accessible_water_types": {"lake", "river", "wetland", "surface_water", "permanent_water"},
-        # Permanent deep water bodies weighted highest — Xenopus needs
-        # water that persists through the dry season. Rivers weighted
-        # lower than lakes — Xenopus prefers still or slow-moving water.
-        # All values are heuristic placeholders pending herpetology review.
-        "water_type_weights": {
-            "lake": 1.0,
-            "river": 0.5,
-            "wetland": 0.8,
-            "surface_water": 0.7,
-            "permanent_water": 1.0,
-        },
-        # 5km overland dispersal range during drought aestivation.
-        # In water Xenopus can travel much further but overland movement
-        # is slow and dangerous — desiccation risk limits dispersal.
-        "daily_range_m": 5_000,
-        # Highest water dependency — fully aquatic obligate.
-        # Cannot survive outside water except during brief drought
-        # dispersal events.
-        "water_dependency": "high",
-        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
-        "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
-        "gbif_cache_file": "gbif_xenopus_laevis.gpkg",
-        "emoji": "🐸",
-    },
+    # "Hyperolius marmoratus": {
+    #     "common_name": "Painted Reed Frog",
+    #     # ---------------------------------------------------------------
+    #     # Painted Reed Frog
+    #     # ---------------------------------------------------------------
+    #     # Painted reed frogs are among the most water-stress-sensitive
+    #     # vertebrates in Africa and serve as a critical early warning
+    #     # indicator species for wetland degradation. As amphibians they
+    #     # require water at every stage of their lifecycle — eggs and
+    #     # tadpoles are fully aquatic, adults require high humidity and
+    #     # proximity to water for reproduction and skin respiration.
+    #     #
+    #     # They are the "canary in the coal mine" for this atlas —
+    #     # where elephants can survive 300km from water, reed frogs
+    #     # cannot survive more than ~2km from a wetland or water body.
+    #     # Their disappearance from a region signals ecosystem collapse
+    #     # well before megafauna are affected.
+    #     #
+    #     # The 2km threshold reflects their extremely limited dispersal
+    #     # ability — reed frogs are small, slow, and desiccation-prone.
+    #     # A reed frog 2km from water in dry season is functionally dead.
+    #     "water_threshold_m": 2_000,
+    #     # Reed frogs require seasonal and permanent wetlands for breeding.
+    #     # They are found in reed beds, marshes, and vegetation adjacent
+    #     # to water. Critically they depend on SEASONAL water — they breed
+    #     # in response to rainfall and seasonal flooding, making them
+    #     # sensitive to changes in seasonal water availability as well
+    #     # as permanent water loss.
+    #     "accessible_water_types": {"wetland", "floodplain", "river", "lake", "surface_water", "permanent_water"},
+    #     # Wetlands and floodplains weighted highest — reed beds and
+    #     # emergent vegetation are essential breeding habitat.
+    #     # Rivers and lakes used for dispersal corridors between wetlands.
+    #     # All values are heuristic placeholders — amphibian ecological
+    #     # validation is a future step with herpetology collaborators.
+    #     "water_type_weights": {
+    #         "wetland": 1.0,
+    #         "floodplain": 0.9,
+    #         "river": 0.6,
+    #         "lake": 0.5,
+    #         "surface_water": 0.8,
+    #         "permanent_water": 0.7,
+    #     },
+    #     # 2km typical dispersal range — reed frogs are extremely
+    #     # sedentary compared to megafauna. This tight range means
+    #     # grid cell sizing needs to be much finer for amphibians
+    #     # than for elephants — a future Phase 2 consideration.
+    #     "daily_range_m": 2_000,
+    #     # Highest water dependency of any species in the atlas —
+    #     # amphibians require water for respiration, reproduction,
+    #     # and temperature regulation. No water = no reed frogs.
+    #     "water_dependency": "high",
+    #     "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
+    #     "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
+    #     "gbif_cache_file": "gbif_hyperolius_marmoratus.gpkg",
+    #     "emoji": "🐸",
+    # },
+    # "Xenopus laevis": {
+    #     "common_name": "African Clawed Frog",
+    #     # ---------------------------------------------------------------
+    #     # African Clawed Frog
+    #     # ---------------------------------------------------------------
+    #     # The African clawed frog is the most scientifically studied
+    #     # amphibian in the world — it was the first vertebrate cloned
+    #     # and has been used in laboratories globally since the 1930s.
+    #     # This gives it an exceptionally large and well-documented GBIF
+    #     # dataset, making it an ideal indicator species for the atlas.
+    #     #
+    #     # Unlike the painted reed frog which lives IN vegetation adjacent
+    #     # to water, Xenopus laevis is fully aquatic — it spends its entire
+    #     # life in water, only leaving during drought to aestivate in mud
+    #     # or disperse to new water bodies. It is a permanent water obligate
+    #     # in the truest sense.
+    #     #
+    #     # The 5km threshold reflects its limited overland dispersal ability
+    #     # during drought-driven migration. A Xenopus more than 5km from
+    #     # permanent water during dry season is in severe stress — it will
+    #     # desiccate rapidly without water for skin respiration.
+    #     #
+    #     # NOTE: Xenopus laevis is also an invasive species outside Africa —
+    #     # GBIF records include European and American populations from
+    #     # escaped laboratory specimens. These are intentionally preserved
+    #     # in the dataset — they are a data quality story, not noise.
+    #     # The Prescribe layer will flag non-African records as low-confidence.
+    #     "water_threshold_m": 5_000,
+    #     # Xenopus is fully aquatic — it requires permanent standing water.
+    #     # Unlike reed frogs it does not use seasonal floodplains for
+    #     # breeding — it needs year-round water bodies deep enough to
+    #     # remain after seasonal drying. Highly tolerant of turbid,
+    #     # low-oxygen water but not saline sources.
+    #     "accessible_water_types": {"lake", "river", "wetland", "surface_water", "permanent_water"},
+    #     # Permanent deep water bodies weighted highest — Xenopus needs
+    #     # water that persists through the dry season. Rivers weighted
+    #     # lower than lakes — Xenopus prefers still or slow-moving water.
+    #     # All values are heuristic placeholders pending herpetology review.
+    #     "water_type_weights": {
+    #         "lake": 1.0,
+    #         "river": 0.5,
+    #         "wetland": 0.8,
+    #         "surface_water": 0.7,
+    #         "permanent_water": 1.0,
+    #     },
+    #     # 5km overland dispersal range during drought aestivation.
+    #     # In water Xenopus can travel much further but overland movement
+    #     # is slow and dangerous — desiccation risk limits dispersal.
+    #     "daily_range_m": 5_000,
+    #     # Highest water dependency — fully aquatic obligate.
+    #     # Cannot survive outside water except during brief drought
+    #     # dispersal events.
+    #     "water_dependency": "high",
+    #     "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
+    #     "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
+    #     "gbif_cache_file": "gbif_xenopus_laevis.gpkg",
+    #     "emoji": "🐸",
+    # },
 }
 
 
