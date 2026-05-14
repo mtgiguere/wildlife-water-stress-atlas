@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wildlife Water Stress Atlas</title>
+
+  <!-- Mapbox GL JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+  <!-- Google Fonts: Bebas Neue (display) + DM Sans (body) -->
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --bg:          #080C10;
+      --panel:       #0D1318;
+      --panel-border:#1A2530;
+      --accent:      #00C4FF;
+      --accent-dim:  rgba(0, 196, 255, 0.12);
+      --accent-glow: rgba(0, 196, 255, 0.35);
+      --water:       rgba(0, 180, 255, 0.75);
+      --danger:      #FF5A3C;
+      --text-primary:#E8EFF5;
+      --text-muted:  #5A7A8A;
+      --text-dim:    #2A4050;
+      --font-display:'Bebas Neue', sans-serif;
+      --font-body:   'DM Sans', sans-serif;
+      --panel-w:     320px;
+      --radius:      6px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* ── Map ───────────────────────────────────────────────────── */
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* ── Left panel ────────────────────────────────────────────── */
+    #panel {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: var(--panel-w);
+      background: linear-gradient(180deg, rgba(8,12,16,0.97) 0%, rgba(13,19,24,0.93) 100%);
+      border-right: 1px solid var(--panel-border);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Header */
+    #panel-header {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+    }
+
+    .atlas-label {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      opacity: 0.8;
+    }
+
+    .atlas-title {
+      font-family: var(--font-display);
+      font-size: 32px;
+      letter-spacing: 2px;
+      line-height: 1.05;
+      color: var(--text-primary);
+    }
+
+    .atlas-subtitle {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      font-weight: 300;
+    }
+
+    /* Panel body */
+    #panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    #panel-body::-webkit-scrollbar { width: 4px; }
+    #panel-body::-webkit-scrollbar-track { background: transparent; }
+    #panel-body::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+    /* Section label */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    /* Species selector */
+    #species-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .species-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+      font-family: var(--font-body);
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .species-btn:hover {
+      background: var(--accent-dim);
+      border-color: var(--panel-border);
+    }
+
+    .species-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .species-emoji { font-size: 18px; line-height: 1; flex-shrink: 0; }
+
+    .species-info { flex: 1; min-width: 0; }
+
+    .species-common {
+      font-weight: 500;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .species-scientific {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-style: italic;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .species-tier {
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    /* Year slider */
+    #year-section { }
+
+    #year-display {
+      font-family: var(--font-display);
+      font-size: 52px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 12px;
+      text-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    #year-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--panel-border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    #year-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    #year-slider::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+    #year-range-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Stats */
+    #stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 26px;
+      letter-spacing: 1px;
+      color: var(--text-primary);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .stat-value.accent { color: var(--accent); }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.3;
+      font-weight: 300;
+    }
+
+    /* Water legend */
+    #legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .legend-line {
+      width: 20px; height: 2px;
+      background: var(--water);
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    .legend-poly {
+      width: 14px; height: 14px;
+      background: rgba(0, 180, 255, 0.25);
+      border: 1px solid var(--water);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+      flex-shrink: 0;
+    }
+
+    /* Panel footer */
+    #panel-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--panel-border);
+      font-size: 10px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+
+    /* ── Loading overlay ───────────────────────────────────────── */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      transition: opacity 0.6s ease;
+    }
+
+    #loading.hidden { opacity: 0; pointer-events: none; }
+
+    .loading-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: 4px;
+      color: var(--accent);
+    }
+
+    .loading-bar-track {
+      width: 200px; height: 2px;
+      background: var(--panel-border);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .loading-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 1px;
+      animation: loadpulse 1.4s ease-in-out infinite;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    @keyframes loadpulse {
+      0%   { width: 0%; margin-left: 0; }
+      50%  { width: 60%; margin-left: 20%; }
+      100% { width: 0%; margin-left: 100%; }
+    }
+
+    .loading-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Tooltip ───────────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: rgba(8,12,16,0.95);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-primary);
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+      box-shadow: 0 0 20px var(--accent-glow);
+      max-width: 200px;
+      line-height: 1.6;
+    }
+
+    /* ── COVID annotation ──────────────────────────────────────── */
+    #covid-note {
+      position: absolute;
+      bottom: 32px;
+      right: 24px;
+      background: rgba(8,12,16,0.9);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--text-primary);
+      max-width: 220px;
+      z-index: 10;
+      display: none;
+      line-height: 1.5;
+      box-shadow: 0 0 16px rgba(255,90,60,0.2);
+    }
+
+    #covid-note strong {
+      color: var(--danger);
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    /* ── Mapbox attribution nudge ──────────────────────────────── */
+    .mapboxgl-ctrl-bottom-right {
+      right: 0;
+      bottom: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading">
+  <div class="loading-title">WILDLIFE WATER STRESS ATLAS</div>
+  <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
+  <div class="loading-sub">Loading water network &amp; occurrence data…</div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Left panel -->
+<div id="panel">
+  <div id="panel-header">
+    <div class="atlas-label">Phase 1 — Describe</div>
+    <div class="atlas-title">WILDLIFE<br>WATER STRESS<br>ATLAS</div>
+    <div class="atlas-subtitle">Tracking species occurrence records against freshwater availability across Africa.</div>
+  </div>
+
+  <div id="panel-body">
+
+    <!-- Species -->
+    <div>
+      <div class="section-label">Species</div>
+      <div id="species-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Year -->
+    <div id="year-section">
+      <div class="section-label">Year</div>
+      <div id="year-display">2020</div>
+      <input type="range" id="year-slider" min="1800" max="2024" value="2020" step="1" />
+      <div id="year-range-labels">
+        <span>1800</span>
+        <span>2024</span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div>
+      <div class="section-label">Statistics</div>
+      <div id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value accent" id="stat-year-count">—</div>
+          <div class="stat-label">Records this year</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-count">—</div>
+          <div class="stat-label">Total in dataset</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">20K+</div>
+          <div class="stat-label">Water sources mapped</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">9</div>
+          <div class="stat-label">Species tracked</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div>
+      <div class="section-label">Legend</div>
+      <div id="legend">
+        <div class="legend-item">
+          <div class="legend-line"></div>
+          <span>Rivers &amp; waterways</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-poly"></div>
+          <span>Lakes, wetlands &amp; pans</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot"></div>
+          <span id="legend-species-label">Species occurrences</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-body -->
+
+  <div id="panel-footer">
+    Sources: GBIF · GLWD v2 (Lehner et al., 2025)<br>
+    Natural Earth · JRC Global Surface Water
+  </div>
+</div><!-- /panel -->
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<!-- COVID annotation -->
+<div id="covid-note">
+  <strong>⚠ COVID-19 DIP</strong>
+  Field researchers couldn't access sites in 2020 — reflected in the record count drop. Data gaps are insights.
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONFIG — replace with your token
+// ─────────────────────────────────────────────────────────────────
+const MAPBOX_TOKEN = 'YOUR_MAPBOX_TOKEN_HERE';
+
+// Species config will be loaded from data/species_config.json
+// Tier labels for display
+const TIER_LABELS = {
+  'Loxodonta africana':      'Megafauna',
+  'Equus quagga':            'Herbivore',
+  'Giraffa camelopardalis':  'Herbivore',
+  'Panthera leo':            'Carnivore',
+  'Acinonyx jubatus':        'Carnivore',
+  'Crocodylus niloticus':    'Indicator',
+  'Phoenicopterus roseus':   'Indicator',
+  'Hyperolius marmoratus':   'Indicator',
+  'Xenopus laevis':          'Indicator',
+};
+
+// ─────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────
+let speciesConfig   = {};
+let allFeatures     = [];   // all occurrence features for current species
+let currentSpecies  = 'Loxodonta africana';
+let currentYear     = 2020;
+let mapReady        = false;
+
+// ─────────────────────────────────────────────────────────────────
+// MAP INIT
+// ─────────────────────────────────────────────────────────────────
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: [20, 0],
+  zoom: 3,
+  minZoom: 2,
+  maxZoom: 12,
+  projection: 'mercator',
+});
+
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+// ─────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return n.toLocaleString();
+}
+
+function getOccurrenceFile(scientificName) {
+  // Mirror the Python export naming: occurrences_gbif_{genus}_{species}.geojson
+  const slug = scientificName.toLowerCase().replace(' ', '_');
+  return `data/occurrences_gbif_${slug}.geojson`;
+}
+
+function filterByYear(features, year) {
+  return features.filter(f => f.properties.year === year);
+}
+
+function updateStats(yearFeatures) {
+  document.getElementById('stat-year-count').textContent = fmt(yearFeatures.length);
+  document.getElementById('stat-total-count').textContent = fmt(allFeatures.length);
+  document.getElementById('covid-note').style.display = currentYear === 2020 ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// YEAR SLIDER
+// ─────────────────────────────────────────────────────────────────
+function getYearRange(features) {
+  if (!features.length) return { min: 1800, max: 2024 };
+  const years = features.map(f => f.properties.year).filter(Boolean);
+  return { min: Math.min(...years), max: Math.max(...years) };
+}
+
+function applyYearFilter(year) {
+  currentYear = year;
+  document.getElementById('year-display').textContent = year;
+
+  const yearFeatures = filterByYear(allFeatures, year);
+
+  if (map.getSource('occurrences')) {
+    map.getSource('occurrences').setData({
+      type: 'FeatureCollection',
+      features: yearFeatures,
+    });
+  }
+
+  updateStats(yearFeatures);
+}
+
+document.getElementById('year-slider').addEventListener('input', e => {
+  applyYearFilter(parseInt(e.target.value));
+});
+
+// ─────────────────────────────────────────────────────────────────
+// LOAD OCCURRENCE DATA FOR SELECTED SPECIES
+// ─────────────────────────────────────────────────────────────────
+async function loadSpecies(scientificName) {
+  currentSpecies = scientificName;
+
+  // Update active button
+  document.querySelectorAll('.species-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.species === scientificName);
+  });
+
+  // Update legend label
+  const cfg = speciesConfig[scientificName] || {};
+  document.getElementById('legend-species-label').textContent =
+    `${cfg.emoji || ''} ${cfg.common_name || scientificName} occurrences`;
+
+  // Fetch GeoJSON
+  const url = getOccurrenceFile(scientificName);
+  let geojson;
+  try {
+    const res = await fetch(url);
+    geojson = await res.json();
+  } catch (e) {
+    console.warn('Could not load occurrences for', scientificName, e);
+    geojson = { type: 'FeatureCollection', features: [] };
+  }
+
+  allFeatures = geojson.features;
+
+  // Update year slider range
+  const { min, max } = getYearRange(allFeatures);
+  const slider = document.getElementById('year-slider');
+  slider.min   = min;
+  slider.max   = max;
+
+  // Clamp current year to valid range
+  const clampedYear = Math.max(min, Math.min(max, currentYear));
+  slider.value = clampedYear;
+
+  document.getElementById('year-range-labels').innerHTML =
+    `<span>${min}</span><span>${max}</span>`;
+
+  applyYearFilter(clampedYear);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BUILD SPECIES BUTTONS
+// ─────────────────────────────────────────────────────────────────
+function buildSpeciesGrid(config) {
+  const grid = document.getElementById('species-grid');
+  grid.innerHTML = '';
+
+  Object.entries(config).forEach(([sci, cfg]) => {
+    const btn = document.createElement('button');
+    btn.className = 'species-btn';
+    btn.dataset.species = sci;
+    btn.innerHTML = `
+      <span class="species-emoji">${cfg.emoji || '🐾'}</span>
+      <span class="species-info">
+        <span class="species-common">${cfg.common_name}</span>
+        <span class="species-scientific">${sci}</span>
+      </span>
+      <span class="species-tier">${TIER_LABELS[sci] || ''}</span>
+    `;
+    btn.addEventListener('click', () => loadSpecies(sci));
+    grid.appendChild(btn);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TOOLTIP
+// ─────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e, props) {
+  const cfg = speciesConfig[currentSpecies] || {};
+  tooltip.innerHTML = `
+    <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
+    Year: ${props.year || '—'}
+  `;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const x = e.originalEvent.clientX;
+  const y = e.originalEvent.clientY;
+  tooltip.style.left = (x + 14) + 'px';
+  tooltip.style.top  = (y - 10) + 'px';
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAP LOAD — ADD LAYERS
+// ─────────────────────────────────────────────────────────────────
+map.on('load', async () => {
+
+  // ── Water layer ──────────────────────────────────────────────
+  map.addSource('water', {
+    type: 'geojson',
+    data: 'data/water.geojson',
+    buffer: 64,
+    tolerance: 0.5,
+  });
+
+  // River lines
+  map.addLayer({
+    id: 'water-lines',
+    type: 'line',
+    source: 'water',
+    filter: ['==', ['geometry-type'], 'LineString'],
+    paint: {
+      'line-color': '#00B4FF',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.6, 6, 2],
+      'line-opacity': 0.7,
+    },
+  });
+
+  // Lake / wetland polygons
+  map.addLayer({
+    id: 'water-polygons-fill',
+    type: 'fill',
+    source: 'water',
+    filter: ['any',
+      ['==', ['geometry-type'], 'Polygon'],
+      ['==', ['geometry-type'], 'MultiPolygon'],
+    ],
+    paint: {
+      'fill-color': '#00B4FF',
+      'fill-opacity': 0.20,
+    },
+  });
+
+  map.addLayer({
+    id: 'water-polygons-stroke',
+    type: 'line',
+    source: 'water',
+    filter: ['any',
+      ['==', ['geometry-type'], 'Polygon'],
+      ['==', ['geometry-type'], 'MultiPolygon'],
+    ],
+    paint: {
+      'line-color': '#00B4FF',
+      'line-width': 0.8,
+      'line-opacity': 0.5,
+    },
+  });
+
+  // ── Occurrences layer (empty until species loads) ─────────────
+  map.addSource('occurrences', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addLayer({
+    id: 'occurrences-glow',
+    type: 'circle',
+    source: 'occurrences',
+    paint: {
+      'circle-radius':  8,
+      'circle-color':   '#00C4FF',
+      'circle-opacity': 0.15,
+      'circle-blur':    1,
+    },
+  });
+
+  map.addLayer({
+    id: 'occurrences-dot',
+    type: 'circle',
+    source: 'occurrences',
+    paint: {
+      'circle-radius':        3.5,
+      'circle-color':         '#00C4FF',
+      'circle-opacity':       0.85,
+      'circle-stroke-width':  0.5,
+      'circle-stroke-color':  '#FFFFFF',
+      'circle-stroke-opacity':0.3,
+    },
+  });
+
+  // ── Tooltip events ────────────────────────────────────────────
+  map.on('mouseenter', 'occurrences-dot', e => {
+    map.getCanvas().style.cursor = 'pointer';
+    showTooltip(e, e.features[0].properties);
+  });
+  map.on('mousemove', 'occurrences-dot', e => {
+    moveTooltip(e);
+  });
+  map.on('mouseleave', 'occurrences-dot', () => {
+    map.getCanvas().style.cursor = '';
+    hideTooltip();
+  });
+
+  mapReady = true;
+
+  // ── Load species config + initial species ─────────────────────
+  try {
+    const res = await fetch('data/species_config.json');
+    speciesConfig = await res.json();
+  } catch (e) {
+    console.warn('Could not load species_config.json', e);
+  }
+
+  buildSpeciesGrid(speciesConfig);
+  await loadSpecies(currentSpecies);
+
+  // Hide loading screen
+  const loading = document.getElementById('loading');
+  loading.classList.add('hidden');
+  setTimeout(() => loading.remove(), 700);
+});
+
+</script>
+</body>
+</html>
