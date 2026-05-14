@@ -480,105 +480,6 @@
       color: var(--accent);
       box-shadow: 0 0 12px var(--accent-glow);
     }
-
-    /* ── Trend chart modal (draggable) ────────────────────────── */
-    #trend-panel {
-      position: absolute;
-      top: 80px;
-      left: 360px;
-      width: 480px;
-      height: 280px;
-      background: linear-gradient(180deg, rgba(8,12,16,0.97) 0%, rgba(8,12,16,0.98) 100%);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      z-index: 20;
-      display: none;
-      flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,196,255,0.1);
-      user-select: none;
-    }
-
-    #trend-panel.visible {
-      display: flex;
-    }
-
-    #trend-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px 8px;
-      border-bottom: 1px solid var(--panel-border);
-      cursor: grab;
-      flex-shrink: 0;
-      border-radius: 8px 8px 0 0;
-    }
-
-    #trend-header:active { cursor: grabbing; }
-
-    #trend-title {
-      font-family: var(--font-display);
-      font-size: 16px;
-      letter-spacing: 2px;
-      color: var(--text-primary);
-    }
-
-    #trend-meta {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .trend-badge {
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 3px 8px;
-      border-radius: 3px;
-      font-family: var(--font-display);
-    }
-
-    .trend-badge.increasing { background: rgba(0,196,255,0.15); color: var(--accent); border: 1px solid var(--accent); }
-    .trend-badge.declining  { background: rgba(255,90,60,0.15);  color: var(--danger); border: 1px solid var(--danger); }
-    .trend-badge.stable     { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--panel-border); }
-
-    #trend-r2 {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-
-    #trend-close {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 16px;
-      padding: 0 4px;
-    }
-
-    #trend-close:hover { color: var(--text-primary); }
-
-    #trend-body {
-      flex: 1;
-      padding: 8px 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-height: 0;
-    }
-
-    #trend-r2-full {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-
-    #trend-canvas {
-      flex: 1;
-      width: 100%;
-      min-height: 0;
-    }
-
   </style>
 </head>
 <body>
@@ -1202,8 +1103,6 @@ map.on('load', async () => {
     map.setLayoutProperty('occurrences-glow', 'visibility', 'visible');
     if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'none');
     if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'none');
-    if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'visible');
-    if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'visible');
     stopPlay();
   }
 
@@ -1213,8 +1112,6 @@ map.on('load', async () => {
     map.setLayoutProperty('occurrences-glow', 'visibility', 'none');
     if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'visible');
     if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'visible');
-    if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'none');
-    if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'none');
     applyCountryView(currentYear);
     stopPlay();
   }
@@ -1303,158 +1200,7 @@ map.on('load', async () => {
       hideTooltip();
     });
   }
-  // ─────────────────────────────────────────────────────────────────
-  // TREND CHART
-  // ─────────────────────────────────────────────────────────────────
-  let trendPanel = document.getElementById('trend-panel');
-  document.getElementById('trend-close').addEventListener('click', () => {
-    trendPanel.classList.remove('visible');
-  });
 
-  function showTrendChart(iso, name) {
-    const series = getCountryTimeSeries(iso);
-    if (!series.length) return;
-
-    // Update header
-    document.getElementById('trend-title').textContent = name.toUpperCase();
-
-    const slope = series[0].slope;
-    const r2    = series[0].r2;
-    const trend = series[0].trend;
-
-    const badge = document.getElementById('trend-badge');
-    badge.textContent = trend.toUpperCase();
-    badge.className   = `trend-badge ${trend}`;
-
-    document.getElementById('trend-r2-full').textContent =
-      `slope: ${slope.toFixed(2)} rec/yr · r²: ${r2.toFixed(2)}`;
-
-    // Draw chart
-    const canvas = document.getElementById('trend-canvas');
-    const ctx    = canvas.getContext('2d');
-    canvas.width  = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    const years  = series.map(d => d.year);
-    const counts = series.map(d => d.count);
-    const minY   = 0;
-    const maxY   = Math.max(...counts, 1);
-    const minX   = Math.min(...years);
-    const maxX   = Math.max(...years);
-
-    const pad = { top: 10, right: 20, bottom: 24, left: 36 };
-    const w   = canvas.width  - pad.left - pad.right;
-    const h   = canvas.height - pad.top  - pad.bottom;
-
-    const toX = x => pad.left + ((x - minX) / (maxX - minX || 1)) * w;
-    const toY = y => pad.top  + (1 - (y - minY) / (maxY - minY || 1)) * h;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth   = 1;
-    [0, 0.25, 0.5, 0.75, 1].forEach(t => {
-      const y = pad.top + t * h;
-      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + w, y); ctx.stroke();
-    });
-
-    // X axis labels
-    ctx.fillStyle  = 'rgba(90,122,138,0.8)';
-    ctx.font       = '10px DM Sans';
-    ctx.textAlign  = 'center';
-    years.filter((_, i) => i % Math.ceil(years.length / 6) === 0).forEach(yr => {
-      ctx.fillText(yr, toX(yr), canvas.height - 4);
-    });
-
-    // Y axis labels
-    ctx.textAlign = 'right';
-    [0, 0.5, 1].forEach(t => {
-      const val = Math.round(minY + t * (maxY - minY));
-      ctx.fillText(val, pad.left - 4, pad.top + (1 - t) * h + 4);
-    });
-
-    // Data line
-    ctx.strokeStyle = 'rgba(0,196,255,0.8)';
-    ctx.lineWidth   = 2;
-    ctx.beginPath();
-    series.forEach((d, i) => {
-      if (i === 0) ctx.moveTo(toX(d.year), toY(d.count));
-      else         ctx.lineTo(toX(d.year), toY(d.count));
-    });
-    ctx.stroke();
-
-    // Data points
-    ctx.fillStyle = 'rgba(0,196,255,1)';
-    series.forEach(d => {
-      ctx.beginPath();
-      ctx.arc(toX(d.year), toY(d.count), 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Trend line
-    const intercept = series[0].slope * minX + (counts[0] - series[0].slope * years[0]);
-    const y1 = series[0].slope * minX + intercept;
-    const y2 = series[0].slope * maxX + intercept;
-
-    ctx.strokeStyle = trend === 'increasing' ? 'rgba(0,196,255,0.4)' :
-                      trend === 'declining'  ? 'rgba(255,90,60,0.6)' :
-                                              'rgba(255,255,255,0.2)';
-    ctx.lineWidth   = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(toX(minX), toY(Math.max(minY, y1)));
-    ctx.lineTo(toX(maxX), toY(Math.max(minY, y2)));
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    trendPanel.classList.add('visible');
-  }
-
-  function getCountryTimeSeries(iso) {
-    return countryData
-      .filter(d => d.ISO_A3 === iso)
-      .sort((a, b) => a.year - b.year);
-  }
-
-  // Country click → trend chart
-  map.on('click', 'countries-fill', e => {
-    const props = e.features[0].properties;
-    if (!props.count) return;
-    showTrendChart(props.ISO_A3, props.NAME);
-  });
-
-  // ─────────────────────────────────────────────────────────────────
-  // DRAGGABLE MODAL
-  // ─────────────────────────────────────────────────────────────────
-  (function() {
-    const panel  = document.getElementById('trend-panel');
-    const header = document.getElementById('trend-header');
-    let dragging = false, startX, startY, startLeft, startTop;
-
-    header.addEventListener('mousedown', e => {
-      if (e.target === document.getElementById('trend-close')) return;
-      dragging = true;
-      startX    = e.clientX;
-      startY    = e.clientY;
-      startLeft = panel.offsetLeft;
-      startTop  = panel.offsetTop;
-      header.style.cursor = 'grabbing';
-    });
-
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      panel.style.left = Math.max(0, startLeft + dx) + 'px';
-      panel.style.top  = Math.max(0, startTop  + dy) + 'px';
-    });
-
-    document.addEventListener('mouseup', () => {
-      dragging = false;
-      header.style.cursor = 'grab';
-    });
-  })();
 
 </script>
 </body>

@@ -21,7 +21,6 @@ TODO Phase 2 — Live Data:
 
 import geopandas as gpd
 
-from wildlife_water_stress_atlas.analytics.trends import add_trends_to_country_counts
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 COUNTRY_COLS = ["NAME", "ISO_A3", "CONTINENT"]
@@ -49,32 +48,13 @@ def export_country_counts(scientific_name, data_dir, output_dir, countries_path)
     countries = load_countries(countries_path)
     joined = join_occurrences_to_countries(occurrences, countries)
     counts = aggregate_by_country_year(joined)
-    counts_with_trends = add_trends_to_country_counts(counts.to_dict("records"))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"country_counts_{cfg['gbif_cache_file'].replace('.gpkg', '.geojson')}"
 
-    import json
-
-    output_file.write_text(json.dumps(counts_with_trends))
+    counts.to_json(output_file, orient="records")
 
 
 def export_all_country_counts(data_dir, output_dir, countries_path):
     for scientific_name in SPECIES_CONFIG:
         export_country_counts(scientific_name, data_dir, output_dir, countries_path)
-
-
-def main():
-    from pathlib import Path
-
-    export_all_country_counts(
-        data_dir=Path("data/processed"),
-        output_dir=Path("apps/mapbox/data"),
-        countries_path=Path("data/raw/countries/ne_110m_admin_0_countries.shp"),
-    )
-
-
-# pragma: no cover — __main__ block is an entry point, not unit-testable.
-# Covered implicitly by running the script directly.
-if __name__ == "__main__":  # pragma: no cover
-    main()
