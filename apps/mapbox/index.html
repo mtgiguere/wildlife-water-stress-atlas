@@ -408,6 +408,78 @@
       right: 0;
       bottom: 0;
     }
+    /* ── Autoplay controls ─────────────────────────────────────── */
+    #autoplay-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    #play-btn {
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 2px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    #play-btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .speed-btn {
+      font-family: var(--font-body);
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 5px 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--panel-border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .speed-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── View toggle ───────────────────────────────────────────── */
+    #view-toggle {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .view-btn {
+      flex: 1;
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 2px;
+      padding: 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--panel-border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .view-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
   </style>
 </head>
 <body>
@@ -432,6 +504,12 @@
 
   <div id="panel-body">
 
+  <!-- View toggle -->
+  <div id="view-toggle">
+    <button class="view-btn active" data-view="points">⬤ POINTS</button>
+    <button class="view-btn" data-view="countries">▦ COUNTRIES</button>
+  </div>
+
     <!-- Species -->
     <div>
       <div class="section-label">Species</div>
@@ -448,6 +526,12 @@
       <div id="year-range-labels">
         <span>1800</span>
         <span>2024</span>
+      </div>
+      <div id="autoplay-controls">
+        <button id="play-btn">▶ PLAY</button>
+        <button class="speed-btn" data-ms="800">SLOW</button>
+        <button class="speed-btn active" data-ms="400">MED</button>
+        <button class="speed-btn" data-ms="150">FAST</button>
       </div>
     </div>
 
@@ -603,6 +687,7 @@ function applyYearFilter(year) {
   }
 
   updateStats(yearFeatures);
+  if (currentView === 'countries') applyCountryView(year);
 }
 
 document.getElementById('year-slider').addEventListener('input', e => {
@@ -652,6 +737,9 @@ async function loadSpecies(scientificName) {
     `<span>${min}</span><span>${max}</span>`;
 
   applyYearFilter(clampedYear);
+
+  await loadCountryData(scientificName);
+  if (currentView === 'countries') applyCountryView(clampedYear);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -805,6 +893,8 @@ map.on('load', async () => {
     hideTooltip();
   });
 
+  await initCountryLayers();
+  await loadCountryData(currentSpecies);
   mapReady = true;
 
   // ── Load species config + initial species ─────────────────────
@@ -818,11 +908,223 @@ map.on('load', async () => {
   buildSpeciesGrid(speciesConfig);
   await loadSpecies(currentSpecies);
 
+  if (currentView === 'countries') applyCountryView(currentYear);
+  else await loadCountryData(currentSpecies);
+
   // Hide loading screen
   const loading = document.getElementById('loading');
   loading.classList.add('hidden');
   setTimeout(() => loading.remove(), 700);
 });
+
+  // ─────────────────────────────────────────────────────────────────
+  // AUTOPLAY
+  // ─────────────────────────────────────────────────────────────────
+  let playInterval = null;
+  let playSpeed    = 400;
+
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      playSpeed = parseInt(btn.dataset.ms);
+      if (playInterval) {
+        stopPlay();
+        startPlay();
+      }
+    });
+  });
+
+  function startPlay() {
+    const slider = document.getElementById('year-slider');
+    document.getElementById('play-btn').textContent = '⏸ PAUSE';
+    playInterval = setInterval(() => {
+      let next = parseInt(slider.value) + 1;
+      if (next > parseInt(slider.max)) next = parseInt(slider.min);
+      slider.value = next;
+      applyYearFilter(next);
+    }, playSpeed);
+  }
+
+  function stopPlay() {
+    clearInterval(playInterval);
+    playInterval = null;
+    document.getElementById('play-btn').textContent = '▶ PLAY';
+  }
+
+  document.getElementById('play-btn').addEventListener('click', () => {
+    if (playInterval) {
+      stopPlay();
+    } else {
+      startPlay();
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // COUNTRY CHOROPLETH
+  // ─────────────────────────────────────────────────────────────────
+  let currentView       = 'points';
+  let countryData       = [];  // [{NAME, ISO_A3, year, count}, ...]
+  let countriesGeoJSON  = null;
+
+  function getCountryFile(scientificName) {
+    const slug = scientificName.toLowerCase().replace(' ', '_');
+    return `data/country_counts_gbif_${slug}.geojson`;
+  }
+
+  async function loadCountryData(scientificName) {
+    const url = getCountryFile(scientificName);
+    try {
+      const res = await fetch(url);
+      countryData = await res.json();
+    } catch(e) {
+      console.warn('Could not load country data for', scientificName, e);
+      countryData = [];
+    }
+  }
+
+  function getCountryGeoJSONForYear(year) {
+    if (!countriesGeoJSON) return { type: 'FeatureCollection', features: [] };
+
+    const yearCounts = {};
+    countryData
+      .filter(d => d.year === year)
+      .forEach(d => { yearCounts[d.ISO_A3] = d.count; });
+
+    const maxCount = Math.max(...Object.values(yearCounts), 1);
+
+    return {
+      type: 'FeatureCollection',
+      features: countriesGeoJSON.features.map(f => ({
+        ...f,
+        properties: {
+          ...f.properties,
+          count:     yearCounts[f.properties.ISO_A3] || 0,
+          intensity: (yearCounts[f.properties.ISO_A3] || 0) / maxCount,
+        }
+      }))
+    };
+  }
+
+  async function initCountriesGeoJSON() {
+    if (countriesGeoJSON) return;
+    try {
+      const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson');
+      countriesGeoJSON = await res.json();
+    } catch(e) {
+      console.warn('Could not load countries GeoJSON', e);
+    }
+  }
+
+  function applyCountryView(year) {
+    if (!map.getSource('countries')) return;
+    map.getSource('countries').setData(getCountryGeoJSONForYear(year));
+  }
+
+  function showPointsView() {
+    currentView = 'points';
+    map.setLayoutProperty('occurrences-dot',  'visibility', 'visible');
+    map.setLayoutProperty('occurrences-glow', 'visibility', 'visible');
+    if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'none');
+    if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'none');
+    stopPlay();
+  }
+
+  function showCountriesView() {
+    currentView = 'countries';
+    map.setLayoutProperty('occurrences-dot',  'visibility', 'none');
+    map.setLayoutProperty('occurrences-glow', 'visibility', 'none');
+    if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'visible');
+    if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'visible');
+    applyCountryView(currentYear);
+    stopPlay();
+  }
+
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.view === 'points') showPointsView();
+      else showCountriesView();
+    });
+  });
+
+  // Add country layers after map loads — append to end of map.on('load')
+  // We'll hook into the existing load by checking after initCountriesGeoJSON
+  async function initCountryLayers() {
+    await initCountriesGeoJSON();
+    if (!countriesGeoJSON) return;
+
+    map.addSource('countries', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+
+    map.addLayer({
+      id: 'countries-fill',
+      type: 'fill',
+      source: 'countries',
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-color': [
+          'interpolate', ['linear'], ['get', 'intensity'],
+          0,    'rgba(0,196,255,0)',
+          0.01, 'rgba(0,196,255,0.1)',
+          0.25, 'rgba(0,196,255,0.35)',
+          0.5,  'rgba(0,196,255,0.6)',
+          1,    'rgba(0,196,255,0.85)',
+        ],
+        'fill-opacity': 0.8,
+      },
+    });
+
+    map.addLayer({
+      id: 'countries-stroke',
+      type: 'line',
+      source: 'countries',
+      layout: { visibility: 'none' },
+      paint: {
+        'line-color': '#00C4FF',
+        'line-width': 0.5,
+        'line-opacity': 0.4,
+      },
+    });
+
+    // Tooltip for country view
+    map.on('mouseenter', 'countries-fill', e => {
+      const props = e.features[0].properties;
+      if (!props.count) return;
+      map.getCanvas().style.cursor = 'pointer';
+      const cfg = speciesConfig[currentSpecies] || {};
+      tooltip.innerHTML = `
+        <strong>${props.NAME}</strong><br>
+        ${cfg.emoji || ''} ${props.count.toLocaleString()} records<br>
+        <span style="color:var(--text-muted)">Year: ${currentYear}</span>
+      `;
+      tooltip.style.display = 'block';
+      moveTooltip(e);
+    });
+    map.on('mousemove', 'countries-fill', e => {
+    const props = e.features[0].properties;
+    if (!props.count) {
+      hideTooltip();
+      return;
+    }
+    const cfg = speciesConfig[currentSpecies] || {};
+    tooltip.innerHTML = `
+      <strong>${props.NAME}</strong><br>
+      ${cfg.emoji || ''} ${props.count.toLocaleString()} records<br>
+      <span style="color:var(--text-muted)">Year: ${currentYear}</span>
+    `;
+    tooltip.style.display = 'block';
+    moveTooltip(e);
+  });
+    map.on('mouseleave', 'countries-fill', () => {
+      map.getCanvas().style.cursor = '';
+      hideTooltip();
+    });
+  }
+
 
 </script>
 </body>
