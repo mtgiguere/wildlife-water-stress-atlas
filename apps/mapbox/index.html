@@ -408,6 +408,50 @@
       right: 0;
       bottom: 0;
     }
+    /* ── Autoplay controls ─────────────────────────────────────── */
+    #autoplay-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    #play-btn {
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 2px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    #play-btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .speed-btn {
+      font-family: var(--font-body);
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 5px 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--panel-border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .speed-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -448,6 +492,12 @@
       <div id="year-range-labels">
         <span>1800</span>
         <span>2024</span>
+      </div>
+      <div id="autoplay-controls">
+        <button id="play-btn">▶ PLAY</button>
+        <button class="speed-btn" data-ms="800">SLOW</button>
+        <button class="speed-btn active" data-ms="400">MED</button>
+        <button class="speed-btn" data-ms="150">FAST</button>
       </div>
     </div>
 
@@ -824,6 +874,48 @@ map.on('load', async () => {
   setTimeout(() => loading.remove(), 700);
 });
 
+  // ─────────────────────────────────────────────────────────────────
+  // AUTOPLAY
+  // ─────────────────────────────────────────────────────────────────
+  let playInterval = null;
+  let playSpeed    = 400;
+
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      playSpeed = parseInt(btn.dataset.ms);
+      if (playInterval) {
+        stopPlay();
+        startPlay();
+      }
+    });
+  });
+
+  function startPlay() {
+    const slider = document.getElementById('year-slider');
+    document.getElementById('play-btn').textContent = '⏸ PAUSE';
+    playInterval = setInterval(() => {
+      let next = parseInt(slider.value) + 1;
+      if (next > parseInt(slider.max)) next = parseInt(slider.min);
+      slider.value = next;
+      applyYearFilter(next);
+    }, playSpeed);
+  }
+
+  function stopPlay() {
+    clearInterval(playInterval);
+    playInterval = null;
+    document.getElementById('play-btn').textContent = '▶ PLAY';
+  }
+
+  document.getElementById('play-btn').addEventListener('click', () => {
+    if (playInterval) {
+      stopPlay();
+    } else {
+      startPlay();
+    }
+  });
 </script>
 </body>
 </html>
