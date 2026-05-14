@@ -20,9 +20,7 @@ def export_occurrences(input_path, output_path):
 
 def export_species_config(output_path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(SPECIES_CONFIG, default=lambda o: list(o) if isinstance(o, set) else str(o))
-    )
+    output_path.write_text(json.dumps(SPECIES_CONFIG, default=lambda o: list(o) if isinstance(o, set) else str(o)))
 
 
 def export_all(data_dir, output_dir):
