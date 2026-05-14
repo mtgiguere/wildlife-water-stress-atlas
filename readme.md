@@ -38,6 +38,37 @@ This is Phase 1 of a three-phase system:
 
 ---
 
+## The Mapbox App
+
+Live: **https://mtgiguere.github.io/wildlife-water-stress-atlas/**
+
+A high-performance interactive web app built with Mapbox GL JS. All rendering
+happens client-side via WebGL — no server, no payload limits, instant response.
+
+Features:
+- Select any of 9 species from the sidebar
+- Year slider filters occurrence records instantly in the browser
+- Dark Mapbox basemap with blue water network (rivers, wetlands, pans, floodplains)
+- COVID-19 dip annotation — 2020 record drop reflects field access disruption
+- Per-year and total record counts
+- Tooltips on hover
+
+**Why Mapbox over Streamlit:** The Streamlit Community Cloud app was hitting
+payload size limits shipping raw GeoJSON from a Python server to the browser
+on every interaction. Mapbox GL JS renders everything on the client GPU —
+same data, zero server overhead, instant filtering. The GeoJSON files are
+pre-exported once and served as static assets.
+
+Run locally:
+```bash
+python scripts/export_mapbox_data.py   # export GeoJSON from .gpkg files (run once)
+cd apps/mapbox
+python -m http.server 3000
+# Open http://localhost:3000
+```
+
+---
+
 ## The Streamlit App
 
 Live: **https://wildlife-water-stress-atlas-hqkgqyhe6avss39umvefxb.streamlit.app**
@@ -101,10 +132,13 @@ Every source class produces the same columns: `geometry`, `source_id`,
 **The app is layered for multiple audiences.**
 ```
 apps/
-  streamlit/   ← public web app, browser-optimized
+  streamlit/   ← public web app, Python/PyDeck
+  mapbox/      ← high-performance web app, Mapbox GL JS + static GeoJSON
   qgis/        ← planned researcher plugin, full resolution
+scripts/
+  export_mapbox_data.py  ← one-time GeoJSON export from .gpkg files
 ```
-The core library knows nothing about either — it's consumed by both.
+The core library knows nothing about either app — it's consumed by both.
 
 **Data gaps are insights, not failures.**
 GBIF records include imprecise coordinates, historical specimens, and
@@ -123,6 +157,12 @@ pip install -e .
 
 # Pre-fetch GBIF occurrence data for all species (run once)
 python scripts/prefetch_gbif.py
+
+# Export GeoJSON for Mapbox app (run once, or after adding species)
+python scripts/export_mapbox_data.py
+
+# Run the Mapbox app
+cd apps/mapbox && python -m http.server 3000
 
 # Run the Streamlit app
 streamlit run apps/streamlit/streamlit_app.py
@@ -161,7 +201,7 @@ ruff format .
 npx playwright test
 ```
 
-**Test coverage: 246 unit tests + 16 Playwright E2E tests, 100% unit coverage**
+**Test coverage: 273 unit tests + 16 Playwright E2E tests, 100% unit coverage**
 
 ---
 
@@ -186,6 +226,9 @@ npx playwright test
 | Deploy to Streamlit Community Cloud | ✅ Live |
 | Year distribution chart (COVID story) | ✅ Done |
 | CI/CD pipeline (GitHub Actions) | ✅ Done |
+| Mapbox GL JS app (WebGL, client-side rendering) | ✅ Done |
+| GeoJSON export script (gpkg → Mapbox static assets) | ✅ Done |
+| Deploy to GitHub Pages | 📋 Next |
 | Auto-play animation | 📋 Next |
 | Icon clustering at low zoom | 📋 Next |
 | Multi-species overlay mode | 📋 Planned |
