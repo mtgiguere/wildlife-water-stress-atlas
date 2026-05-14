@@ -941,9 +941,56 @@ map.on('load', async () => {
 
   // ── Occurrences layer (empty until species loads) ─────────────
   map.addSource('occurrences', {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      cluster: true,
+      clusterMaxZoom: 6,
+      clusterRadius: 40,
+    });
+
+  // Cluster circles
+    map.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'occurrences',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step', ['get', 'point_count'],
+          '#00C4FF', 50,
+          '#0090CC', 200,
+          '#005F88'
+        ],
+        'circle-radius': [
+          'step', ['get', 'point_count'],
+          14, 50,
+          20, 200,
+          26
+        ],
+        'circle-opacity': 0.85,
+        'circle-stroke-width': 1.5,
+        'circle-stroke-color': '#FFFFFF',
+        'circle-stroke-opacity': 0.3,
+      },
+    });
+
+  // Cluster count labels
+  map.addLayer({
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'occurrences',
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': '{point_count_abbreviated}',
+      'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+      'text-size': 12,
+    },
+    paint: {
+      'text-color': '#ffffff',
+    },
   });
+
+
 
   map.addLayer({
     id: 'occurrences-glow',
@@ -955,6 +1002,7 @@ map.on('load', async () => {
       'circle-opacity': 0.15,
       'circle-blur':    1,
     },
+    filter: ['!', ['has', 'point_count']],
   });
 
   map.addLayer({
@@ -969,6 +1017,7 @@ map.on('load', async () => {
       'circle-stroke-color':  '#FFFFFF',
       'circle-stroke-opacity':0.3,
     },
+    filter: ['!', ['has', 'point_count']],
   });
 
   // ── Tooltip events ────────────────────────────────────────────
@@ -987,6 +1036,18 @@ map.on('load', async () => {
   await initCountryLayers();
   await loadCountryData(currentSpecies);
   mapReady = true;
+
+  map.on('click', 'clusters', e => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+      const clusterId = features[0].properties.cluster_id;
+      map.getSource('occurrences').getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) return;
+        map.easeTo({ center: features[0].geometry.coordinates, zoom });
+      });
+    });
+
+    map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
 
   // ── Load species config + initial species ─────────────────────
   try {
@@ -1118,6 +1179,8 @@ map.on('load', async () => {
     map.setLayoutProperty('occurrences-glow', 'visibility', 'visible');
     if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'none');
     if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'none');
+    if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'visible');
+    if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'visible');
     stopPlay();
   }
 
@@ -1127,6 +1190,8 @@ map.on('load', async () => {
     map.setLayoutProperty('occurrences-glow', 'visibility', 'none');
     if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'visible');
     if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'visible');
+    if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'none');
+    if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'none');
     applyCountryView(currentYear);
     stopPlay();
   }
