@@ -6,8 +6,8 @@
   <title>Wildlife Water Stress Atlas</title>
 
   <!-- Mapbox GL JS -->
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 
   <!-- Google Fonts: Bebas Neue (display) + DM Sans (body) -->
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -481,48 +481,52 @@
       box-shadow: 0 0 12px var(--accent-glow);
     }
 
-    /* ── Trend chart panel ─────────────────────────────────────── */
+    /* ── Trend chart modal (draggable) ────────────────────────── */
     #trend-panel {
       position: absolute;
-      bottom: 0;
-      left: var(--panel-w);
-      right: 0;
-      height: 220px;
-      background: linear-gradient(180deg, rgba(8,12,16,0.92) 0%, rgba(8,12,16,0.98) 100%);
-      border-top: 1px solid var(--panel-border);
+      top: 80px;
+      left: 360px;
+      width: 480px;
+      height: 280px;
+      background: linear-gradient(180deg, rgba(8,12,16,0.97) 0%, rgba(8,12,16,0.98) 100%);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      z-index: 10;
+      z-index: 20;
       display: none;
       flex-direction: column;
-      padding: 16px 24px;
-      gap: 8px;
-      transform: translateY(100%);
-      transition: transform 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,196,255,0.1);
+      user-select: none;
     }
 
     #trend-panel.visible {
       display: flex;
-      transform: translateY(0);
     }
 
     #trend-header {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--panel-border);
+      cursor: grab;
       flex-shrink: 0;
+      border-radius: 8px 8px 0 0;
     }
+
+    #trend-header:active { cursor: grabbing; }
 
     #trend-title {
       font-family: var(--font-display);
-      font-size: 18px;
+      font-size: 16px;
       letter-spacing: 2px;
       color: var(--text-primary);
     }
 
     #trend-meta {
       display: flex;
-      gap: 16px;
+      gap: 10px;
       align-items: center;
     }
 
@@ -555,9 +559,24 @@
 
     #trend-close:hover { color: var(--text-primary); }
 
+    #trend-body {
+      flex: 1;
+      padding: 8px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+    }
+
+    #trend-r2-full {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
     #trend-canvas {
       flex: 1;
       width: 100%;
+      min-height: 0;
     }
 
   </style>
@@ -673,19 +692,23 @@
   <strong>⚠ COVID-19 DIP</strong>
   Field researchers couldn't access sites in 2020 — reflected in the record count drop. Data gaps are insights.
 </div>
-<!-- Trend chart panel -->
+<!-- Trend chart modal -->
 <div id="trend-panel">
   <div id="trend-header">
     <div id="trend-title">COUNTRY TREND</div>
     <div id="trend-meta">
       <span id="trend-badge" class="trend-badge stable">STABLE</span>
-      <span id="trend-r2"></span>
       <button id="trend-close">✕</button>
     </div>
   </div>
-  <canvas id="trend-canvas"></canvas>
+  <div id="trend-body">
+    <div id="trend-r2-full"></div>
+    <canvas id="trend-canvas"></canvas>
+  </div>
 </div>
 <script>
+
+
 // ─────────────────────────────────────────────────────────────────
 // CONFIG — replace with your token
 // ─────────────────────────────────────────────────────────────────
@@ -1303,7 +1326,7 @@ map.on('load', async () => {
     badge.textContent = trend.toUpperCase();
     badge.className   = `trend-badge ${trend}`;
 
-    document.getElementById('trend-r2').textContent =
+    document.getElementById('trend-r2-full').textContent =
       `slope: ${slope.toFixed(2)} rec/yr · r²: ${r2.toFixed(2)}`;
 
     // Draw chart
@@ -1394,12 +1417,45 @@ map.on('load', async () => {
       .sort((a, b) => a.year - b.year);
   }
 
-// Country click → trend chart
+  // Country click → trend chart
   map.on('click', 'countries-fill', e => {
     const props = e.features[0].properties;
     if (!props.count) return;
     showTrendChart(props.ISO_A3, props.NAME);
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // DRAGGABLE MODAL
+  // ─────────────────────────────────────────────────────────────────
+  (function() {
+    const panel  = document.getElementById('trend-panel');
+    const header = document.getElementById('trend-header');
+    let dragging = false, startX, startY, startLeft, startTop;
+
+    header.addEventListener('mousedown', e => {
+      if (e.target === document.getElementById('trend-close')) return;
+      dragging = true;
+      startX    = e.clientX;
+      startY    = e.clientY;
+      startLeft = panel.offsetLeft;
+      startTop  = panel.offsetTop;
+      header.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      panel.style.left = Math.max(0, startLeft + dx) + 'px';
+      panel.style.top  = Math.max(0, startTop  + dy) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+      header.style.cursor = 'grab';
+    });
+  })();
+
 </script>
 </body>
 </html>
