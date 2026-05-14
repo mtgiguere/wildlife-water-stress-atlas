@@ -47,11 +47,13 @@ happens client-side via WebGL — no server, no payload limits, instant response
 
 Features:
 - Select any of 9 species from the sidebar
-- Year slider filters occurrence records instantly in the browser
+- ⬤ **Points view** — occurrence dots with animated year slider and autoplay (Slow/Med/Fast)
+- ▦ **Countries view** — choropleth shaded by record count per country per year
+- Click any country → **trend chart** slides up with linear regression, slope, r², and INCREASING/STABLE/DECLINING classification
 - Dark Mapbox basemap with blue water network (rivers, wetlands, pans, floodplains)
 - COVID-19 dip annotation — 2020 record drop reflects field access disruption
-- Per-year and total record counts
-- Tooltips on hover
+- Fly-to-Africa animation on species switch
+- Per-year and total record counts, tooltips on hover
 
 **Why Mapbox over Streamlit:** The Streamlit Community Cloud app was hitting
 payload size limits shipping raw GeoJSON from a Python server to the browser
@@ -61,7 +63,8 @@ pre-exported once and served as static assets.
 
 Run locally:
 ```bash
-python scripts/export_mapbox_data.py   # export GeoJSON from .gpkg files (run once)
+python scripts/export_mapbox_data.py          # export occurrence + water GeoJSON (run once)
+python scripts/export_country_aggregates.py   # export country counts with trend data (run once)
 cd apps/mapbox
 python -m http.server 3000
 # Open http://localhost:3000
@@ -71,7 +74,7 @@ python -m http.server 3000
 
 ## The Streamlit App
 
-Live: **https://wildlife-water-stress-atlas-hqkgqyhe6avss39umvefxb.streamlit.app**
+Live: **https://wildlife-water-stress-atlas-ngvdrwg2yhzekplfeq6nvd.streamlit.app**
 
 An interactive web app built with Streamlit and PyDeck allows users to:
 - Select any of 9 species from the sidebar dropdown
@@ -95,17 +98,25 @@ The core library computes water stress scores for any species:
 - Scores each occurrence by distance to nearest accessible water
 - Aggregates to a 50km grid for visualization
 
+**Analytics modules:**
+- `analytics/overlap.py` — distance from each occurrence to nearest water source
+- `analytics/scoring.py` — water stress score (0–1) per occurrence
+- `analytics/water_access.py` — species-specific water type filtering
+- `analytics/spatial.py` — aggregates point scores to 50km grid
+- `analytics/trends.py` — `compute_linear_regression()`, `classify_trend()`, `get_country_time_series()`, `add_trends_to_country_counts()`. Trend regression is computed in the Python pipeline and baked into exported GeoJSON — slope, r², and trend classification are pre-computed, not computed at runtime in the browser.
+
 The phantom thirst bug is fixed — elephants near Etosha Pan (Namibia) and
 Makgadikgadi/Sua Pan (Botswana) previously appeared falsely stressed because
 those water sources weren't in the data. GLWD v2 now correctly captures them.
 
 ---
 
-## Water Data Sources
+## Data Sources
 
 | Source | Type | What It Adds |
 |---|---|---|
 | Natural Earth rivers | Shapefile (lines) | River network — lines for distance calc accuracy |
+| Natural Earth countries | Shapefile (polygons) | Country boundaries for choropleth aggregation |
 | GLWD v2 | GeoTIFF (raster) | Wetlands, pans, floodplains, saline lakes |
 | JRC Global Surface Water | GeoTIFF tiles | Seasonal and ephemeral surface water |
 | GBIF API | REST API | Species occurrence records (paginated, cached) |
@@ -114,15 +125,24 @@ GLWD v2 is the Global Lakes and Wetlands Database version 2 (Lehner et al.,
 2025), distributed under Creative Commons Attribution 4.0. It classifies
 inland water into 33 types at 500m resolution.
 
+**Why GBIF?** GBIF — the Global Biodiversity Information Facility — is
+government-funded intergovernmental infrastructure used by IUCN for Red List
+assessments. More than 6 peer-reviewed papers per day cite GBIF data.
+
+**The honest caveat:** Record counts increase over time not because animal
+populations are booming, but because data collection has grown. The COVID-19
+dip in 2020 is visible in the year slider — field researchers couldn't access
+sites. Data gaps are insights, not errors. The linear regression trend in the
+country chart reflects observation effort as much as ecological signal — this
+is surfaced explicitly via the r² value.
+
 ---
 
 ## Architecture
 
 **Species config is a single source of truth.**
 `config/species.py` holds all species-specific parameters. Adding a new
-species means adding one dict entry — no other code changes. Each entry
-includes water thresholds, accessible water types, reliability weights,
-daily range, icon path, GBIF cache filename, and emoji.
+species means adding one dict entry — no other code changes.
 
 **Water sources share a normalized schema.**
 Every source class produces the same columns: `geometry`, `source_id`,
@@ -136,16 +156,23 @@ apps/
   mapbox/      ← high-performance web app, Mapbox GL JS + static GeoJSON
   qgis/        ← planned researcher plugin, full resolution
 scripts/
-  export_mapbox_data.py  ← one-time GeoJSON export from .gpkg files
+  export_mapbox_data.py         ← exports occurrence + water GeoJSON from .gpkg
+  export_country_aggregates.py  ← spatial join to Natural Earth countries,
+                                   aggregates by country + year, runs linear
+                                   regression, bakes slope/r2/trend into GeoJSON
 ```
-The core library knows nothing about either app — it's consumed by both.
+
+**Pipeline philosophy — static pre-computation:**
+Country aggregation and trend regression are computed once in Python and
+exported to static GeoJSON. The frontend reads pre-computed fields directly.
+No server, no runtime computation. When GBIF data updates, re-run the export
+scripts. A scheduled GitHub Actions job can automate this in Phase 2.
 
 **Data gaps are insights, not failures.**
 GBIF records include imprecise coordinates, historical specimens, and
 potentially captive animals alongside wild GPS-tracked individuals.
 These are intentionally preserved — gaps surface funding needs and
-highlight understudied populations. The 2020 COVID dip is visible in
-the year slider — that's a story worth telling.
+highlight understudied populations.
 
 ---
 
@@ -161,6 +188,9 @@ python scripts/prefetch_gbif.py
 # Export GeoJSON for Mapbox app (run once, or after adding species)
 python scripts/export_mapbox_data.py
 
+# Export country-level aggregates with trend data (run once, or after adding species)
+python scripts/export_country_aggregates.py
+
 # Run the Mapbox app
 cd apps/mapbox && python -m http.server 3000
 
@@ -173,7 +203,8 @@ python scripts/plot_elephants.py
 
 Data files are not committed to git (too large). Required files:
 - `data/raw/water/glwd/GLWD_v2_0_main_class.tif` — HydroSHEDS GLWD v2
-- `data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp` — Natural Earth
+- `data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp` — Natural Earth rivers
+- `data/raw/countries/ne_110m_admin_0_countries.shp` — Natural Earth countries (choropleth)
 - `data/raw/water/jrc_gsw/` — JRC Global Surface Water tiles (Africa)
 - `data/processed/gbif_*.gpkg` — cached GBIF records per species (built by prefetch_gbif.py)
 - `data/processed/water_africa.gpkg` — cached water layer (built on first run)
@@ -201,7 +232,7 @@ ruff format .
 npx playwright test
 ```
 
-**Test coverage: 273 unit tests + 16 Playwright E2E tests, 100% unit coverage**
+**Test coverage: 299 unit tests + 16 Playwright E2E tests, 100% unit coverage**
 
 ---
 
@@ -227,9 +258,13 @@ npx playwright test
 | Year distribution chart (COVID story) | ✅ Done |
 | CI/CD pipeline (GitHub Actions) | ✅ Done |
 | Mapbox GL JS app (WebGL, client-side rendering) | ✅ Done |
-| GeoJSON export script (gpkg → Mapbox static assets) | ✅ Done |
-| Deploy to GitHub Pages | 📋 Next |
-| Auto-play animation | 📋 Next |
+| GeoJSON export pipeline (gpkg → static assets) | ✅ Done |
+| Deploy to GitHub Pages | ✅ Live |
+| Auto-play animation with speed controls | ✅ Done |
+| Fly-to-Africa on species switch | ✅ Done |
+| Country choropleth view (Natural Earth spatial join) | ✅ Done |
+| Linear regression trend analytics (core library, TDD) | ✅ Done |
+| Country trend chart (click country → slide-up chart) | ✅ Done |
 | Icon clustering at low zoom | 📋 Next |
 | Multi-species overlay mode | 📋 Planned |
 | Add Hippo + Buffalo | 📋 Planned |

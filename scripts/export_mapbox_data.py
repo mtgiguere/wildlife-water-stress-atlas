@@ -36,3 +36,18 @@ def export_all(data_dir, output_dir):
         )
 
     export_species_config(output_dir / "species_config.json")
+
+
+def main():
+    from pathlib import Path
+
+    export_all(
+        data_dir=Path("data/processed"),
+        output_dir=Path("apps/mapbox/data"),
+    )
+
+
+# pragma: no cover — __main__ block is an entry point, not unit-testable.
+# Covered implicitly by running the script directly.
+if __name__ == "__main__":  # pragma: no cover
+    main()
