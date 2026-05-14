@@ -60,3 +60,16 @@ def export_country_counts(scientific_name, data_dir, output_dir, countries_path)
 def export_all_country_counts(data_dir, output_dir, countries_path):
     for scientific_name in SPECIES_CONFIG:
         export_country_counts(scientific_name, data_dir, output_dir, countries_path)
+
+def main():
+    from pathlib import Path
+    export_all_country_counts(
+        data_dir=Path("data/processed"),
+        output_dir=Path("apps/mapbox/data"),
+        countries_path=Path("data/raw/countries/ne_110m_admin_0_countries.shp"),
+    )
+
+# pragma: no cover — __main__ block is an entry point, not unit-testable.
+# Covered implicitly by running the script directly.
+if __name__ == "__main__": # pragma: no cover
+    main()

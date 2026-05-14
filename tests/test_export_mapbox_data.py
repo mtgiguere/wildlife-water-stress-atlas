@@ -261,3 +261,14 @@ def test_export_all_passes_correct_output_paths(tmp_path):
         for scientific_name, cfg in SPECIES_CONFIG.items():
             expected = cfg["gbif_cache_file"].replace(".gpkg", ".geojson")
             assert f"occurrences_{expected}" in output_names, f"Missing output file for {scientific_name}"
+
+def test_export_mapbox_data_main_calls_export_all():
+    """main() calls export_all with the correct default paths."""
+    from pathlib import Path
+    with patch("scripts.export_mapbox_data.export_all") as mock_export:
+        from scripts.export_mapbox_data import main
+        main()
+        mock_export.assert_called_once_with(
+            data_dir=Path("data/processed"),
+            output_dir=Path("apps/mapbox/data"),
+        )
