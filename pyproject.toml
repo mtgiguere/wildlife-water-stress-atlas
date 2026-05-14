@@ -18,11 +18,11 @@ dependencies = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "src", "apps" = "apps"}
+package-dir = {"" = "src", "apps" = "apps", "scripts" = "scripts"}
 
 [tool.setuptools.packages.find]
-where = ["src", "."]
-include = ["wildlife_water_stress_atlas*", "apps*", "scripts*"]
+where = ["src"]
+include = ["wildlife_water_stress_atlas*"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=wildlife_water_stress_atlas --cov=apps --cov=scripts --cov-report=term-missing --cov-fail-under=80 -m 'not integration'"
