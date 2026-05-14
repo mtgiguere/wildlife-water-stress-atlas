@@ -40,12 +40,14 @@ def export_all(data_dir, output_dir):
 
 def main():
     from pathlib import Path
+
     export_all(
         data_dir=Path("data/processed"),
         output_dir=Path("apps/mapbox/data"),
     )
 
+
 # pragma: no cover — __main__ block is an entry point, not unit-testable.
 # Covered implicitly by running the script directly.
-if __name__ == "__main__": # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     main()

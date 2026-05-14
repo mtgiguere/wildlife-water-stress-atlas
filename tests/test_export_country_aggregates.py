@@ -245,11 +245,14 @@ def test_export_all_country_counts_calls_export_for_each_species(tmp_path):
 
         assert mock_export.call_count == len(SPECIES_CONFIG)
 
+
 def test_export_country_aggregates_main_calls_export_all(tmp_path):
     """main() calls export_all_country_counts with the correct default paths."""
     from pathlib import Path
+
     with patch("scripts.export_country_aggregates.export_all_country_counts") as mock_export:
         from scripts.export_country_aggregates import main
+
         main()
         mock_export.assert_called_once_with(
             data_dir=Path("data/processed"),

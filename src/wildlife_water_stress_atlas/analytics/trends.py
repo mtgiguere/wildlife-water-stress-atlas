@@ -1,9 +1,8 @@
-
-
 # Minimum slope (records/year) to classify a trend as increasing or declining.
 # Slopes within [-0.5, 0.5] are considered stable — noise, not signal.
 # Heuristic placeholder — ecological validation needed in Phase 2.
 STABLE_THRESHOLD = 0.5
+
 
 def compute_linear_regression(year_counts):
     if len(year_counts) < 2:
@@ -11,20 +10,20 @@ def compute_linear_regression(year_counts):
 
     xs = list(year_counts.keys())
     ys = list(year_counts.values())
-    n  = len(xs)
+    n = len(xs)
 
     x_mean = sum(xs) / n
     y_mean = sum(ys) / n
 
-    numerator   = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
+    numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True))
     denominator = sum((x - x_mean) ** 2 for x in xs)
 
-    slope     = numerator / denominator if denominator else 0
+    slope = numerator / denominator if denominator else 0
     intercept = y_mean - slope * x_mean
 
-    ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys))
+    ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys, strict=True))
     ss_tot = sum((y - y_mean) ** 2 for y in ys)
-    r2     = 1 - ss_res / ss_tot if ss_tot else 0
+    r2 = 1 - ss_res / ss_tot if ss_tot else 0
 
     return {"slope": slope, "intercept": intercept, "r2": r2}
 
@@ -36,12 +35,11 @@ def classify_trend(slope):
         return "declining"
     else:
         return "stable"
-    
+
+
 def get_country_time_series(data, iso_a3):
-    return sorted(
-        [r for r in data if r["ISO_A3"] == iso_a3],
-        key=lambda r: r["year"]
-    )
+    return sorted([r for r in data if r["ISO_A3"] == iso_a3], key=lambda r: r["year"])
+
 
 def add_trends_to_country_counts(data):
     # Get unique countries
@@ -55,12 +53,9 @@ def add_trends_to_country_counts(data):
         regression = compute_linear_regression(year_counts)
         trends[iso] = {
             "slope": regression["slope"],
-            "r2":    regression["r2"],
+            "r2": regression["r2"],
             "trend": classify_trend(regression["slope"]),
         }
 
     # Add trend fields to every record
-    return [
-        {**r, **trends[r["ISO_A3"]]}
-        for r in data
-    ]
+    return [{**r, **trends[r["ISO_A3"]]} for r in data]
