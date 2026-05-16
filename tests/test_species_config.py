@@ -346,3 +346,63 @@ def test_species_config_contains_painted_reed_frog():
 
 def test_species_config_contains_african_clawed_frog():
     assert "Xenopus laevis" in SPECIES_CONFIG
+
+
+def test_species_config_contains_hippopotamus():
+    assert "Hippopotamus amphibius" in SPECIES_CONFIG
+
+
+def test_species_config_contains_african_buffalo():
+    assert "Syncerus caffer" in SPECIES_CONFIG
+
+
+def test_hippo_water_threshold_is_tight():
+    # Hippos seldom move more than 3km from water — 15km is a generous
+    # upper bound that accounts for drought-driven dispersal movements.
+    assert SPECIES_CONFIG["Hippopotamus amphibius"]["water_threshold_m"] == 15_000
+
+
+def test_hippo_water_dependency_is_high():
+    assert SPECIES_CONFIG["Hippopotamus amphibius"]["water_dependency"] == "high"
+
+
+def test_hippo_accessible_water_types_are_correct():
+    assert SPECIES_CONFIG["Hippopotamus amphibius"]["accessible_water_types"] == {
+        "river", "lake", "wetland", "floodplain", "permanent_water"
+    }
+
+
+def test_hippo_water_type_weights_are_correct():
+    weights = SPECIES_CONFIG["Hippopotamus amphibius"]["water_type_weights"]
+    assert weights["river"] == 1.0
+    assert weights["lake"] == 1.0
+    assert weights["wetland"] == 0.8
+    assert weights["floodplain"] == 0.9
+    assert weights["permanent_water"] == 1.0
+
+
+def test_buffalo_water_threshold_is_correct():
+    # Buffalo drink daily and contract their range sharply around
+    # permanent water in dry season — 100km reflects dry-season max.
+    assert SPECIES_CONFIG["Syncerus caffer"]["water_threshold_m"] == 100_000
+
+
+def test_buffalo_water_dependency_is_high():
+    assert SPECIES_CONFIG["Syncerus caffer"]["water_dependency"] == "high"
+
+
+def test_buffalo_accessible_water_types_are_correct():
+    assert SPECIES_CONFIG["Syncerus caffer"]["accessible_water_types"] == {
+        "river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"
+    }
+
+
+def test_buffalo_water_type_weights_are_correct():
+    weights = SPECIES_CONFIG["Syncerus caffer"]["water_type_weights"]
+    assert weights["river"] == 1.0
+    assert weights["lake"] == 1.0
+    assert weights["pan"] == 0.5
+    assert weights["wetland"] == 0.7
+    assert weights["floodplain"] == 0.9
+    assert weights["surface_water"] == 0.6
+    assert weights["permanent_water"] == 0.9
