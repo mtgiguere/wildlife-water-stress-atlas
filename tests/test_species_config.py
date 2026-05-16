@@ -367,9 +367,7 @@ def test_hippo_water_dependency_is_high():
 
 
 def test_hippo_accessible_water_types_are_correct():
-    assert SPECIES_CONFIG["Hippopotamus amphibius"]["accessible_water_types"] == {
-        "river", "lake", "wetland", "floodplain", "permanent_water"
-    }
+    assert SPECIES_CONFIG["Hippopotamus amphibius"]["accessible_water_types"] == {"river", "lake", "wetland", "floodplain", "permanent_water"}
 
 
 def test_hippo_water_type_weights_are_correct():
@@ -392,9 +390,7 @@ def test_buffalo_water_dependency_is_high():
 
 
 def test_buffalo_accessible_water_types_are_correct():
-    assert SPECIES_CONFIG["Syncerus caffer"]["accessible_water_types"] == {
-        "river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"
-    }
+    assert SPECIES_CONFIG["Syncerus caffer"]["accessible_water_types"] == {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"}
 
 
 def test_buffalo_water_type_weights_are_correct():

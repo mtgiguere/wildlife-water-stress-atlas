@@ -480,116 +480,116 @@ SPECIES_CONFIG: dict[str, dict] = {
         "emoji": "🐸",
     },
     "Hippopotamus amphibius": {
-            "common_name": "Hippopotamus",
-            # ---------------------------------------------------------------
-            # Common Hippopotamus
-            # ---------------------------------------------------------------
-            # Hippos are among the most water-dependent large mammals on Earth —
-            # arguably more so than even elephants. Their unique skin lacks sweat
-            # glands and desiccates rapidly when exposed to direct sunlight;
-            # regular immersion in water is essential for thermoregulation.
-            # They also have unusually high faecal water loss, making continuous
-            # access to water a physiological necessity, not just a preference.
-            #
-            # Published tracking studies show hippos seldom move more than 3km
-            # from water under normal conditions, emerging only at night to graze
-            # on grass within a few kilometres of their daytime pools. During
-            # severe drought, sub-adult males have been tracked making dispersal
-            # movements of ~15km upstream to find alternative pools — this
-            # defines the upper bound for our threshold.
-            #
-            # The 15km threshold is tight but ecologically grounded: a hippo
-            # more than 15km from permanent water is almost certainly dead,
-            # displaced by catastrophic drought, or a very rare dispersal event.
-            # This makes hippos a near-crocodile-tier permanent water indicator.
-            "water_threshold_m": 15_000,
-            # Hippos require deep permanent water for daytime refuge — rivers
-            # and lakes are primary. Floodplains are critical secondary habitat
-            # for nocturnal grazing and wet-season wallowing. Wetlands used
-            # for wallowing and as dispersal corridors between river pools.
-            # Saline lakes excluded — hippos are freshwater obligates.
-            # Pans excluded — too shallow for thermoregulatory immersion.
-            "accessible_water_types": {"river", "lake", "wetland", "floodplain", "permanent_water"},
-            # Rivers and permanent water weighted at 1.0 — hippos' primary
-            # daytime refuge. Floodplains high (0.9) — essential grazing habitat
-            # and wet-season habitat. Wetlands moderate (0.8) — used for
-            # wallowing and dispersal but less reliable than rivers.
-            # All values are heuristic placeholders pending validation.
-            "water_type_weights": {
-                "river": 1.0,
-                "lake": 1.0,
-                "wetland": 0.8,
-                "floodplain": 0.9,
-                "permanent_water": 1.0,
-            },
-            # 3km typical nightly grazing range from water — hippos are not
-            # long-distance movers. During drought dispersal, sub-adult males
-            # may cover ~15km but this is exceptional.
-            "daily_range_m": 3_000,
-            # Highest water dependency — permanent water obligate for
-            # thermoregulation, not just drinking.
-            "water_dependency": "high",
-            "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f99b.png",
-            "icon_static_path": "app/static/Creative-Tail-Animal-hippo.svg.png",
-            "gbif_cache_file": "gbif_hippopotamus_amphibius.gpkg",
-            "emoji": "🦛",
+        "common_name": "Hippopotamus",
+        # ---------------------------------------------------------------
+        # Common Hippopotamus
+        # ---------------------------------------------------------------
+        # Hippos are among the most water-dependent large mammals on Earth —
+        # arguably more so than even elephants. Their unique skin lacks sweat
+        # glands and desiccates rapidly when exposed to direct sunlight;
+        # regular immersion in water is essential for thermoregulation.
+        # They also have unusually high faecal water loss, making continuous
+        # access to water a physiological necessity, not just a preference.
+        #
+        # Published tracking studies show hippos seldom move more than 3km
+        # from water under normal conditions, emerging only at night to graze
+        # on grass within a few kilometres of their daytime pools. During
+        # severe drought, sub-adult males have been tracked making dispersal
+        # movements of ~15km upstream to find alternative pools — this
+        # defines the upper bound for our threshold.
+        #
+        # The 15km threshold is tight but ecologically grounded: a hippo
+        # more than 15km from permanent water is almost certainly dead,
+        # displaced by catastrophic drought, or a very rare dispersal event.
+        # This makes hippos a near-crocodile-tier permanent water indicator.
+        "water_threshold_m": 15_000,
+        # Hippos require deep permanent water for daytime refuge — rivers
+        # and lakes are primary. Floodplains are critical secondary habitat
+        # for nocturnal grazing and wet-season wallowing. Wetlands used
+        # for wallowing and as dispersal corridors between river pools.
+        # Saline lakes excluded — hippos are freshwater obligates.
+        # Pans excluded — too shallow for thermoregulatory immersion.
+        "accessible_water_types": {"river", "lake", "wetland", "floodplain", "permanent_water"},
+        # Rivers and permanent water weighted at 1.0 — hippos' primary
+        # daytime refuge. Floodplains high (0.9) — essential grazing habitat
+        # and wet-season habitat. Wetlands moderate (0.8) — used for
+        # wallowing and dispersal but less reliable than rivers.
+        # All values are heuristic placeholders pending validation.
+        "water_type_weights": {
+            "river": 1.0,
+            "lake": 1.0,
+            "wetland": 0.8,
+            "floodplain": 0.9,
+            "permanent_water": 1.0,
         },
-        "Syncerus caffer": {
-            "common_name": "Cape Buffalo",
-            # ---------------------------------------------------------------
-            # African Buffalo (Cape Buffalo)
-            # ---------------------------------------------------------------
-            # African buffalo are highly water-dependent grazers that drink
-            # daily and structure their movements tightly around water
-            # availability. Tracking studies in the Okavango Delta and Ruaha
-            # National Park show buffalo contract their home ranges dramatically
-            # during the dry season, concentrating near permanent water as
-            # seasonal sources dry up. They are classic dry-season indicators —
-            # where buffalo congregate, permanent water is present.
-            #
-            # Unlike zebras which migrate long distances tracking rainfall,
-            # buffalo tend to hold smaller territories and wait out the dry
-            # season near reliable water. Their 95% home ranges vary from
-            # 73–601km² across studies, with larger ranges in wet season when
-            # they can range freely from water.
-            #
-            # The 100km threshold reflects their moderate range — tighter than
-            # lions (200km) but looser than hippos. A buffalo 100km from water
-            # in dry season has effectively lost access to its critical resource.
-            "water_threshold_m": 100_000,
-            # Buffalo drink from all permanent and seasonal surface water.
-            # Floodplains are particularly important — buffalo in flood-pulse
-            # ecosystems (e.g. Okavango) select seasonally-flooded habitats
-            # during the early and late flood seasons for high-quality forage.
-            # Saline lakes excluded — buffalo require fresh water.
-            "accessible_water_types": {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"},
-            # Floodplains weighted very high (0.9) — buffalo in flood-pulse
-            # ecosystems strongly select flooded habitats when available.
-            # Permanent water weighted high (0.9) — critical dry-season refuge.
-            # Pans moderate (0.5) — used opportunistically but too ephemeral
-            # to sustain large herds through dry season.
-            # All values are heuristic placeholders pending ecological review.
-            "water_type_weights": {
-                "river": 1.0,
-                "lake": 1.0,
-                "pan": 0.5,
-                "wetland": 0.7,
-                "floodplain": 0.9,
-                "surface_water": 0.6,
-                "permanent_water": 0.9,
-            },
-            # 20km typical dry-season daily range — buffalo move less than
-            # zebras but more than hippos. Herds of hundreds can cover
-            # significant ground tracking forage near water.
-            "daily_range_m": 20_000,
-            # High water dependency — drinks daily, contracts range to
-            # permanent water in dry season.
-            "water_dependency": "high",
-            "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f403.png",
-            "icon_static_path": "app/static/Creative-Tail-Animal-buffalo.svg.png",
-            "gbif_cache_file": "gbif_syncerus_caffer.gpkg",
-            "emoji": "🐃",
+        # 3km typical nightly grazing range from water — hippos are not
+        # long-distance movers. During drought dispersal, sub-adult males
+        # may cover ~15km but this is exceptional.
+        "daily_range_m": 3_000,
+        # Highest water dependency — permanent water obligate for
+        # thermoregulation, not just drinking.
+        "water_dependency": "high",
+        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f99b.png",
+        "icon_static_path": "app/static/Creative-Tail-Animal-hippo.svg.png",
+        "gbif_cache_file": "gbif_hippopotamus_amphibius.gpkg",
+        "emoji": "🦛",
+    },
+    "Syncerus caffer": {
+        "common_name": "Cape Buffalo",
+        # ---------------------------------------------------------------
+        # African Buffalo (Cape Buffalo)
+        # ---------------------------------------------------------------
+        # African buffalo are highly water-dependent grazers that drink
+        # daily and structure their movements tightly around water
+        # availability. Tracking studies in the Okavango Delta and Ruaha
+        # National Park show buffalo contract their home ranges dramatically
+        # during the dry season, concentrating near permanent water as
+        # seasonal sources dry up. They are classic dry-season indicators —
+        # where buffalo congregate, permanent water is present.
+        #
+        # Unlike zebras which migrate long distances tracking rainfall,
+        # buffalo tend to hold smaller territories and wait out the dry
+        # season near reliable water. Their 95% home ranges vary from
+        # 73–601km² across studies, with larger ranges in wet season when
+        # they can range freely from water.
+        #
+        # The 100km threshold reflects their moderate range — tighter than
+        # lions (200km) but looser than hippos. A buffalo 100km from water
+        # in dry season has effectively lost access to its critical resource.
+        "water_threshold_m": 100_000,
+        # Buffalo drink from all permanent and seasonal surface water.
+        # Floodplains are particularly important — buffalo in flood-pulse
+        # ecosystems (e.g. Okavango) select seasonally-flooded habitats
+        # during the early and late flood seasons for high-quality forage.
+        # Saline lakes excluded — buffalo require fresh water.
+        "accessible_water_types": {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"},
+        # Floodplains weighted very high (0.9) — buffalo in flood-pulse
+        # ecosystems strongly select flooded habitats when available.
+        # Permanent water weighted high (0.9) — critical dry-season refuge.
+        # Pans moderate (0.5) — used opportunistically but too ephemeral
+        # to sustain large herds through dry season.
+        # All values are heuristic placeholders pending ecological review.
+        "water_type_weights": {
+            "river": 1.0,
+            "lake": 1.0,
+            "pan": 0.5,
+            "wetland": 0.7,
+            "floodplain": 0.9,
+            "surface_water": 0.6,
+            "permanent_water": 0.9,
         },
+        # 20km typical dry-season daily range — buffalo move less than
+        # zebras but more than hippos. Herds of hundreds can cover
+        # significant ground tracking forage near water.
+        "daily_range_m": 20_000,
+        # High water dependency — drinks daily, contracts range to
+        # permanent water in dry season.
+        "water_dependency": "high",
+        "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f403.png",
+        "icon_static_path": "app/static/Creative-Tail-Animal-buffalo.svg.png",
+        "gbif_cache_file": "gbif_syncerus_caffer.gpkg",
+        "emoji": "🐃",
+    },
 }
 # ---------------------------------------------------------------------------
 # Validation
