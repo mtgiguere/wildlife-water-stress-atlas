@@ -34,7 +34,7 @@ Clean dependency-injection pattern. No species names hardcoded. No changes neede
 Aggregates point-level stress scores into a grid.
 - `aggregate_stress_to_grid(gdf, cell_size_meters)` → GeoDataFrame of grid cells
 
-**`analytics/trends.py`** ← NEW
+**`analytics/trends.py`**
 Linear regression trend analysis for country-level occurrence counts.
 - `compute_linear_regression(year_counts)` → `{slope, intercept, r2}`. Pure Python, no numpy/scipy dependency. Guards for empty input and single data point (returns zeros).
 - `classify_trend(slope)` → `"increasing"` | `"stable"` | `"declining"`. Uses `STABLE_THRESHOLD = 0.5` records/year — heuristic placeholder, ecological validation needed in Phase 2.
@@ -47,20 +47,22 @@ Main pipeline entry point. Uses `load_all_water()` with `WATER_CONFIG` dict. Spe
 **`scripts/prefetch_gbif.py`**
 Bulk GBIF prefetch script. Loops through all species in `SPECIES_CONFIG` and pre-populates cache files in `data/processed/`. Run once after adding new species. Supports `--species` flag for single species fetch and `--force` flag to re-fetch existing cache files.
 
-**`scripts/export_mapbox_data.py`** ← NEW
+**`scripts/export_mapbox_data.py`**
 Exports data for the Mapbox app:
 - `export_water(input_path, output_path)` — water_africa_simplified.gpkg → water.geojson
 - `export_occurrences(input_path, output_path)` — per-species gpkg → occurrences_gbif_{species}.geojson. Keeps only `species`, `year`, `geometry` columns.
 - `export_species_config(output_path)` — SPECIES_CONFIG → species_config.json (sets serialized to lists)
 - `export_all(data_dir, output_dir)` — orchestrates all three for all species
+- Has `__main__` block — run as `python scripts/export_mapbox_data.py`
 
-**`scripts/export_country_aggregates.py`** ← NEW
+**`scripts/export_country_aggregates.py`**
 Spatial join pipeline for the choropleth view:
 - `load_countries(path)` — loads Natural Earth 110m country shapefile, keeps `NAME`, `ISO_A3`, `CONTINENT`, `geometry`
 - `join_occurrences_to_countries(occurrences, countries)` — GeoPandas spatial join (within), left join so ocean points get null country
 - `aggregate_by_country_year(joined)` — groups by NAME + ISO_A3 + year, counts records, filters to Africa only
 - `export_country_counts(scientific_name, data_dir, output_dir, countries_path)` — orchestrates load → join → aggregate → add_trends → write JSON
 - `export_all_country_counts(data_dir, output_dir, countries_path)` — loops all species in SPECIES_CONFIG
+- Has `__main__` block — run as `python scripts/export_country_aggregates.py`
 
 Output format: `[{NAME, ISO_A3, year, count, slope, r2, trend}, ...]` — trends baked in at export time.
 
@@ -79,16 +81,21 @@ Now includes:
 - Dark theme + hero banner (elephants_waterhole.jpeg)
 - `st.session_state` for species selection persistence across reruns
 
-**`apps/mapbox/index.html`** ← NEW
-Single-file Mapbox GL JS app. Dark aesthetic (Bebas Neue + DM Sans fonts, cyan accent on near-black).
+**`apps/mapbox/`** ← REFACTORED (was single index.html, now split)
+Three-file structure:
+- `index.html` — HTML structure only (~110 lines)
+- `css/styles.css` — all styles (~310 lines)
+- `js/app.js` — all JS logic (~370 lines)
+
 Features:
 - ⬤ POINTS view — circle layers with glow effect, year slider, autoplay (▶/⏸, Slow/Med/Fast)
-- ▦ COUNTRIES view — choropleth using Natural Earth GeoJSON from GitHub CDN. Intensity interpolated 0→1 per year. Country click → trend chart slide-up panel.
-- Trend chart — pure Canvas 2D API (no library). Draws raw data line (cyan), trend line (dashed, color-coded by trend classification), grid lines, axis labels.
+- ▦ COUNTRIES view — choropleth using Natural Earth GeoJSON from GitHub CDN. Intensity interpolated 0→1 per year. Country click → trend chart draggable modal.
+- Trend chart — pure Canvas 2D API (no library). Draws raw data line (cyan), trend line (dashed, color-coded by trend classification), grid lines, axis labels. Draggable modal.
 - Tooltip — updates on mousemove across country borders (not just mouseenter), so switching from Tanzania to Kenya updates immediately.
 - Fly-to-Africa on species switch — `map.flyTo({center:[20,0], zoom:3, duration:1200})`
 - COVID-19 annotation panel — appears only when year === 2020
 - Loading overlay with animated progress bar
+- Icon clustering at low zoom — `cluster: true` on GeoJSON source, cluster circle styling with count labels ✅
 
 ### Current Data Sources
 | Layer | File | Source | Format | Notes |
@@ -134,8 +141,9 @@ Default water classes for elephants: `{2, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 1
 Classes 1 and 4 excluded from defaults — covered by Natural Earth with better geometry types.
 
 ### Current Test Coverage
-**299 unit tests, 100% coverage**
-**16 Playwright E2E tests — 16 passing, 0 pending** ✅
+**311 unit tests, 100% coverage**
+**16 Playwright E2E tests (Streamlit) — 16 passing** ✅
+**25 Playwright E2E tests (Mapbox) — 25 passing** ✅
 TDD strictly enforced — tests written before implementation on every change.
 
 Test files:
@@ -154,6 +162,14 @@ Test files:
 - `test_export_country_aggregates.py` — load_countries, join_occurrences_to_countries, aggregate_by_country_year, export_country_counts, export_all_country_counts (9 tests)
 - `test_water_real_data.py` — integration test, hits real filesystem, keep separated from CI fast runs
 
+Playwright configs:
+- `playwright.config.ts` — Streamlit app, port 8501
+- `playwright.mapbox.config.ts` — Mapbox app, port 3000
+- Run Streamlit: `npx playwright test`
+- Run Mapbox: `npx playwright test --config playwright.mapbox.config.ts`
+- Streamlit spec: `tests/e2e/test_streamlit.spec.ts` (renamed from test_app.spec.ts)
+- Mapbox spec: `tests/e2e/test_mapbox.spec.ts`
+
 ### Current Species Registry
 All species in `SPECIES_CONFIG` with GBIF cache files:
 
@@ -168,15 +184,18 @@ All species in `SPECIES_CONFIG` with GBIF cache files:
 | Phoenicopterus roseus | Greater Flamingo | 🦩 | 50km | high | gbif_phoenicopterus_roseus.gpkg | 99,900 |
 | Hyperolius marmoratus | Painted Reed Frog | 🐸 | 2km | high | gbif_hyperolius_marmoratus.gpkg | ~TBC |
 | Xenopus laevis | African Clawed Frog | 🐸 | 5km | high | gbif_xenopus_laevis.gpkg | ~TBC |
+| Hippopotamus amphibius | Hippopotamus | 🦛 | 15km | high | gbif_hippopotamus_amphibius.gpkg | ~13,000 |
+| Syncerus caffer | Cape Buffalo | 🐃 | 100km | high | gbif_syncerus_caffer.gpkg | ~17,369 |
 
 ### What the Mapbox App Shows Right Now
 - Dark Mapbox basemap (dark-v11)
-- ⬤ POINTS view: Blue occurrence dots with glow, year slider (autoplay ▶/⏸), species selector
+- ⬤ POINTS view: Blue occurrence dots with glow, year slider (autoplay ▶/⏸), species selector, icon clustering at low zoom
 - ▦ COUNTRIES view: Choropleth (cyan intensity by record count), year slider updates choropleth
-- Trend chart: Click country → slide-up panel with Canvas 2D line chart, trend line, slope/r²/classification badge
+- Trend chart: Click country → draggable modal with Canvas 2D line chart, trend line, slope/r²/classification badge
 - Fly-to-Africa animation on species switch
 - COVID-19 annotation (year 2020 only)
 - Water network: rivers (lines) + wetlands/lakes/pans (polygons) from GLWD v2 + Natural Earth
+- 11 species including Hippopotamus and Cape Buffalo
 
 ### Mapbox App — Deployed URLs
 - **GitHub Pages (live):** https://mtgiguere.github.io/wildlife-water-stress-atlas/
@@ -196,17 +215,11 @@ Tests moved inside `test.describe` block so they receive the `beforeEach` naviga
 ### Gap: Performance — Raster Vectorization is Slow
 Caching implemented. `@st.cache_data` working.
 
-### Gap: Icon Clustering at Low Zoom
-When zoomed out to full Africa, dense occurrence clusters overlap. Mapbox GL JS has built-in clustering support — `cluster: true` on the GeoJSON source. Next feature to implement.
-
-### Gap: Playwright E2E Tests Need Update for Mapbox App
-No Playwright tests exist for the Mapbox app yet. The Streamlit tests cover the Streamlit app only.
+### Gap: Water Stress Not Visualized in Mapbox App
+The analytics pipeline (`overlap.py`, `scoring.py`) computes water stress scores per occurrence but this data is NOT yet exported to GeoJSON or visualized in the Mapbox app. Currently only occurrence counts and trend data are shown. Showing stress scores (color-coded points, heatmap, or grid layer) is the next major feature.
 
 ### Gap: JRC GSW Multi-Tile Loading
 JRCTileDirectory source class planned for multiple 10-degree tiles.
-
-### Gap: export scripts lack `if __name__ == "__main__"` blocks
-`export_mapbox_data.py` and `export_country_aggregates.py` are currently run via `python -c` one-liners. Should add main blocks so they're runnable as `python scripts/export_mapbox_data.py` directly.
 
 ---
 
@@ -217,18 +230,15 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 - **CI/CD pipeline**: unit tests + linting + vulnerability scans minimum on every push
 - **Never hardcode species names** anywhere in library code
 
-1. **Icon clustering** — `cluster: true` on Mapbox occurrences source, cluster circle styling
-2. **Add `__main__` blocks** to export scripts
-3. **Playwright E2E for Mapbox app** — species switch, view toggle, year slider, country click
-4. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
-5. **Multi-species overlay** — "Compare All Species" mode
-6. **Add Hippo + Buffalo** — find icons, add to SPECIES_CONFIG
-7. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
-8. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
-9. **Additional water sources** — springs, reservoirs, boreholes
-10. **Human pressure layer** — roads, fences, settlements (Pressure Type 2)
-11. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
-12. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
+1. **Water stress visualization** — export stress scores per occurrence to GeoJSON, color-code points in Mapbox by stress level (low/moderate/high). This is the "killer feature" — the whole platform is named after it.
+2. **Multi-species overlay** — "Compare All Species" mode
+3. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
+4. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
+5. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
+6. **Additional water sources** — springs, reservoirs, boreholes
+7. **Human pressure layer** — roads, fences, settlements (Pressure Type 2)
+8. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
+9. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
 
 ---
 
@@ -241,7 +251,7 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 | Natural Earth countries | Shapefile | Global | Country boundaries for choropleth |
 | GLWD v2 | GeoTIFF | Global | Wetlands, pans, floodplains, saline lakes |
 | JRC Global Surface Water | GeoTIFF tiles | Global | Seasonal/ephemeral surface water |
-| GBIF API | REST API | Global | Species occurrences — 9 species cached |
+| GBIF API | REST API | Global | Species occurrences — 11 species cached |
 
 ### Planned — Water Layers
 | Dataset | Type | Coverage | Key Use | URL |
@@ -277,31 +287,37 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 - **Standalone PowerShell** for Playwright (Node v22), VS Code terminal for everything else.
 - **`st.session_state`** used for species selection persistence in `streamlit_app.py`.
 - **`_cache_dir` parameter** in `load_gbif_data()` — underscore prefix tells `@st.cache_data` not to hash it.
-- **`icon_static_path`** in SPECIES_CONFIG — served from Streamlit static folder. Same-origin, no CORS.
+- **`icon_static_path`** in SPECIES_CONFIG — served from Streamlit static folder at `apps/streamlit/static/`. Same-origin, no CORS.
 - **`gbif_cache_file`** in SPECIES_CONFIG — format `gbif_{genus}_{species}.gpkg`.
 - **Mapbox token** — public scopes only, URL-restricted to GitHub Pages + localhost. Safe to commit.
 - **`pyproject.toml` setuptools config** — `package-dir = {"" = "src", "apps" = "apps", "scripts" = "scripts"}`, `packages.find where = ["src"]`. The `conftest.py` at root adds scripts to sys.path for pytest.
 - **`conftest.py`** at repo root — adds project root to `sys.path` so `scripts` package is importable in tests.
 - **`STABLE_THRESHOLD = 0.5`** in `trends.py` — heuristic, ecological validation needed in Phase 2.
 - **Country choropleth** uses Natural Earth GeoJSON fetched from GitHub CDN (`nvkelso/natural-earth-vector`) at runtime. The country count data (`country_counts_gbif_*.geojson`) is pre-exported and committed.
-- **Trend chart** is pure Canvas 2D API — no chart library dependency. Draws raw data line, trend line (dashed, color-coded), grid, axis labels.
+- **Trend chart** is pure Canvas 2D API — no chart library dependency. Draws raw data line, trend line (dashed, color-coded), grid, axis labels. Draggable modal.
 - **Flamingo has 99,900 GBIF records** — global distribution including Europe (escaped lab specimens). Intentionally preserved as data quality story.
 - **Mali desert elephants** (~17°N in Niger/Mali) appear in GBIF data — real, not data errors. World's northernmost elephant population.
 - **Giraffe records are sparse** (~5,549) — scientifically meaningful (Vulnerable IUCN, population -40% in 30 years).
 - **Two frog species share the same Streamlit icon** — tooltip distinguishes them.
-- **Developer is planning a decade of digital nomad travel** — Africa leg includes Chobe National Park (highest elephant concentration on Earth). Full circle with this project. 🐘
-- **Job interview context** — interviewing for Mapbox SDE II, Boundaries team. The Mapbox app was built specifically to demo their product. Key talking points: Streamlit payload limits → Mapbox migration; Natural Earth spatial join mirrors Boundaries pipeline patterns; TDD throughout; GBIF credibility answer (see pinned answer above).
+- **Hippo icon** — `Creative-Tail-Animal-hippo.svg.png` in `apps/streamlit/static/`
+- **Buffalo icon** — `Creative-Tail-Animal-buffalo.svg.png` in `apps/streamlit/static/`
+- **Developer is planning a decade of digital nomad travel** — Africa leg includes Chobe National Park (highest elephant concentration on Earth). Puerto Vallarta is the dream remote work destination. Full circle with this project. 🐘
+- **Mapbox app file structure** — refactored from single 1500-line `index.html` to `index.html` + `css/styles.css` + `js/app.js`. Always run server from `apps/mapbox/` directory.
+- **Browser cache** — always test in incognito when debugging data changes. Regular browser caches `species_config.json` aggressively.
 
-### Session End State (May 14, 2026)
-- 299 unit tests, 100% coverage ✅
-- 16 Playwright E2E tests (Streamlit only) ✅
+### Session End State (May 18, 2026)
+- 311 unit tests, 100% coverage ✅
+- 16 Playwright E2E tests (Streamlit) ✅
+- 25 Playwright E2E tests (Mapbox) ✅
 - Mapbox app live on GitHub Pages ✅
+- Mapbox app refactored to 3-file structure ✅
 - Country choropleth + trend chart live ✅
 - Linear regression in core analytics library ✅
-- All 9 species exported and working ✅
+- 11 species including Hippo + Cape Buffalo ✅
+- Icon clustering on points view ✅
+- All merged to main ✅
 
 Next session priorities:
-1. Icon clustering on points view
-2. `__main__` blocks for export scripts
-3. Playwright E2E for Mapbox app
-4. Interview prep / rehearsal
+1. **Water stress visualization** — the namesake feature, still not shown in the app
+2. Multi-species overlay
+3. Human pressure layer
