@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-// CONFIG
+// app.js
 // ─────────────────────────────────────────────────────────────────
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibXRnaWd1ZXJlIiwiYSI6ImNtcDRnNzl3ejAwajAycG9rb2s1Y2N4NDcifQ.Q72clPC-L8yxVcvrs0LmHA';
 
@@ -13,19 +13,39 @@ const TIER_LABELS = {
   'Phoenicopterus roseus':   'Indicator',
   'Hyperolius marmoratus':   'Indicator',
   'Xenopus laevis':          'Indicator',
+  'Hippopotamus amphibius':  'Megafauna',
+  'Syncerus caffer':         'Herbivore',
 };
+
+// Stress level color palette
+// low = green, moderate = yellow, high = red, fallback = cyan
+const STRESS_COLORS = {
+  low:      '#00C87A',
+  moderate: '#FFB800',
+  high:     '#FF5A3C',
+  fallback: '#00C4FF',
+};
+
+// Mapbox match expression — maps stress_level property to color
+const STRESS_COLOR_EXPR = [
+  'match', ['get', 'stress_level'],
+  'low',      STRESS_COLORS.low,
+  'moderate', STRESS_COLORS.moderate,
+  'high',     STRESS_COLORS.high,
+  STRESS_COLORS.fallback,
+];
 
 // ─────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────
-let speciesConfig   = {};
-let allFeatures     = [];   // all occurrence features for current species
-let currentSpecies  = 'Loxodonta africana';
-let currentYear     = 2020;
-let currentView     = 'points';
-let countryData     = [];   // [{NAME, ISO_A3, year, count}, ...]
+let speciesConfig    = {};
+let allFeatures      = [];   // all occurrence features for current species
+let currentSpecies   = 'Loxodonta africana';
+let currentYear      = 2020;
+let currentView      = 'points';
+let countryData      = [];   // [{NAME, ISO_A3, year, count}, ...]
 let countriesGeoJSON = null;
-let mapReady        = false;
+let mapReady         = false;
 
 // ─────────────────────────────────────────────────────────────────
 // MAP INIT
@@ -52,9 +72,11 @@ function fmt(n) {
   return n.toLocaleString();
 }
 
-function getOccurrenceFile(scientificName) {
+function getStressFile(scientificName) {
+  // Load stress score GeoJSON — occurrences enriched with distance_m,
+  // stress_score (0-1), and stress_level (low/moderate/high)
   const slug = scientificName.toLowerCase().replace(' ', '_');
-  return `data/occurrences_gbif_${slug}.geojson`;
+  return `data/stress_scores_gbif_${slug}.geojson`;
 }
 
 function filterByYear(features, year) {
@@ -72,11 +94,21 @@ function updateStats(yearFeatures) {
 // ─────────────────────────────────────────────────────────────────
 const tooltip = document.getElementById('tooltip');
 
+function stressLevelLabel(level) {
+  if (level === 'low')      return `<span style="color:${STRESS_COLORS.low}">● LOW</span>`;
+  if (level === 'moderate') return `<span style="color:${STRESS_COLORS.moderate}">● MODERATE</span>`;
+  if (level === 'high')     return `<span style="color:${STRESS_COLORS.high}">● HIGH</span>`;
+  return '—';
+}
+
 function showTooltip(e, props) {
   const cfg = speciesConfig[currentSpecies] || {};
+  const distKm = props.distance_m ? (props.distance_m / 1000).toFixed(1) + ' km' : '—';
   tooltip.innerHTML = `
     <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
-    Year: ${props.year || '—'}
+    Year: ${props.year || '—'}<br>
+    Distance to water: ${distKm}<br>
+    Stress: ${stressLevelLabel(props.stress_level)}
   `;
   tooltip.style.display = 'block';
   moveTooltip(e);
@@ -200,18 +232,21 @@ async function loadSpecies(scientificName) {
   document.getElementById('legend-species-label').textContent =
     `${cfg.emoji || ''} ${cfg.common_name || scientificName} occurrences`;
 
-  // Fetch GeoJSON
-  const url = getOccurrenceFile(scientificName);
+  // Fetch stress score GeoJSON — occurrences enriched with stress_level
+  const url = getStressFile(scientificName);
   let geojson;
   try {
     const res = await fetch(url);
     geojson = await res.json();
   } catch (e) {
-    console.warn('Could not load occurrences for', scientificName, e);
+    console.warn('Could not load stress scores for', scientificName, e);
     geojson = { type: 'FeatureCollection', features: [] };
   }
 
   allFeatures = geojson.features;
+
+  // Fly to Africa on species switch
+  map.flyTo({ center: [20, 0], zoom: 3, duration: 1200 });
 
   // Update year slider range
   const { min, max } = getYearRange(allFeatures);
@@ -652,6 +687,7 @@ map.on('load', async () => {
     },
   });
 
+  // Glow layer — soft halo color-coded by stress level
   map.addLayer({
     id: 'occurrences-glow',
     type: 'circle',
@@ -659,24 +695,25 @@ map.on('load', async () => {
     filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-radius':  8,
-      'circle-color':   '#00C4FF',
+      'circle-color':   STRESS_COLOR_EXPR,
       'circle-opacity': 0.15,
       'circle-blur':    1,
     },
   });
 
+  // Dot layer — solid point color-coded by stress level
   map.addLayer({
     id: 'occurrences-dot',
     type: 'circle',
     source: 'occurrences',
     filter: ['!', ['has', 'point_count']],
     paint: {
-      'circle-radius':        3.5,
-      'circle-color':         '#00C4FF',
-      'circle-opacity':       0.85,
-      'circle-stroke-width':  0.5,
-      'circle-stroke-color':  '#FFFFFF',
-      'circle-stroke-opacity':0.3,
+      'circle-radius':         3.5,
+      'circle-color':          STRESS_COLOR_EXPR,
+      'circle-opacity':        0.85,
+      'circle-stroke-width':   0.5,
+      'circle-stroke-color':   '#FFFFFF',
+      'circle-stroke-opacity': 0.3,
     },
   });
 
