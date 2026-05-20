@@ -562,29 +562,3 @@ html, body {
   width: 100%;
   min-height: 0;
 }
-
-/* ── Map legend overlay (pinned bottom-left of map canvas) ─── */
-#map-legend {
-  position: absolute;
-  bottom: 32px;
-  left: calc(var(--panel-w) + 16px);
-  background: rgba(8,12,16,0.88);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  z-index: 10;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 170px;
-}
-
-#map-legend .legend-section-label {
-  font-size: 9px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 2px;
-}
