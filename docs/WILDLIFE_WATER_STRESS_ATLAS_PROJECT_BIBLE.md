@@ -41,8 +41,14 @@ Linear regression trend analysis for country-level occurrence counts.
 - `get_country_time_series(data, iso_a3)` → list of records for one country, sorted by year ascending.
 - `add_trends_to_country_counts(data)` → adds `slope`, `r2`, `trend` fields to every record. Called by `export_country_aggregates.py` to bake regression into GeoJSON at export time — not computed at runtime in the browser.
 
+**`utils/generic_threader.py`**
+Generic parallel job runner using Python threading. I/O-bound tasks only (not CPU-bound).
+- `GenericThreader(jobs)` — jobs is a list of `(func, args, kwargs)` tuples
+- `run()` → list of results in job order. Exceptions are caught and stored as results, not raised.
+- Used by `export_stress_scores.py` to fan out 11 PostGIS KNN queries in parallel.
+
 **`scripts/plot_elephants.py`**
-Main pipeline entry point. Uses `load_all_water()` with `WATER_CONFIG` dict. Species name in single `SPECIES` constant at top of file. Africa bbox `(-20, -40, 55, 40)` passed to all water sources.
+Developer visualization script. Uses `load_all_water()` with `WATER_CONFIG` dict. Species name in single `SPECIES` constant at top of file. Africa bbox `(-20, -40, 55, 40)` passed to all water sources.
 
 **`scripts/prefetch_gbif.py`**
 Bulk GBIF prefetch script. Loops through all species in `SPECIES_CONFIG` and pre-populates cache files in `data/processed/`. Run once after adding new species. Supports `--species` flag for single species fetch and `--force` flag to re-fetch existing cache files.
@@ -66,7 +72,15 @@ Spatial join pipeline for the choropleth view:
 
 Output format: `[{NAME, ISO_A3, year, count, slope, r2, trend}, ...]` — trends baked in at export time.
 
-TODO Phase 2: When GBIF data goes live on a schedule, wrap export scripts in GitHub Actions cron job. Frontend requires zero changes.
+**`scripts/export_stress_scores.py`**
+PostGIS KNN stress score pipeline:
+- `compute_stress_scores(engine, scientific_name)` — runs KNN query against PostGIS, adds `distance_m`, `stress_score` (0-1), `stress_level` (low/moderate/high)
+- `export_stress_scores(engine, scientific_name, output_path)` — writes enriched GeoJSON
+- `export_all_stress_scores(engine, output_dir)` — orchestrates all species using `GenericThreader` for parallel execution (~15 seconds for all 11 species)
+- Output: `apps/mapbox/data/stress_scores_gbif_{species}.geojson`
+- Has `__main__` block — run as `python scripts/export_stress_scores.py`
+
+TODO Phase 2: Wrap export scripts in GitHub Actions cron job. Frontend requires zero changes.
 
 **`apps/streamlit/streamlit_app.py`**
 Main Streamlit app. Intentionally thin — orchestrates components only.
@@ -111,9 +125,9 @@ Natural Earth lakes retired — replaced by GLWD class 1 (freshwater lake).
 ### GBIF Credibility — Pinned Answer
 **Why GBIF?** GBIF — the Global Biodiversity Information Facility — is government-funded intergovernmental infrastructure (same tier as UN). IUCN publishes Red List data through GBIF — our occurrence data and their Endangered/Vulnerable classifications come from the same ecosystem. More than 6 peer-reviewed papers per day cite GBIF data.
 
-**The honest caveat (important for interviews):** Record counts increase over time not because animal populations are booming, but because data collection has grown. Spatial clustering bias persists even after cleaning — only 6.74% of the globe has been sampled, with disproportionately poor tropical coverage. Our platform treats data gaps as insights: the COVID-19 dip in 2020, funding cycles, and field access limits are all visible signals worth surfacing, not hiding. The r² value in the trend chart makes this bias explicit — r²=0.26 means year explains only 26% of the variance; the rest is observation effort.
+**The honest caveat:** Record counts increase over time not because animal populations are booming, but because data collection has grown. Spatial clustering bias persists even after cleaning — only 6.74% of the globe has been sampled, with disproportionately poor tropical coverage. Our platform treats data gaps as insights: the COVID-19 dip in 2020, funding cycles, and field access limits are all visible signals worth surfacing, not hiding. The r² value in the trend chart makes this bias explicit — r²=0.26 means year explains only 26% of the variance; the rest is observation effort.
 
-**Interview talking point:** "We chose GBIF because it's the same data source IUCN uses for Red List assessments. But we're explicit about its limitations — record counts increase over time not because animal populations are booming, but because data collection has grown. Our platform treats data gaps as insights, not errors."
+**Talking point:** "We chose GBIF because it's the same data source IUCN uses for Red List assessments. But we're explicit about its limitations — record counts increase over time not because animal populations are booming, but because data collection has grown. Our platform treats data gaps as insights, not errors."
 
 ### GLWD v2 Class Map
 The full 33-class schema. Classes used by the pipeline:
@@ -160,6 +174,8 @@ Test files:
 - `test_trends.py` — compute_linear_regression, classify_trend, get_country_time_series, add_trends_to_country_counts (14 tests)
 - `test_export_mapbox_data.py` — export_water, export_occurrences, export_species_config, export_all (12 tests)
 - `test_export_country_aggregates.py` — load_countries, join_occurrences_to_countries, aggregate_by_country_year, export_country_counts, export_all_country_counts (9 tests)
+- `test_export_stress_scores.py` — compute_stress_scores, export_stress_scores, export_all_stress_scores, main (17 tests)
+- `test_generic_threader.py` / `test_threader.py` — GenericThreader parallel execution, error handling
 - `test_water_real_data.py` — integration test, hits real filesystem, keep separated from CI fast runs
 
 Playwright configs:
@@ -200,7 +216,7 @@ All species in `SPECIES_CONFIG` with GBIF cache files:
 ### Mapbox App — Deployed URLs
 - **GitHub Pages (live):** https://mtgiguere.github.io/wildlife-water-stress-atlas/
 - **Local dev:** `cd apps/mapbox && python -m http.server 3000` → http://localhost:3000
-- **Mapbox token:** URL-restricted to GitHub Pages + localhost. Public scopes only (no secret scopes). Safe to commit — URL restriction means token is useless outside those two origins.
+- **Mapbox token:** URL-restricted to GitHub Pages + localhost. Public scopes only. Safe to commit.
 
 ---
 
@@ -211,6 +227,9 @@ GLWD v2 integrated. Etosha Pan (class 2), Makgadikgadi/Sua Pan (class 32) now ca
 
 ### Bug: Playwright Chart Tests — FIXED ✅
 Tests moved inside `test.describe` block so they receive the `beforeEach` navigation hook.
+
+### Gap: Water Quality Not Factored Into Stress Score
+Current stress scoring uses distance + species threshold only. Water reliability and permanence fields (`reliability`, `permanence`, `months_water`) exist in the water layer schema but are NOT yet used in scoring. An elephant 1km from a salt pan scores "low stress" even though salt pans are unreliable. Phase 2 should incorporate `water_type_weights` into the actual stress score calculation, not just water source filtering.
 
 ### Gap: Performance — Raster Vectorization is Slow
 Caching implemented. `@st.cache_data` working.
@@ -260,6 +279,60 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 | Global Dam Watch (GDW) | Shapefile | Global | Reservoirs, dams | globaldamwatch.org |
 | HydroRIVERS | Shapefile | Global | Improved river network | hydrosheds.org |
 | OpenStreetMap | API / extract | Global | Boreholes, waterholes | overpass-api.de |
+
+---
+
+## 7. Architecture Roadmap
+
+### Phase 1 — Now (current state)
+- **Ingest**: `prefetch_gbif.py` run manually + raw shapefiles (GLWD, NE, JRC)
+- **Store**: `.gpkg` files locally (git-LFS) + PostGIS local (port 5433)
+- **Compute**: PostGIS KNN queries via `export_stress_scores.py`, ~15s for all 11 species
+- **Export**: `export_mapbox_data.py` + `export_country_aggregates.py` + `export_stress_scores.py`, run manually
+- **Frontend**: GitHub Pages + Mapbox GL JS, static GeoJSON with stress scores baked in
+
+### Phase 2 — Next
+- **Ingest**: AWS Lambda nightly GBIF fetch, triggered by GitHub Actions cron
+- **Store**: PostGIS local → AWS RDS PostGIS
+- **Compute**: Same PostGIS KNN — just point connection string at RDS
+- **Export**: GitHub Actions cron automates full pipeline. Frontend requires zero changes.
+- **Frontend**: GitHub Pages (unchanged) + water quality weighting in stress scores + human pressure layer
+
+### Phase 3 — Future
+- **Ingest**: Streaming ingest — CHIRPS rainfall, CMIP6 climate projections, WDPA protected areas
+- **Store**: AWS RDS PostGIS (managed, scalable)
+- **Compute**: AWS Lambda on-demand scoring + climate modeling
+- **Export**: API + static hybrid — live queries for recent data, cached static for historical
+- **Frontend**: GitHub Pages (unchanged) + climate predict layer + prescribe/intervention layer
+
+### Key architectural decisions (pinned)
+- **GitHub Pages stays forever** — zero cost, zero ops, perfect for static Mapbox app. Never needs EC2.
+- **EC2 is never needed** — serverless all the way (Lambda for compute, S3/CloudFront if outgrown)
+- **PostGIS is the performance unlock** — GIST index KNN, ~15s for 231K records across 11 species
+- **AWS Lambda enters in Phase 2** for scheduled GBIF ingest only — pennies per month
+- **Static pre-computation philosophy never changes** — bake everything at export time, no runtime server compute
+- **Credentials never hardcoded** — `WILDLIFE_ATLAS_DB_URL` env var, AWS Secrets Manager in Phase 3
+
+### PostGIS local setup
+```bash
+# PostgreSQL installs on port 5433 (Docker occupies 5432)
+# Connect via pgAdmin or psql -p 5433
+
+# Create DB and enable PostGIS
+createdb wildlife_atlas
+psql -p 5433 wildlife_atlas -c "CREATE EXTENSION postgis;"
+
+# Load all species (uses load_postgis.py)
+python scripts/load_postgis.py
+
+# Build GIST indexes (run in pgAdmin)
+CREATE INDEX ON water_sources USING GIST(geometry);
+CREATE INDEX ON occurrences_loxodonta_africana USING GIST(geometry);
+-- ... repeat for all 11 species
+
+# Export stress scores
+python scripts/export_stress_scores.py
+```
 
 ---
 

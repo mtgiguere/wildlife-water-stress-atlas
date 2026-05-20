@@ -15,6 +15,9 @@ dependencies = [
     "rasterio",
     "streamlit",
     "pydeck",
+    "sqlalchemy",
+    "geoalchemy2",
+    "psycopg2-binary",
 ]
 
 [tool.setuptools]
@@ -51,4 +54,5 @@ omit = [
     "scripts/load_data.py",
     "scripts/plot_elephants.py",
     "scripts/prefetch_gbif.py",
+    "scripts/load_postgis.py",
 ]

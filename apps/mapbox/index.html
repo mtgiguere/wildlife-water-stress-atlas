@@ -4,12 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wildlife Water Stress Atlas</title>
-
-  <!-- Mapbox GL JS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-
-  <!-- Google Fonts: Bebas Neue (display) + DM Sans (body) -->
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="css/styles.css" />
@@ -25,6 +21,36 @@
 
 <!-- Map -->
 <div id="map"></div>
+
+<!-- Map legend overlay — pinned bottom-left of map canvas, always visible -->
+<div id="map-legend">
+  <div class="legend-section-label">Water</div>
+  <div class="legend-item">
+    <div class="legend-line"></div>
+    <span>Rivers &amp; waterways</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-poly"></div>
+    <span>Lakes, wetlands &amp; pans</span>
+  </div>
+  <div class="legend-section-label" style="margin-top:6px">Water stress</div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#00C87A; box-shadow:0 0 6px rgba(0,200,122,0.4)"></div>
+    <span>Low</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#FFB800; box-shadow:0 0 6px rgba(255,184,0,0.4)"></div>
+    <span>Moderate</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#FF5A3C; box-shadow:0 0 6px rgba(255,90,60,0.4)"></div>
+    <span>High</span>
+  </div>
+  <div class="legend-item" style="margin-top:4px; opacity:0.5">
+    <div class="legend-dot" style="background:var(--accent)"></div>
+    <span id="legend-species-label" style="font-size:10px; font-style:italic">Species occurrences</span>
+  </div>
+</div>
 
 <!-- Left panel -->
 <div id="panel">
@@ -84,27 +110,8 @@
           <div class="stat-label">Water sources mapped</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">9</div>
+          <div class="stat-value">11</div>
           <div class="stat-label">Species tracked</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Legend -->
-    <div>
-      <div class="section-label">Legend</div>
-      <div id="legend">
-        <div class="legend-item">
-          <div class="legend-line"></div>
-          <span>Rivers &amp; waterways</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-poly"></div>
-          <span>Lakes, wetlands &amp; pans</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot"></div>
-          <span id="legend-species-label">Species occurrences</span>
         </div>
       </div>
     </div>
