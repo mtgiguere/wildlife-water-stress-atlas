@@ -41,11 +41,20 @@ Linear regression trend analysis for country-level occurrence counts.
 - `get_country_time_series(data, iso_a3)` → list of records for one country, sorted by year ascending.
 - `add_trends_to_country_counts(data)` → adds `slope`, `r2`, `trend` fields to every record. Called by `export_country_aggregates.py` to bake regression into GeoJSON at export time — not computed at runtime in the browser.
 
+**`utils/generic_threader.py`**
+Generic parallel job runner using Python threading. I/O-bound tasks only (not CPU-bound).
+- `GenericThreader(jobs)` — jobs is a list of `(func, args, kwargs)` tuples
+- `run()` → list of results in job order. Exceptions are caught and stored as results, not raised.
+- Used by `export_stress_scores.py` to fan out 11 PostGIS KNN queries in parallel.
+
 **`scripts/plot_elephants.py`**
-Main pipeline entry point. Uses `load_all_water()` with `WATER_CONFIG` dict. Species name in single `SPECIES` constant at top of file. Africa bbox `(-20, -40, 55, 40)` passed to all water sources.
+Developer visualization script. Uses `load_all_water()` with `WATER_CONFIG` dict. Species name in single `SPECIES` constant at top of file. Africa bbox `(-20, -40, 55, 40)` passed to all water sources.
 
 **`scripts/prefetch_gbif.py`**
 Bulk GBIF prefetch script. Loops through all species in `SPECIES_CONFIG` and pre-populates cache files in `data/processed/`. Run once after adding new species. Supports `--species` flag for single species fetch and `--force` flag to re-fetch existing cache files.
+
+**`scripts/load_postgis.py`**
+One-time data loading utility. Loads all `.gpkg` files into PostGIS using SQLAlchemy + GeoPandas. Excluded from coverage — dev tool, not library code. Uses port 5433 (Docker occupies 5432). Connection string reads from `WILDLIFE_ATLAS_DB_URL` env var or defaults to local dev URL.
 
 **`scripts/export_mapbox_data.py`**
 Exports data for the Mapbox app:
@@ -66,7 +75,15 @@ Spatial join pipeline for the choropleth view:
 
 Output format: `[{NAME, ISO_A3, year, count, slope, r2, trend}, ...]` — trends baked in at export time.
 
-TODO Phase 2: When GBIF data goes live on a schedule, wrap export scripts in GitHub Actions cron job. Frontend requires zero changes.
+**`scripts/export_stress_scores.py`**
+PostGIS KNN stress score pipeline:
+- `compute_stress_scores(engine, scientific_name)` — runs KNN query against PostGIS, adds `distance_m`, `stress_score` (0-1), `stress_level` (low/moderate/high)
+- `export_stress_scores(engine, scientific_name, output_path)` — writes enriched GeoJSON
+- `export_all_stress_scores(engine, output_dir)` — orchestrates all species using `GenericThreader` for parallel execution (~15 seconds for all 11 species)
+- Output: `apps/mapbox/data/stress_scores_gbif_{species}.geojson`
+- Has `__main__` block — run as `python scripts/export_stress_scores.py`
+
+TODO Phase 2: Wrap export scripts in GitHub Actions cron job. Frontend requires zero changes.
 
 **`apps/streamlit/streamlit_app.py`**
 Main Streamlit app. Intentionally thin — orchestrates components only.
@@ -81,21 +98,20 @@ Now includes:
 - Dark theme + hero banner (elephants_waterhole.jpeg)
 - `st.session_state` for species selection persistence across reruns
 
-**`apps/mapbox/`** ← REFACTORED (was single index.html, now split)
-Three-file structure:
-- `index.html` — HTML structure only (~110 lines)
-- `css/styles.css` — all styles (~310 lines)
-- `js/app.js` — all JS logic (~370 lines)
+**`apps/mapbox/`** — Three-file structure (refactored from single 1500-line index.html)
+- `index.html` — HTML structure only (~130 lines)
+- `css/styles.css` — all styles (~590 lines including map legend overlay)
+- `js/app.js` — all JS logic (~400 lines)
 
 Features:
-- ⬤ POINTS view — circle layers with glow effect, year slider, autoplay (▶/⏸, Slow/Med/Fast)
-- ▦ COUNTRIES view — choropleth using Natural Earth GeoJSON from GitHub CDN. Intensity interpolated 0→1 per year. Country click → trend chart draggable modal.
-- Trend chart — pure Canvas 2D API (no library). Draws raw data line (cyan), trend line (dashed, color-coded by trend classification), grid lines, axis labels. Draggable modal.
-- Tooltip — updates on mousemove across country borders (not just mouseenter), so switching from Tanzania to Kenya updates immediately.
+- ⬤ POINTS view — circle layers color-coded by stress level (🟢 low=#00C87A / 🟡 moderate=#FFB800 / 🔴 high=#FF5A3C), year slider, autoplay (▶/⏸, Slow/Med/Fast), icon clustering at low zoom
+- ▦ COUNTRIES view — choropleth using Natural Earth GeoJSON from GitHub CDN. Country click → draggable trend chart modal.
+- Map legend overlay — pinned bottom-left of map canvas, always visible, shows water types + stress levels
+- Tooltip — shows species, year, distance to water (km), stress level with color
+- Trend chart — pure Canvas 2D API. Draws raw data line, trend line (dashed, color-coded), grid, axis labels. Draggable modal.
 - Fly-to-Africa on species switch — `map.flyTo({center:[20,0], zoom:3, duration:1200})`
 - COVID-19 annotation panel — appears only when year === 2020
 - Loading overlay with animated progress bar
-- Icon clustering at low zoom — `cluster: true` on GeoJSON source, cluster circle styling with count labels ✅
 
 ### Current Data Sources
 | Layer | File | Source | Format | Notes |
@@ -111,9 +127,9 @@ Natural Earth lakes retired — replaced by GLWD class 1 (freshwater lake).
 ### GBIF Credibility — Pinned Answer
 **Why GBIF?** GBIF — the Global Biodiversity Information Facility — is government-funded intergovernmental infrastructure (same tier as UN). IUCN publishes Red List data through GBIF — our occurrence data and their Endangered/Vulnerable classifications come from the same ecosystem. More than 6 peer-reviewed papers per day cite GBIF data.
 
-**The honest caveat (important for interviews):** Record counts increase over time not because animal populations are booming, but because data collection has grown. Spatial clustering bias persists even after cleaning — only 6.74% of the globe has been sampled, with disproportionately poor tropical coverage. Our platform treats data gaps as insights: the COVID-19 dip in 2020, funding cycles, and field access limits are all visible signals worth surfacing, not hiding. The r² value in the trend chart makes this bias explicit — r²=0.26 means year explains only 26% of the variance; the rest is observation effort.
+**The honest caveat:** Record counts increase over time not because animal populations are booming, but because data collection has grown. Spatial clustering bias persists even after cleaning — only 6.74% of the globe has been sampled, with disproportionately poor tropical coverage. Our platform treats data gaps as insights: the COVID-19 dip in 2020, funding cycles, and field access limits are all visible signals worth surfacing, not hiding. The r² value in the trend chart makes this bias explicit — r²=0.26 means year explains only 26% of the variance; the rest is observation effort.
 
-**Interview talking point:** "We chose GBIF because it's the same data source IUCN uses for Red List assessments. But we're explicit about its limitations — record counts increase over time not because animal populations are booming, but because data collection has grown. Our platform treats data gaps as insights, not errors."
+**Talking point:** "We chose GBIF because it's the same data source IUCN uses for Red List assessments. But we're explicit about its limitations — record counts increase over time not because animal populations are booming, but because data collection has grown. Our platform treats data gaps as insights, not errors."
 
 ### GLWD v2 Class Map
 The full 33-class schema. Classes used by the pipeline:
@@ -141,7 +157,7 @@ Default water classes for elephants: `{2, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 1
 Classes 1 and 4 excluded from defaults — covered by Natural Earth with better geometry types.
 
 ### Current Test Coverage
-**311 unit tests, 100% coverage**
+**328 unit tests, 100% coverage**
 **16 Playwright E2E tests (Streamlit) — 16 passing** ✅
 **25 Playwright E2E tests (Mapbox) — 25 passing** ✅
 TDD strictly enforced — tests written before implementation on every change.
@@ -160,6 +176,8 @@ Test files:
 - `test_trends.py` — compute_linear_regression, classify_trend, get_country_time_series, add_trends_to_country_counts (14 tests)
 - `test_export_mapbox_data.py` — export_water, export_occurrences, export_species_config, export_all (12 tests)
 - `test_export_country_aggregates.py` — load_countries, join_occurrences_to_countries, aggregate_by_country_year, export_country_counts, export_all_country_counts (9 tests)
+- `test_export_stress_scores.py` — compute_stress_scores, export_stress_scores, export_all_stress_scores, main (17 tests)
+- `test_generic_threader.py` / `test_threader.py` — GenericThreader parallel execution, error handling
 - `test_water_real_data.py` — integration test, hits real filesystem, keep separated from CI fast runs
 
 Playwright configs:
@@ -167,7 +185,7 @@ Playwright configs:
 - `playwright.mapbox.config.ts` — Mapbox app, port 3000
 - Run Streamlit: `npx playwright test`
 - Run Mapbox: `npx playwright test --config playwright.mapbox.config.ts`
-- Streamlit spec: `tests/e2e/test_streamlit.spec.ts` (renamed from test_app.spec.ts)
+- Streamlit spec: `tests/e2e/test_streamlit.spec.ts`
 - Mapbox spec: `tests/e2e/test_mapbox.spec.ts`
 
 ### Current Species Registry
@@ -182,16 +200,18 @@ All species in `SPECIES_CONFIG` with GBIF cache files:
 | Acinonyx jubatus | Cheetah | 🐆 | 250km | low | gbif_acinonyx_jubatus.gpkg | 8,508 |
 | Crocodylus niloticus | Nile Crocodile | 🐊 | 10km | high | gbif_crocodylus_niloticus.gpkg | 9,134 |
 | Phoenicopterus roseus | Greater Flamingo | 🦩 | 50km | high | gbif_phoenicopterus_roseus.gpkg | 99,900 |
-| Hyperolius marmoratus | Painted Reed Frog | 🐸 | 2km | high | gbif_hyperolius_marmoratus.gpkg | ~TBC |
-| Xenopus laevis | African Clawed Frog | 🐸 | 5km | high | gbif_xenopus_laevis.gpkg | ~TBC |
+| Hyperolius marmoratus | Painted Reed Frog | 🐸 | 2km | high | gbif_hyperolius_marmoratus.gpkg | 8,255 |
+| Xenopus laevis | African Clawed Frog | 🐸 | 5km | high | gbif_xenopus_laevis.gpkg | 9,983 |
 | Hippopotamus amphibius | Hippopotamus | 🦛 | 15km | high | gbif_hippopotamus_amphibius.gpkg | ~13,000 |
 | Syncerus caffer | Cape Buffalo | 🐃 | 100km | high | gbif_syncerus_caffer.gpkg | ~17,369 |
 
 ### What the Mapbox App Shows Right Now
 - Dark Mapbox basemap (dark-v11)
-- ⬤ POINTS view: Blue occurrence dots with glow, year slider (autoplay ▶/⏸), species selector, icon clustering at low zoom
+- ⬤ POINTS view: Occurrence dots color-coded by water stress level (🟢 low / 🟡 moderate / 🔴 high), year slider (autoplay ▶/⏸), species selector, icon clustering at low zoom
 - ▦ COUNTRIES view: Choropleth (cyan intensity by record count), year slider updates choropleth
 - Trend chart: Click country → draggable modal with Canvas 2D line chart, trend line, slope/r²/classification badge
+- Map legend overlay: always visible, pinned bottom-left, shows water types + stress colors
+- Tooltip: species, year, distance to water (km), stress level
 - Fly-to-Africa animation on species switch
 - COVID-19 annotation (year 2020 only)
 - Water network: rivers (lines) + wetlands/lakes/pans (polygons) from GLWD v2 + Natural Earth
@@ -200,7 +220,7 @@ All species in `SPECIES_CONFIG` with GBIF cache files:
 ### Mapbox App — Deployed URLs
 - **GitHub Pages (live):** https://mtgiguere.github.io/wildlife-water-stress-atlas/
 - **Local dev:** `cd apps/mapbox && python -m http.server 3000` → http://localhost:3000
-- **Mapbox token:** URL-restricted to GitHub Pages + localhost. Public scopes only (no secret scopes). Safe to commit — URL restriction means token is useless outside those two origins.
+- **Mapbox token:** URL-restricted to GitHub Pages + localhost. Public scopes only. Safe to commit.
 
 ---
 
@@ -212,14 +232,17 @@ GLWD v2 integrated. Etosha Pan (class 2), Makgadikgadi/Sua Pan (class 32) now ca
 ### Bug: Playwright Chart Tests — FIXED ✅
 Tests moved inside `test.describe` block so they receive the `beforeEach` navigation hook.
 
+### Gap: Water Quality Not Factored Into Stress Score
+Current stress scoring uses distance + species threshold only. Water reliability and permanence fields (`reliability`, `permanence`, `months_water`) exist in the water layer schema but are NOT yet used in scoring. An elephant 1km from a salt pan scores "low stress" even though salt pans are unreliable. Phase 2 should incorporate `water_type_weights` into the actual stress score calculation, not just water source filtering.
+
 ### Gap: Performance — Raster Vectorization is Slow
 Caching implemented. `@st.cache_data` working.
 
-### Gap: Water Stress Not Visualized in Mapbox App
-The analytics pipeline (`overlap.py`, `scoring.py`) computes water stress scores per occurrence but this data is NOT yet exported to GeoJSON or visualized in the Mapbox app. Currently only occurrence counts and trend data are shown. Showing stress scores (color-coded points, heatmap, or grid layer) is the next major feature.
-
 ### Gap: JRC GSW Multi-Tile Loading
 JRCTileDirectory source class planned for multiple 10-degree tiles.
+
+### Gap: Playwright E2E Tests for Mapbox — Stress Colors Not Tested
+Current Mapbox Playwright tests don't verify stress color rendering — WebGL layers aren't testable via DOM inspection. Consider pixel-based screenshot comparison in Phase 2.
 
 ---
 
@@ -230,14 +253,14 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 - **CI/CD pipeline**: unit tests + linting + vulnerability scans minimum on every push
 - **Never hardcode species names** anywhere in library code
 
-1. **Water stress visualization** — export stress scores per occurrence to GeoJSON, color-code points in Mapbox by stress level (low/moderate/high). This is the "killer feature" — the whole platform is named after it.
+1. **Water quality weighting in stress score** — incorporate `reliability` and `permanence` from water layer into scoring, not just distance
 2. **Multi-species overlay** — "Compare All Species" mode
-3. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
+3. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view
 4. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
 5. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
 6. **Additional water sources** — springs, reservoirs, boreholes
-7. **Human pressure layer** — roads, fences, settlements (Pressure Type 2)
-8. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
+7. **Human pressure layer** — roads, fences, settlements
+8. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer
 9. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
 
 ---
@@ -267,17 +290,17 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 
 ### Phase 1 — Now (current state)
 - **Ingest**: `prefetch_gbif.py` run manually + raw shapefiles (GLWD, NE, JRC)
-- **Store**: `.gpkg` files locally, tracked via git-LFS
-- **Compute**: Python pipeline (`overlap.py` + `scoring.py`), run manually
-- **Export**: `export_mapbox_data.py` + `export_country_aggregates.py`, run manually
-- **Frontend**: GitHub Pages + Mapbox GL JS, static GeoJSON
+- **Store**: `.gpkg` files locally (git-LFS) + PostGIS local (port 5433)
+- **Compute**: PostGIS KNN queries via `export_stress_scores.py`, ~15s for all 11 species
+- **Export**: `export_mapbox_data.py` + `export_country_aggregates.py` + `export_stress_scores.py`, run manually
+- **Frontend**: GitHub Pages + Mapbox GL JS, static GeoJSON with stress scores baked in
 
 ### Phase 2 — Next
 - **Ingest**: AWS Lambda nightly GBIF fetch, triggered by GitHub Actions cron
-- **Store**: PostGIS local with GIST spatial index (later → AWS RDS PostGIS)
-- **Compute**: PostGIS `ST_Distance` KNN queries (fast via GIST index) replacing in-memory GeoPandas nearest-neighbor
-- **Export**: Same export scripts, now reading from PostGIS. Stress scores + trend data baked into GeoJSON. GitHub Actions cron automates full pipeline.
-- **Frontend**: GitHub Pages (unchanged) + stress visualization layer (color-coded points: green/yellow/red by stress level)
+- **Store**: PostGIS local → AWS RDS PostGIS
+- **Compute**: Same PostGIS KNN — just point connection string at RDS
+- **Export**: GitHub Actions cron automates full pipeline. Frontend requires zero changes.
+- **Frontend**: GitHub Pages (unchanged) + water quality weighting in stress scores + human pressure layer
 
 ### Phase 3 — Future
 - **Ingest**: Streaming ingest — CHIRPS rainfall, CMIP6 climate projections, WDPA protected areas
@@ -288,34 +311,31 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 
 ### Key architectural decisions (pinned)
 - **GitHub Pages stays forever** — zero cost, zero ops, perfect for static Mapbox app. Never needs EC2.
-- **EC2 is never needed** — serverless all the way (Lambda for compute, S3/CloudFront if GitHub Pages is ever outgrown)
-- **PostGIS is the performance unlock** — `ST_Distance` + GIST index makes stress score export go from hours → minutes. Start local, migrate to RDS in Phase 3.
-- **AWS Lambda enters in Phase 2** for scheduled GBIF ingest only — pennies per month, no server to maintain
-- **Static pre-computation philosophy never changes** — bake everything at export time, frontend reads pre-computed fields. No runtime server compute.
+- **EC2 is never needed** — serverless all the way (Lambda for compute, S3/CloudFront if outgrown)
+- **PostGIS is the performance unlock** — GIST index KNN, ~15s for 231K records across 11 species
+- **AWS Lambda enters in Phase 2** for scheduled GBIF ingest only — pennies per month
+- **Static pre-computation philosophy never changes** — bake everything at export time, no runtime server compute
+- **Credentials never hardcoded** — `WILDLIFE_ATLAS_DB_URL` env var, AWS Secrets Manager in Phase 3
 
-### PostGIS setup (local, Phase 2 starting point)
+### PostGIS local setup
 ```bash
-# After installing PostgreSQL + PostGIS:
+# PostgreSQL installs on port 5433 (Docker occupies 5432)
+# Connect via pgAdmin or psql -p 5433
+
+# Create DB and enable PostGIS
 createdb wildlife_atlas
-psql wildlife_atlas -c "CREATE EXTENSION postgis;"
+psql -p 5433 wildlife_atlas -c "CREATE EXTENSION postgis;"
 
-# Load water sources
-ogr2ogr -f PostgreSQL PG:"dbname=wildlife_atlas" data/processed/water_africa.gpkg -nln water_sources
+# Load all species (uses load_postgis.py)
+python scripts/load_postgis.py
 
-# Load occurrences per species (repeat for each)
-ogr2ogr -f PostgreSQL PG:"dbname=wildlife_atlas" data/processed/gbif_loxodonta_africana.gpkg -nln occurrences_loxodonta_africana
+# Build GIST indexes (run in pgAdmin)
+CREATE INDEX ON water_sources USING GIST(geometry);
+CREATE INDEX ON occurrences_loxodonta_africana USING GIST(geometry);
+-- ... repeat for all 11 species
 
-# Build GIST indexes
-psql wildlife_atlas -c "CREATE INDEX ON water_sources USING GIST(geom);"
-psql wildlife_atlas -c "CREATE INDEX ON occurrences_loxodonta_africana USING GIST(geom);"
-
-# KNN nearest-neighbor query (replaces add_distance_to_water())
-# SELECT o.*, ST_Distance(o.geom::geography, w.geom::geography) as distance_m
-# FROM occurrences_loxodonta_africana o
-# CROSS JOIN LATERAL (
-#     SELECT geom FROM water_sources
-#     ORDER BY o.geom <-> geom LIMIT 1
-# ) w
+# Export stress scores
+python scripts/export_stress_scores.py
 ```
 
 ---
@@ -358,12 +378,17 @@ psql wildlife_atlas -c "CREATE INDEX ON occurrences_loxodonta_africana USING GIS
 - **Two frog species share the same Streamlit icon** — tooltip distinguishes them.
 - **Hippo icon** — `Creative-Tail-Animal-hippo.svg.png` in `apps/streamlit/static/`
 - **Buffalo icon** — `Creative-Tail-Animal-buffalo.svg.png` in `apps/streamlit/static/`
-- **Developer is planning a decade of digital nomad travel** — Africa leg includes Chobe National Park (highest elephant concentration on Earth). Puerto Vallarta is the dream remote work destination. Full circle with this project. 🐘
-- **Mapbox app file structure** — refactored from single 1500-line `index.html` to `index.html` + `css/styles.css` + `js/app.js`. Always run server from `apps/mapbox/` directory.
-- **Browser cache** — always test in incognito when debugging data changes. Regular browser caches `species_config.json` aggressively.
+- **PostGIS runs on port 5433** — Docker Desktop occupies 5432. Always connect on 5433.
+- **`load_postgis.py` is excluded from coverage** — one-time dev tool, not library code.
+- **Stress score GeoJSON** — `apps/mapbox/data/stress_scores_gbif_{slug}.geojson` — committed to git, loaded by Mapbox app instead of raw occurrence GeoJSON.
+- **Stress colors**: low=#00C87A (green), moderate=#FFB800 (yellow), high=#FF5A3C (red), fallback=#00C4FF (cyan)
+- **Map legend** is a pinned overlay (`#map-legend`) positioned bottom-left of map canvas, always visible. Not inside the scrollable panel.
+- **Mapbox app file structure** — always run server from `apps/mapbox/` directory, not repo root.
+- **Browser cache** — always test in incognito when debugging data changes.
+- **Water quality gap** — stress score uses distance only, not water reliability/permanence. Elephants near salt pans score "low" even though pans are unreliable. Phase 2 fix: incorporate `water_type_weights` into scoring.
 
-### Session End State (May 18, 2026)
-- 311 unit tests, 100% coverage ✅
+### Session End State (May 19, 2026)
+- 328 unit tests, 100% coverage ✅
 - 16 Playwright E2E tests (Streamlit) ✅
 - 25 Playwright E2E tests (Mapbox) ✅
 - Mapbox app live on GitHub Pages ✅
@@ -372,9 +397,14 @@ psql wildlife_atlas -c "CREATE INDEX ON occurrences_loxodonta_africana USING GIS
 - Linear regression in core analytics library ✅
 - 11 species including Hippo + Cape Buffalo ✅
 - Icon clustering on points view ✅
+- PostGIS local setup with GIST indexes ✅
+- Stress score export pipeline (PostGIS KNN + GenericThreader) ✅
+- Color-coded stress points live on map ✅
+- Pinned map legend overlay ✅
 - All merged to main ✅
 
 Next session priorities:
-1. **Water stress visualization** — the namesake feature, still not shown in the app
+1. Water quality weighting in stress score (salt pan vs river distinction)
 2. Multi-species overlay
 3. Human pressure layer
+4. Update Playwright Mapbox tests for stress score view
