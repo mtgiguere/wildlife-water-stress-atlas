@@ -263,6 +263,63 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 
 ---
 
+## 7. Architecture Roadmap
+
+### Phase 1 — Now (current state)
+- **Ingest**: `prefetch_gbif.py` run manually + raw shapefiles (GLWD, NE, JRC)
+- **Store**: `.gpkg` files locally, tracked via git-LFS
+- **Compute**: Python pipeline (`overlap.py` + `scoring.py`), run manually
+- **Export**: `export_mapbox_data.py` + `export_country_aggregates.py`, run manually
+- **Frontend**: GitHub Pages + Mapbox GL JS, static GeoJSON
+
+### Phase 2 — Next
+- **Ingest**: AWS Lambda nightly GBIF fetch, triggered by GitHub Actions cron
+- **Store**: PostGIS local with GIST spatial index (later → AWS RDS PostGIS)
+- **Compute**: PostGIS `ST_Distance` KNN queries (fast via GIST index) replacing in-memory GeoPandas nearest-neighbor
+- **Export**: Same export scripts, now reading from PostGIS. Stress scores + trend data baked into GeoJSON. GitHub Actions cron automates full pipeline.
+- **Frontend**: GitHub Pages (unchanged) + stress visualization layer (color-coded points: green/yellow/red by stress level)
+
+### Phase 3 — Future
+- **Ingest**: Streaming ingest — CHIRPS rainfall, CMIP6 climate projections, WDPA protected areas
+- **Store**: AWS RDS PostGIS (managed, scalable)
+- **Compute**: AWS Lambda on-demand scoring + climate modeling
+- **Export**: API + static hybrid — live queries for recent data, cached static for historical
+- **Frontend**: GitHub Pages (unchanged) + climate predict layer + prescribe/intervention layer
+
+### Key architectural decisions (pinned)
+- **GitHub Pages stays forever** — zero cost, zero ops, perfect for static Mapbox app. Never needs EC2.
+- **EC2 is never needed** — serverless all the way (Lambda for compute, S3/CloudFront if GitHub Pages is ever outgrown)
+- **PostGIS is the performance unlock** — `ST_Distance` + GIST index makes stress score export go from hours → minutes. Start local, migrate to RDS in Phase 3.
+- **AWS Lambda enters in Phase 2** for scheduled GBIF ingest only — pennies per month, no server to maintain
+- **Static pre-computation philosophy never changes** — bake everything at export time, frontend reads pre-computed fields. No runtime server compute.
+
+### PostGIS setup (local, Phase 2 starting point)
+```bash
+# After installing PostgreSQL + PostGIS:
+createdb wildlife_atlas
+psql wildlife_atlas -c "CREATE EXTENSION postgis;"
+
+# Load water sources
+ogr2ogr -f PostgreSQL PG:"dbname=wildlife_atlas" data/processed/water_africa.gpkg -nln water_sources
+
+# Load occurrences per species (repeat for each)
+ogr2ogr -f PostgreSQL PG:"dbname=wildlife_atlas" data/processed/gbif_loxodonta_africana.gpkg -nln occurrences_loxodonta_africana
+
+# Build GIST indexes
+psql wildlife_atlas -c "CREATE INDEX ON water_sources USING GIST(geom);"
+psql wildlife_atlas -c "CREATE INDEX ON occurrences_loxodonta_africana USING GIST(geom);"
+
+# KNN nearest-neighbor query (replaces add_distance_to_water())
+# SELECT o.*, ST_Distance(o.geom::geography, w.geom::geography) as distance_m
+# FROM occurrences_loxodonta_africana o
+# CROSS JOIN LATERAL (
+#     SELECT geom FROM water_sources
+#     ORDER BY o.geom <-> geom LIMIT 1
+# ) w
+```
+
+---
+
 ## 11. Notes for Future Claude Sessions
 
 - The developer uses **strict TDD** — always write tests before implementation. Non-negotiable.

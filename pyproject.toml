@@ -51,4 +51,5 @@ omit = [
     "scripts/load_data.py",
     "scripts/plot_elephants.py",
     "scripts/prefetch_gbif.py",
+    "scripts/load_postgis.py",
 ]
