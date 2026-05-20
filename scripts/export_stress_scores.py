@@ -83,7 +83,7 @@ def compute_stress_scores(engine, scientific_name: str) -> gpd.GeoDataFrame:
     query = KNN_QUERY.format(table=table)
 
     gdf = gpd.read_postgis(query, engine, geom_col="geometry")
-    
+
     gdf["stress_score"] = gdf["distance_m"].apply(lambda d: water_stress_score(d, scientific_name))
     gdf["stress_level"] = gdf["stress_score"].apply(classify_stress_level)
 
