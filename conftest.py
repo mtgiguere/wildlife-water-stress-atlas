@@ -1,13 +1,12 @@
-import os
-import sys
-from pathlib import Path
-
 # PostgreSQL/PostGIS sets PROJ_LIB to its own outdated PROJ database on
 # Windows. Override it BEFORE importing rasterio or pyproj so the PROJ DLL
 # initializes against the correct database (the one rasterio was compiled with).
 # importlib.util.find_spec locates rasterio without importing it, so the PROJ
 # DLL has not yet initialized when we set the environment variables.
 import importlib.util as _ilu
+import os
+import sys
+from pathlib import Path
 
 _rasterio_spec = _ilu.find_spec("rasterio")
 if _rasterio_spec and _rasterio_spec.origin:
