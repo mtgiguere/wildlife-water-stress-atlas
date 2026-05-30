@@ -374,7 +374,8 @@ def test_glwd_clips_to_bbox():
         source = GLWDWetlands("dummy/glwd.tif", bbox=(0, 0, 2, 2))
         result = source.load()
 
-    assert len(result) >= 0  # just verify it runs without error
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert "water_type" in result.columns
 
 
 # ---------------------------------------------------------------------------

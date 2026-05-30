@@ -310,6 +310,7 @@ def test_simplify_water_for_browser_has_fewer_features_than_input(
 ):
     result = simplify_water_for_browser(mock_water_gdf_with_ephemerals)
 
+    assert len(result) > 0, "Filtering removed everything — some features should survive"
     assert len(result) < len(mock_water_gdf_with_ephemerals)
 
 

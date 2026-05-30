@@ -1,16 +1,27 @@
 from wildlife_water_stress_atlas.analytics.scoring import water_stress_score
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+
+_ELEPHANT = "Loxodonta africana"
+_THRESHOLD = SPECIES_CONFIG[_ELEPHANT]["water_threshold_m"]
 
 
 def test_water_stress_score_zero_distance():
-    assert water_stress_score(0, "Loxodonta africana") == 0
+    assert water_stress_score(0, _ELEPHANT) == 0
 
 
-def test_water_stress_score_mid_range():
-    assert 0 < water_stress_score(150_000, "Loxodonta africana") < 1
+def test_water_stress_score_linear_scaling():
+    """At half the threshold, score is exactly 0.5 — verifies linear relationship."""
+    assert water_stress_score(_THRESHOLD / 2, _ELEPHANT) == 0.5
+
+
+def test_water_stress_score_at_exact_threshold_is_one():
+    """At exactly the threshold distance, score is 1.0."""
+    assert water_stress_score(_THRESHOLD, _ELEPHANT) == 1.0
 
 
 def test_water_stress_score_caps_at_one():
-    assert water_stress_score(500_000, "Loxodonta africana") == 1.0
+    """Any distance beyond the threshold is capped at 1.0, not allowed to exceed it."""
+    assert water_stress_score(_THRESHOLD * 2, _ELEPHANT) == 1.0
 
 
 def test_classify_stress_level_returns_high_for_scores_at_or_above_0_8():

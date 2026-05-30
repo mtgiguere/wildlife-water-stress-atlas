@@ -109,7 +109,7 @@ def test_build_water_layer_uses_geojson_layer_type(mock_water_gdf):
 
 def test_build_water_layer_is_not_pickable_by_default(mock_water_gdf):
     result = build_water_layer(mock_water_gdf)
-    assert all(layer.pickable is False for layer in result)
+    assert all(not layer.pickable for layer in result)
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ def test_build_occurrences_layer_uses_icon_layer_type(mock_occurrences_gdf):
 
 def test_build_occurrences_layer_is_pickable(mock_occurrences_gdf):
     result = build_occurrences_layer(mock_occurrences_gdf)
-    assert result.pickable is True
+    assert result.pickable
 
 
 def test_build_occurrences_layer_handles_empty_geodataframe(empty_occurrences_gdf):

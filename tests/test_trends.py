@@ -10,6 +10,8 @@ FUNCTION COVERAGE:
 - get_country_time_series(data, iso) — filter country_counts list by ISO_A3
 """
 
+import pytest
+
 from wildlife_water_stress_atlas.analytics.trends import compute_linear_regression
 
 # ---------------------------------------------------------------------------
@@ -152,3 +154,53 @@ def test_add_trends_to_country_counts_adds_slope_and_classification():
     assert all("r2" in r for r in kenya_records)
     assert all("trend" in r for r in kenya_records)
     assert kenya_records[0]["trend"] == "increasing"
+
+
+def test_compute_linear_regression_handles_two_points():
+    """Two data points define a perfect line — r2 must be 1.0."""
+    result = compute_linear_regression({2018: 10, 2020: 30})
+    assert result["r2"] == pytest.approx(1.0)
+    assert result["slope"] > 0
+
+
+def test_compute_linear_regression_slope_is_zero_for_constant_data():
+    """Same count every year → flat line, slope == 0."""
+    result = compute_linear_regression({2018: 50, 2019: 50, 2020: 50})
+    assert result["slope"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_compute_linear_regression_handles_declining_data():
+    """Decreasing counts produce a negative slope."""
+    result = compute_linear_regression({2018: 40, 2019: 30, 2020: 20, 2021: 10})
+    assert result["slope"] == pytest.approx(-10.0, abs=0.001)
+    assert result["r2"] == pytest.approx(1.0, abs=0.001)
+
+
+def test_add_trends_to_country_counts_handles_empty_input():
+    """Empty list in → empty list out, no crash."""
+    from wildlife_water_stress_atlas.analytics.trends import add_trends_to_country_counts
+
+    result = add_trends_to_country_counts([])
+    assert result == []
+
+
+def test_add_trends_to_country_counts_handles_multiple_countries_independently():
+    """Each country gets its own regression — one increasing, one declining."""
+    from wildlife_water_stress_atlas.analytics.trends import add_trends_to_country_counts
+
+    data = [
+        {"NAME": "Kenya", "ISO_A3": "KEN", "year": 2018, "count": 10},
+        {"NAME": "Kenya", "ISO_A3": "KEN", "year": 2019, "count": 20},
+        {"NAME": "Kenya", "ISO_A3": "KEN", "year": 2020, "count": 30},
+        {"NAME": "Tanzania", "ISO_A3": "TZA", "year": 2018, "count": 30},
+        {"NAME": "Tanzania", "ISO_A3": "TZA", "year": 2019, "count": 20},
+        {"NAME": "Tanzania", "ISO_A3": "TZA", "year": 2020, "count": 10},
+    ]
+
+    result = add_trends_to_country_counts(data)
+
+    kenya = [r for r in result if r["ISO_A3"] == "KEN"]
+    tanzania = [r for r in result if r["ISO_A3"] == "TZA"]
+
+    assert kenya[0]["trend"] == "increasing"
+    assert tanzania[0]["trend"] == "declining"

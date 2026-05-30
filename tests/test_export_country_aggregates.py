@@ -168,6 +168,30 @@ def test_aggregate_by_country_year_excludes_non_africa():
     assert "Kenya" in result["NAME"].values
 
 
+def test_aggregate_by_country_year_drops_null_country_names():
+    """Points outside all country polygons have null NAME from the spatial join.
+    These should be excluded — a null country name is not a useful data point.
+    """
+    joined = gpd.GeoDataFrame(
+        {
+            "NAME": ["Kenya", None],
+            "ISO_A3": ["KEN", None],
+            "CONTINENT": ["Africa", None],
+            "year": [2020, 2020],
+            "species": ["Loxodonta africana"] * 2,
+        },
+        geometry=[Point(37, 0), Point(0, 0)],
+        crs="EPSG:4326",
+    )
+
+    from scripts.export_country_aggregates import aggregate_by_country_year
+
+    result = aggregate_by_country_year(joined)
+
+    assert result["NAME"].isna().sum() == 0
+    assert "Kenya" in result["NAME"].values
+
+
 def test_export_country_counts_writes_geojson(tmp_path):
     """export_country_counts() writes a GeoJSON file for the given species."""
     data_dir = tmp_path / "data" / "processed"
