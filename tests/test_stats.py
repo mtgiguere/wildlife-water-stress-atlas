@@ -39,12 +39,6 @@ def test_get_water_threshold_display_elephant():
     assert result == "300 km"
 
 
-# def test_get_water_threshold_display_reed_frog():
-#     # 2,000m → "2 km"
-#     result = get_water_threshold_display("Hyperolius marmoratus")
-#     assert result == "2 km"
-
-
 def test_get_water_threshold_display_raises_for_unknown_species():
     # Unknown species should raise KeyError — no silent defaults
     with pytest.raises(KeyError):

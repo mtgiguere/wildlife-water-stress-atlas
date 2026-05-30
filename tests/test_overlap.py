@@ -70,3 +70,51 @@ def test_add_distance_to_water_works_with_combined_water_sources():
 
     assert "distance_to_water" in result.columns
     assert result.loc[0, "distance_to_water"] >= 0
+
+
+def test_add_distance_to_water_empty_occurrences_returns_empty():
+    """Empty occurrences GeoDataFrame produces an empty result — no crash."""
+    occurrences = gpd.GeoDataFrame(
+        {"species": []},
+        geometry=[],
+        crs="EPSG:4326",
+    )
+
+    water = gpd.GeoDataFrame(
+        {"type": ["river"]},
+        geometry=[LineString([(0, 0), (0, 2)])],
+        crs="EPSG:4326",
+    )
+
+    result = add_distance_to_water(occurrences, water)
+
+    assert isinstance(result, gpd.GeoDataFrame)
+    assert len(result) == 0
+    assert "distance_to_water" in result.columns
+
+
+def test_add_distance_to_water_distance_is_in_meters():
+    """Distances should be metric (meters in EPSG:3857), not degrees.
+
+    One degree of longitude at the equator is ~111km. A point 1 degree
+    away from a river should produce a distance in the tens-of-thousands
+    range (meters), not a value close to 1.0 (which would indicate
+    the computation stayed in degree-based coordinates).
+    """
+    occurrences = gpd.GeoDataFrame(
+        {"species": ["Loxodonta africana"]},
+        geometry=[Point(1, 0)],
+        crs="EPSG:4326",
+    )
+
+    water = gpd.GeoDataFrame(
+        {"type": ["river"]},
+        geometry=[LineString([(0, -1), (0, 1)])],
+        crs="EPSG:4326",
+    )
+
+    result = add_distance_to_water(occurrences, water)
+
+    distance = result.loc[0, "distance_to_water"]
+    assert distance > 10_000, f"Distance {distance}m looks like degrees, not meters"
+    assert distance < 200_000, f"Distance {distance}m is implausibly large for a 1-degree separation"

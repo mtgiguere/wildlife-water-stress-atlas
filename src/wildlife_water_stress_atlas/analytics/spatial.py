@@ -22,6 +22,9 @@ def aggregate_stress_to_grid(
     Returns:
         GeoDataFrame of grid cells in EPSG:4326 with mean water_stress_score.
     """
+    if gdf.empty:
+        return gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+
     projected = gdf.to_crs(epsg=3857).copy()
 
     projected["x_bin"] = (projected.geometry.x // cell_size_meters) * cell_size_meters
