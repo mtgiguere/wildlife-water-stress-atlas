@@ -32,7 +32,25 @@ import geopandas as gpd
 import pandas as pd
 import requests
 
-from wildlife_water_stress_atlas.ingest.threats import OSM_HIGHWAY_MAP
+# Only fetch "major" roads — motorway through tertiary, plus their link ramps.
+# Tracks and footpaths are ~90%+ of OSM linear volume in Africa yet contribute
+# negligible threat under the current nearest-road model (and a zero-weight
+# nearest path can even mask a real road). Excluding them keeps the continental
+# dataset to <1GB and the export runnable on one machine. track/path remain
+# supported in the threat model (KNOWN_ROAD_CLASSES) — they are simply not
+# fetched. Revisit if path-level threat (e.g. amphibians) is ever modeled.
+MAJOR_HIGHWAY_TAGS = {
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
+    "primary",
+    "primary_link",
+    "secondary",
+    "secondary_link",
+    "tertiary",
+    "tertiary_link",
+}
 
 GEOFABRIK_BASE = "https://download.geofabrik.de/africa"
 
@@ -70,9 +88,11 @@ TARGET_COUNTRIES = [
     "chad",
 ]
 
-# Geofabrik free GPKGs use this layer name and 'fclass' instead of 'highway'.
-# The full (paid) GPKG uses 'lines' with 'highway' — free is what we download.
-_ROADS_LAYER = "gis_osm_roads_free_1"
+# Geofabrik free GPKGs store roads in this layer with an 'fclass' column
+# (not 'highway'). NOTE: the layer is 'gis_osm_roads_free' WITHOUT a numeric
+# suffix — the '_1' suffix is the shapefile naming convention; the GPKG drops
+# it. Verified against the real Africa sub-region downloads.
+_ROADS_LAYER = "gis_osm_roads_free"
 _HIGHWAY_COL = "highway"
 _FCLASS_COL = "fclass"
 
@@ -168,9 +188,9 @@ def fetch_country_roads(country_slug: str) -> gpd.GeoDataFrame:
     """
     Download, extract, and filter roads for one country.
 
-    Downloads the Geofabrik GPKG, reads the lines layer, and returns only
-    the road segments whose highway tag is in OSM_HIGHWAY_MAP (dropping
-    residential, service, unclassified, etc.).
+    Downloads the Geofabrik GPKG, reads the roads layer, and returns only
+    the major road segments whose highway tag is in MAJOR_HIGHWAY_TAGS
+    (dropping residential, service, track, path, footway, etc.).
 
     Args:
         country_slug: Geofabrik Africa sub-region slug (e.g. "kenya").
@@ -193,7 +213,7 @@ def fetch_country_roads(country_slug: str) -> gpd.GeoDataFrame:
     if gdf.empty or "highway" not in gdf.columns:
         return _empty
 
-    gdf = gdf[gdf["highway"].isin(OSM_HIGHWAY_MAP)].copy()
+    gdf = gdf[gdf["highway"].isin(MAJOR_HIGHWAY_TAGS)].copy()
 
     if gdf.empty:
         return _empty
@@ -226,12 +246,12 @@ def fetch_all_road_data(
         gdf = fetch_country_roads(slug)
         if not gdf.empty:
             layers.append(gdf)
-            print(f"→ {len(gdf):,} segments")
+            print(f"-> {len(gdf):,} segments")
         else:
-            print("→ empty or failed")
+            print("-> empty or failed")
 
     if not layers:
-        print("  No road data retrieved — check country slugs and network.")
+        print("  No road data retrieved - check country slugs and network.")
         return
 
     merged = pd.concat(layers, ignore_index=True)
@@ -239,7 +259,7 @@ def fetch_all_road_data(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     result.to_file(output_path, driver="GPKG")
-    print(f"  → {output_path} ({len(result):,} road segments total)")
+    print(f"  -> {output_path} ({len(result):,} road segments total)")
 
 
 def main() -> None:

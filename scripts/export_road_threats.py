@@ -135,9 +135,9 @@ def export_all_road_threats(
                 scientific_name=scientific_name,
                 roads=roads,
             )
-            print(f"  → road_threats_gbif_{slug}.geojson")
+            print(f"  -> road_threats_gbif_{slug}.geojson")
         except Exception as e:
-            print(f"  ERROR — {scientific_name}: {e}")
+            print(f"  ERROR - {scientific_name}: {e}")
 
 
 def main() -> None:

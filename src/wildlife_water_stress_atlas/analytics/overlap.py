@@ -63,14 +63,19 @@ def add_distance_to_road(
     occurrences_projected = occurrences.to_crs(epsg=3857)
     roads_projected = roads.to_crs(epsg=3857)
 
-    def nearest(point):
-        distances = roads_projected.distance(point)
-        nearest_idx = distances.idxmin()
-        return distances.loc[nearest_idx], roads_projected.loc[nearest_idx, "road_class"]
+    # sjoin_nearest uses a spatial index (STRtree), so this is
+    # ~O(points · log roads) rather than the O(points · roads) of a
+    # per-point brute-force scan — essential for continental road networks.
+    joined = gpd.sjoin_nearest(
+        occurrences_projected,
+        roads_projected[["road_class", "geometry"]],
+        how="left",
+        distance_col="distance_to_road_m",
+    )
 
-    result = occurrences_projected.copy()
-    nearest_pairs = [nearest(point) for point in result.geometry]
-    result["distance_to_road_m"] = [pair[0] for pair in nearest_pairs]
-    result["road_class"] = [pair[1] for pair in nearest_pairs]
+    # Equidistant roads produce duplicate rows for one occurrence — keep the
+    # first match per original occurrence so the row count is preserved.
+    joined = joined[~joined.index.duplicated(keep="first")]
+    joined = joined.drop(columns="index_right", errors="ignore")
 
-    return result.to_crs(epsg=4326)
+    return joined.to_crs(epsg=4326)

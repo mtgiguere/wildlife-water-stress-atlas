@@ -42,7 +42,7 @@ REQUESTS_GET = "scripts.fetch_road_data.requests.get"
 def make_gpkg_zip(tmp_path: Path, highway_values: list[str]) -> bytes:
     """Build zip bytes containing a GPKG matching Geofabrik free format.
 
-    Geofabrik free GPKGs use layer 'gis_osm_roads_free_1' with an 'fclass'
+    Geofabrik free GPKGs use layer 'gis_osm_roads_free' with an 'fclass'
     column (not 'highway') — same values, different column name.
     """
     gdf = gpd.GeoDataFrame(
@@ -54,7 +54,7 @@ def make_gpkg_zip(tmp_path: Path, highway_values: list[str]) -> bytes:
         crs="EPSG:4326",
     )
     gpkg_path = tmp_path / "country-latest.gpkg"
-    gdf.to_file(gpkg_path, layer="gis_osm_roads_free_1", driver="GPKG")
+    gdf.to_file(gpkg_path, layer="gis_osm_roads_free", driver="GPKG")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -69,7 +69,7 @@ def make_gpkg_zip_from_gdf(tmp_path: Path, gdf: gpd.GeoDataFrame) -> bytes:
     highway column) that make_gpkg_zip cannot.
     """
     gpkg_path = tmp_path / "country-latest.gpkg"
-    gdf.to_file(gpkg_path, layer="gis_osm_roads_free_1", driver="GPKG")
+    gdf.to_file(gpkg_path, layer="gis_osm_roads_free", driver="GPKG")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -184,7 +184,7 @@ def test_extract_roads_from_zip_returns_geodataframe(tmp_path):
 
 
 def test_extract_roads_from_zip_reads_gis_osm_roads_layer(tmp_path):
-    """Geofabrik free GPKGs use layer gis_osm_roads_free_1, not lines."""
+    """Geofabrik free GPKGs use layer gis_osm_roads_free, not lines."""
     from scripts.fetch_road_data import extract_roads_from_zip
 
     zip_bytes = make_gpkg_zip(tmp_path, ["motorway", "primary"])
@@ -317,6 +317,32 @@ def test_fetch_country_roads_returns_empty_when_all_classes_unknown(tmp_path, mo
 
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == 0
+
+
+def test_fetch_country_roads_keeps_only_major_roads(tmp_path, monkeypatch):
+    """Only motorway..tertiary are fetched. Tracks and footpaths — the bulk of
+    OSM volume and negligible threat under the current model — are excluded."""
+    from scripts.fetch_road_data import fetch_country_roads
+
+    zip_bytes = make_gpkg_zip(tmp_path, ["motorway", "primary", "tertiary", "track", "path", "footway"])
+    monkeypatch.setattr(REQUESTS_GET, lambda url, **kw: mock_response(zip_bytes))
+
+    result = fetch_country_roads("kenya")
+
+    assert set(result["highway"]) == {"motorway", "primary", "tertiary"}
+
+
+def test_fetch_country_roads_keeps_major_link_variants(tmp_path, monkeypatch):
+    """Link ramps of major roads (primary_link, etc.) are kept — they are the
+    same threat as their parent road."""
+    from scripts.fetch_road_data import fetch_country_roads
+
+    zip_bytes = make_gpkg_zip(tmp_path, ["primary_link", "trunk_link", "path"])
+    monkeypatch.setattr(REQUESTS_GET, lambda url, **kw: mock_response(zip_bytes))
+
+    result = fetch_country_roads("kenya")
+
+    assert set(result["highway"]) == {"primary_link", "trunk_link"}
 
 
 def test_fetch_country_roads_returns_empty_on_download_failure(monkeypatch):
