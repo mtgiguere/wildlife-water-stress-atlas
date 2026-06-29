@@ -36,3 +36,41 @@ def add_distance_to_water(
     result["distance_to_water"] = result.geometry.apply(lambda point: water_projected.distance(point).min())
 
     return result.to_crs(epsg=4326)
+
+
+def add_distance_to_road(
+    occurrences: gpd.GeoDataFrame,
+    roads: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """
+    Add distance-to-nearest-road values and the nearest road's class.
+
+    Args:
+        occurrences: GeoDataFrame of species occurrence points (any species).
+        roads: Normalized roads GeoDataFrame as produced by OSMRoads.load() —
+               must carry a 'road_class' column.
+
+    Returns:
+        GeoDataFrame with two added columns:
+            distance_to_road_m : meters to the nearest road
+            road_class         : the class of that nearest road
+
+    Note:
+        Distance is computed in EPSG:3857 (Web Mercator) for metric accuracy,
+        then the result is re-projected back to EPSG:4326 for consistency
+        with the rest of the pipeline — mirrors add_distance_to_water().
+    """
+    occurrences_projected = occurrences.to_crs(epsg=3857)
+    roads_projected = roads.to_crs(epsg=3857)
+
+    def nearest(point):
+        distances = roads_projected.distance(point)
+        nearest_idx = distances.idxmin()
+        return distances.loc[nearest_idx], roads_projected.loc[nearest_idx, "road_class"]
+
+    result = occurrences_projected.copy()
+    nearest_pairs = [nearest(point) for point in result.geometry]
+    result["distance_to_road_m"] = [pair[0] for pair in nearest_pairs]
+    result["road_class"] = [pair[1] for pair in nearest_pairs]
+
+    return result.to_crs(epsg=4326)
