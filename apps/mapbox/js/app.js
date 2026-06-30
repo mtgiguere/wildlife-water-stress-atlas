@@ -408,6 +408,7 @@ function showPointsView() {
   setVisibility('countries-stroke', false);
   setVisibility('threats-dot',      false);
   setVisibility('threats-glow',     false);
+  setVisibility('roads-backbone-line', false);
   updateLegend();
   stopPlay();
 }
@@ -422,6 +423,7 @@ function showCountriesView() {
   setVisibility('countries-stroke', true);
   setVisibility('threats-dot',      false);
   setVisibility('threats-glow',     false);
+  setVisibility('roads-backbone-line', false);
   applyCountryView(currentYear);
   updateLegend();
   stopPlay();
@@ -435,6 +437,7 @@ function showThreatsView() {
   setVisibility('cluster-count',    false);
   setVisibility('countries-fill',   false);
   setVisibility('countries-stroke', false);
+  setVisibility('roads-backbone-line', true);
   setVisibility('threats-dot',      true);
   setVisibility('threats-glow',     true);
   updateLegend();
@@ -809,6 +812,29 @@ map.on('load', async () => {
       'circle-stroke-width':   0.5,
       'circle-stroke-color':   '#FFFFFF',
       'circle-stroke-opacity': 0.3,
+    },
+  });
+
+  // ── Backbone road network ─────────────────────────────────────
+  // Simplified motorway/trunk/primary lines — drawn beneath the threat
+  // points so a red occurrence is visibly "next to a road". Amber, to read
+  // distinctly from the blue water network. Shown only in the ROADS view.
+  map.addSource('roads-backbone', {
+    type: 'geojson',
+    data: 'data/roads_backbone.geojson',
+    buffer: 64,
+    tolerance: 0.5,
+  });
+
+  map.addLayer({
+    id: 'roads-backbone-line',
+    type: 'line',
+    source: 'roads-backbone',
+    layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color':   '#E0A040',
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 3, 0.4, 7, 1.2, 11, 2.5],
+      'line-opacity': 0.5,
     },
   });
 

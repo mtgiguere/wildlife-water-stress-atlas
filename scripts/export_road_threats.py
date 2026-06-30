@@ -42,6 +42,13 @@ AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 
 _OUTPUT_COLS = ["species", "year", "distance_to_road_m", "road_class", "road_threat_score"]
 
+# Backbone road network drawn on the map (ROADS view). Only the highest-order
+# classes are shown — enough to make a red occurrence legible ("it's next to a
+# motorway") without committing the full 400k+ segment network. Geometry is
+# simplified for web display; the analytics still score against ALL major roads.
+BACKBONE_ROAD_CLASSES = {"motorway", "trunk", "primary"}
+ROAD_SIMPLIFY_TOLERANCE_DEG = 0.01  # ~1km at the equator — fine at continental zoom
+
 
 def compute_road_threats(
     occurrences: gpd.GeoDataFrame,
@@ -65,6 +72,55 @@ def compute_road_threats(
     """
     with_distances = add_distance_to_road(occurrences, roads)
     return apply_road_threat_score(with_distances, road_threat_score)
+
+
+def build_backbone_roads(
+    roads: gpd.GeoDataFrame,
+    classes: set = BACKBONE_ROAD_CLASSES,
+    tolerance: float = ROAD_SIMPLIFY_TOLERANCE_DEG,
+) -> gpd.GeoDataFrame:
+    """
+    Subset roads to the backbone classes and simplify their geometry.
+
+    Pure transform — no I/O. Used to build a lightweight road-network layer
+    for the map without shipping the full segment set.
+
+    Args:
+        roads     : Normalized roads GeoDataFrame (must have a road_class column).
+        classes   : Road classes to keep. Default BACKBONE_ROAD_CLASSES.
+        tolerance : Simplification tolerance in degrees (EPSG:4326).
+
+    Returns:
+        GeoDataFrame with road_class + simplified geometry, backbone classes only.
+    """
+    backbone = roads[roads["road_class"].isin(classes)][["road_class", "geometry"]].copy()
+    backbone["geometry"] = backbone.geometry.simplify(tolerance, preserve_topology=False)
+    return backbone
+
+
+def export_backbone_roads(
+    roads_path: Path,
+    output_path: Path,
+    roads: gpd.GeoDataFrame | None = None,
+) -> None:
+    """
+    Export the simplified backbone road network as GeoJSON for the map layer.
+
+    Args:
+        roads_path  : Path to the OSM roads GeoPackage (used only if roads is None).
+        output_path : Path to write the output GeoJSON.
+        roads       : Pre-loaded roads GDF. If provided, roads_path is ignored.
+    """
+    if roads is None:
+        roads = load_all_threats(
+            {"sources": {"osm_roads": {"path": str(roads_path)}}},
+            bbox=AFRICA_BBOX,
+        )
+
+    backbone = build_backbone_roads(roads)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    backbone.to_file(output_path, driver="GeoJSON")
 
 
 def export_road_threat(
@@ -145,6 +201,10 @@ def main() -> None:
         data_dir=Path("data/processed"),
         roads_path=Path("data/raw/threats/africa_roads.gpkg"),
         output_dir=Path("apps/mapbox/data"),
+    )
+    export_backbone_roads(
+        roads_path=Path("data/raw/threats/africa_roads.gpkg"),
+        output_path=Path("apps/mapbox/data/roads_backbone.geojson"),
     )
 
 

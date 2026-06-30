@@ -157,6 +157,93 @@ def test_compute_road_threats_works_for_all_species(mock_roads):
 
 
 # ---------------------------------------------------------------------------
+# build_backbone_roads — pure subsetting + simplification for the map layer
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mixed_class_roads():
+    return gpd.GeoDataFrame(
+        {"road_class": ["motorway", "trunk", "primary", "secondary", "tertiary"]},
+        geometry=[LineString([(i, 0), (i + 1, 1)]) for i in range(5)],
+        crs="EPSG:4326",
+    )
+
+
+def test_build_backbone_roads_returns_geodataframe(mixed_class_roads):
+    from scripts.export_road_threats import build_backbone_roads
+
+    assert isinstance(build_backbone_roads(mixed_class_roads), gpd.GeoDataFrame)
+
+
+def test_build_backbone_roads_keeps_only_backbone_classes(mixed_class_roads):
+    """Only motorway/trunk/primary survive — secondary and tertiary are dropped."""
+    from scripts.export_road_threats import build_backbone_roads
+
+    result = build_backbone_roads(mixed_class_roads)
+
+    assert set(result["road_class"]) == {"motorway", "trunk", "primary"}
+
+
+def test_build_backbone_roads_simplifies_geometry():
+    """A many-vertex line is simplified to fewer vertices for web display."""
+    from scripts.export_road_threats import build_backbone_roads
+
+    zigzag = [(x / 50.0, (x % 2) / 50.0) for x in range(60)]
+    roads = gpd.GeoDataFrame({"road_class": ["motorway"]}, geometry=[LineString(zigzag)], crs="EPSG:4326")
+
+    result = build_backbone_roads(roads, tolerance=0.5)
+
+    assert len(result.iloc[0].geometry.coords) < len(zigzag)
+
+
+def test_build_backbone_roads_keeps_road_class_column(mixed_class_roads):
+    from scripts.export_road_threats import build_backbone_roads
+
+    assert "road_class" in build_backbone_roads(mixed_class_roads).columns
+
+
+# ---------------------------------------------------------------------------
+# export_backbone_roads — file I/O
+# ---------------------------------------------------------------------------
+
+
+def test_export_backbone_roads_writes_backbone_only_geojson(tmp_path, mixed_class_roads):
+    from scripts.export_road_threats import export_backbone_roads
+
+    out = tmp_path / "roads_backbone.geojson"
+    with patch("scripts.export_road_threats.load_all_threats", return_value=mixed_class_roads):
+        export_backbone_roads(roads_path=tmp_path / "roads.gpkg", output_path=out)
+
+    assert out.exists()
+    data = json.load(open(out))
+    assert data["type"] == "FeatureCollection"
+    assert {f["properties"]["road_class"] for f in data["features"]} == {"motorway", "trunk", "primary"}
+
+
+def test_export_backbone_roads_creates_output_directory(tmp_path, mixed_class_roads):
+    from scripts.export_road_threats import export_backbone_roads
+
+    out = tmp_path / "deep" / "nested" / "roads_backbone.geojson"
+    with patch("scripts.export_road_threats.load_all_threats", return_value=mixed_class_roads):
+        export_backbone_roads(roads_path=tmp_path / "roads.gpkg", output_path=out)
+
+    assert out.exists()
+
+
+def test_export_backbone_roads_uses_preloaded_roads(tmp_path, mixed_class_roads):
+    """When roads are passed in, the GPKG is not reloaded."""
+    from scripts.export_road_threats import export_backbone_roads
+
+    out = tmp_path / "rb.geojson"
+    with patch("scripts.export_road_threats.load_all_threats") as mock_load:
+        export_backbone_roads(roads_path=tmp_path / "roads.gpkg", output_path=out, roads=mixed_class_roads)
+        mock_load.assert_not_called()
+
+    assert out.exists()
+
+
+# ---------------------------------------------------------------------------
 # export_road_threat — file I/O mocked
 # ---------------------------------------------------------------------------
 
@@ -322,9 +409,24 @@ def test_export_all_road_threats_continues_on_species_error(tmp_path):
 def test_main_calls_export_all_road_threats():
     from scripts.export_road_threats import main
 
-    with patch("scripts.export_road_threats.export_all_road_threats") as mock_export:
+    with (
+        patch("scripts.export_road_threats.export_all_road_threats") as mock_export,
+        patch("scripts.export_road_threats.export_backbone_roads"),
+    ):
         main()
         mock_export.assert_called_once()
         call_kwargs = mock_export.call_args.kwargs
         assert call_kwargs["roads_path"] == Path("data/raw/threats/africa_roads.gpkg")
         assert call_kwargs["output_dir"] == Path("apps/mapbox/data")
+
+
+def test_main_exports_backbone_roads_for_map_layer():
+    from scripts.export_road_threats import main
+
+    with (
+        patch("scripts.export_road_threats.export_all_road_threats"),
+        patch("scripts.export_road_threats.export_backbone_roads") as mock_backbone,
+    ):
+        main()
+        mock_backbone.assert_called_once()
+        assert mock_backbone.call_args.kwargs["output_path"] == Path("apps/mapbox/data/roads_backbone.geojson")
