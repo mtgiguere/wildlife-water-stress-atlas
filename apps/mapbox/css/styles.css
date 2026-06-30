@@ -448,14 +448,15 @@ html, body {
   flex: 1;
   font-family: var(--font-display);
   font-size: 12px;
-  letter-spacing: 2px;
-  padding: 8px;
+  letter-spacing: 1px;
+  padding: 8px 4px;
   border-radius: var(--radius);
   border: 1px solid var(--panel-border);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .view-btn.active {
@@ -587,4 +588,12 @@ html, body {
   text-transform: uppercase;
   color: var(--text-dim);
   margin-bottom: 2px;
+}
+
+/* Legend view-sections (water stress / road threat) stack their own items
+   with the same gap as the rest of the legend. Toggled by view in JS. */
+#legend-stress, #legend-threat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

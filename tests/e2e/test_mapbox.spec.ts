@@ -43,9 +43,9 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
   // Species selector
   // ---------------------------------------------------------------------------
 
-  test('all 9 species buttons are rendered', async ({ page }) => {
+  test('all 11 species buttons are rendered', async ({ page }) => {
     const buttons = page.locator('.species-btn');
-    await expect(buttons).toHaveCount(9);
+    await expect(buttons).toHaveCount(11);
   });
 
   test('African Elephant is selected by default', async ({ page }) => {
@@ -88,6 +88,40 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await page.locator('.view-btn', { hasText: 'COUNTRIES' }).click();
     await page.locator('.view-btn', { hasText: 'POINTS' }).click();
     await expect(page.locator('.view-btn.active')).toContainText('POINTS');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Road threat view
+  // ---------------------------------------------------------------------------
+
+  test('ROADS view button is present', async ({ page }) => {
+    await expect(page.locator('.view-btn', { hasText: 'ROADS' })).toBeVisible();
+  });
+
+  test('clicking ROADS makes it active', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'ROADS' }).click();
+    await expect(page.locator('.view-btn.active')).toContainText('ROADS');
+  });
+
+  test('road threat legend is hidden by default', async ({ page }) => {
+    await expect(page.locator('#legend-threat')).toBeHidden();
+  });
+
+  test('road threat legend appears in ROADS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'ROADS' }).click();
+    await expect(page.locator('#legend-threat')).toBeVisible();
+  });
+
+  test('water stress legend is hidden in ROADS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'ROADS' }).click();
+    await expect(page.locator('#legend-stress')).toBeHidden();
+  });
+
+  test('switching from ROADS back to POINTS restores the water stress legend', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'ROADS' }).click();
+    await page.locator('.view-btn', { hasText: 'POINTS' }).click();
+    await expect(page.locator('#legend-stress')).toBeVisible();
+    await expect(page.locator('#legend-threat')).toBeHidden();
   });
 
   // ---------------------------------------------------------------------------
