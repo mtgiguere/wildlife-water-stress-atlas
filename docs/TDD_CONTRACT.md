@@ -376,6 +376,8 @@ bugs in this codebase that would not exist if we had done this.
 | 8 hollow tests with conditional guards | Manual retrospective | No guards — design fixture to guarantee non-empty result |
 | 20+ seed-dependent assertions | Manual retrospective | Hypothesis property tests |
 | Column naming inconsistency (node types) | Manual retrospective | Enum defined in test file before any implementation |
+| Geofabrik layer name `gis_osm_roads_free_1` | Real continental fetch produced 0 roads | Integration test against a real (small) download |
+| Road layer rendered at 0.4px — invisible | Human noticed on the live map | Visual smoke test via software-WebGL screenshot |
 
 None of these were caught by the tests. They were caught by CI or by a human reviewing.
 **Tests that don't catch bugs are documentation, not verification.**
@@ -386,3 +388,55 @@ None of these were caught by the tests. They were caught by CI or by a human rev
 *Its purpose is to prevent future sessions from repeating the same patterns.*
 *The evidence in it is real. The bugs were real. The fixes were real.*
 *Do the work in the right order.*
+
+---
+
+## Addendum — Road Threat Layer (2026-06)
+
+The road-threat / human-pressure feature was built with strict TDD on the
+Python side and it held: the analytics (`threat_scoring`, threats ingest,
+backbone export, the major-roads filter) were all genuine RED→GREEN, and the
+scoring was correct the whole way. But the session exposed **two blind spots
+the discipline above does not cover** — both bugs escaped green test suites and
+were caught only by running against reality.
+
+### Blind spot A: external-format assumptions (a live TAD specimen)
+
+`fetch_road_data.py` assumed the Geofabrik roads layer was named
+`gis_osm_roads_free_1`. The unit test *wrote its own fixture with that same
+name and read it back* — so it passed green while disagreeing with reality (the
+real layer is `gis_osm_roads_free`, no `_1`). Every real download silently
+produced zero roads.
+
+This is Bug #1's pattern in new clothing: **the test confirmed what the code
+assumed, not what was true.** A self-referential fixture can never catch an
+assumption about an *external* data format. Only an integration test that pulls
+a real (small) file can.
+
+> **Rule:** When code parses an external format (a download, an API response, a
+> file schema), a unit test with a self-authored fixture proves your parser is
+> self-consistent — nothing more. Add an `@pytest.mark.integration` test against
+> one real sample.
+
+### Blind spot B: visual / rendering behavior
+
+The Mapbox layer was added correctly, threw no console errors, and passed every
+DOM-level Playwright test (button exists, legend toggles) — yet drew at 0.4px
+line-width, i.e. **invisible** at the default zoom. "No console errors" is
+necessary but not sufficient: it proves the layer *loaded*, not that a human can
+*see* it. Both visual regressions (invisible roads, then roads overpowering the
+points) were caught by the user, not the suite.
+
+> **Rule:** DOM assertions are not visual verification. For a WebGL map, render
+> it (software WebGL / SwiftShader works headless) and assert on the pixels, or
+> at minimum eyeball a screenshot before claiming a visualization "works."
+
+### The meta-lesson
+
+The original evidence table's refrain — *"None of these were caught by the
+tests; they were caught by CI or by a human"* — held again, with two new
+"realities" added to the list: **real external data sources** and **real
+rendering**. TDD remains excellent on its home turf (pure/algorithmic Python).
+Its coverage stops at the Python boundary; that boundary is exactly where these
+two bugs lived. The follow-ups (integration test for the roads download; a
+SwiftShader visual smoke test) are tracked in the project bible.
