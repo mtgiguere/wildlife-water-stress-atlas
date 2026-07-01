@@ -41,6 +41,27 @@ Linear regression trend analysis for country-level occurrence counts.
 - `get_country_time_series(data, iso_a3)` → list of records for one country, sorted by year ascending.
 - `add_trends_to_country_counts(data)` → adds `slope`, `r2`, `trend` fields to every record. Called by `export_country_aggregates.py` to bake regression into GeoJSON at export time — not computed at runtime in the browser.
 
+**`ingest/threats.py`** ← human pressure layer (Pressure Type 2)
+Threat source ingestion, mirroring the `ingest/water.py` source-class pattern.
+- `OSMRoads(filepath, bbox=None, region="africa")` — loads OSM-derived roads, maps the OSM `highway` tag to canonical road classes via `OSM_HIGHWAY_MAP`, drops unknown tags, clips to bbox. Normalized schema: `geometry`, `source_id`, `road_class`, `region` (EPSG:4326).
+- `OSM_HIGHWAY_MAP` — folds `_link` ramps and minor footway variants into their parent class. Its values == `KNOWN_ROAD_CLASSES`.
+- `load_all_threats(config, bbox=None)` — registry function mirroring `load_all_water()`; warns loudly when bbox is omitted.
+
+**`analytics/threat_scoring.py`**
+Road proximity scoring, structurally parallel to `water_stress_score`.
+- `road_threat_score(distance_m, road_class, species)` → float 0–1.
+  `score = road_sensitivity * road_class_weight * (1 - distance_m / road_threshold_m)`, clamped to [0,1], 0 at/beyond `road_threshold_m`. `road_sensitivity == 0.0` (flamingo) short-circuits to 0.
+- Reads `road_sensitivity`, `road_threshold_m`, `road_class_weights` from `SPECIES_CONFIG`; raises `KeyError` for unknown species or road class.
+
+**`analytics/overlap.py`** (road addition)
+- `add_distance_to_road(occurrences, roads)` → adds `distance_to_road_m` + nearest road's `road_class`. Uses `sjoin_nearest` (STRtree) — required for the continental road network.
+
+**`analytics/apply.py`** (road addition)
+- `apply_road_threat_score(gdf, scoring_func)` → adds a `road_threat_score` column (3-arg counterpart to `apply_water_stress_score`).
+
+**`config/species.py`** (road fields)
+Each species now also carries `road_sensitivity` (0–1; 0 = immune, e.g. flamingo), `road_threshold_m`, and `road_class_weights` (weight per class). Module-level `KNOWN_ROAD_CLASSES = {motorway, trunk, primary, secondary, tertiary, track, path}`. Values are heuristic placeholders pending ecological validation, same as the water weights. Amphibians are most road-sensitive (reed frog 1.0, path weight 0.0 by design); megafauna low (~0.3); flamingo 0.0.
+
 **`utils/generic_threader.py`**
 Generic parallel job runner using Python threading. I/O-bound tasks only (not CPU-bound).
 - `GenericThreader(jobs)` — jobs is a list of `(func, args, kwargs)` tuples
@@ -79,6 +100,18 @@ PostGIS KNN stress score pipeline:
 - `export_all_stress_scores(engine, output_dir)` — orchestrates all species using `GenericThreader` for parallel execution (~15 seconds for all 11 species)
 - Output: `apps/mapbox/data/stress_scores_gbif_{species}.geojson`
 - Has `__main__` block — run as `python scripts/export_stress_scores.py`
+
+**`scripts/fetch_road_data.py`**
+Downloads OSM road data for African countries from Geofabrik (free `.gpkg.zip`, no API key) and merges a single `data/raw/threats/africa_roads.gpkg`.
+- `get_geofabrik_url(slug)`, `download_gpkg_zip(url)`, `extract_roads_from_zip(zip_bytes)` (reads the `gis_osm_roads_free` layer, renames `fclass`→`highway`), `fetch_country_roads(slug)`, `fetch_all_road_data(output_path, countries)`.
+- Filters to `MAJOR_HIGHWAY_TAGS` (motorway/trunk/primary/secondary/tertiary + links) at fetch time — footpaths/tracks are ~90%+ of OSM volume and negligible threat under the nearest-road model. `TARGET_COUNTRIES` = 26 African nations covering the species ranges. Result: **435,446 major-road segments**.
+
+**`scripts/export_road_threats.py`**
+Road threat export pipeline (mirrors `export_stress_scores.py`):
+- `compute_road_threats(occurrences, roads, scientific_name)` — `add_distance_to_road` → `apply_road_threat_score`.
+- `export_road_threat(...)` / `export_all_road_threats(...)` — per-species GeoJSON `apps/mapbox/data/road_threats_gbif_{species}.geojson` (props: species, year, distance_to_road_m, road_class, road_threat_score).
+- `build_backbone_roads(roads)` / `export_backbone_roads(...)` — simplified motorway/trunk/primary lines for the map layer → `apps/mapbox/data/roads_backbone.geojson` (137,560 segments). Display-only; scoring still uses all major roads.
+- `main()` runs both exports. Score sanity from the real run: reed frog max 0.999, elephant ~0.29, flamingo 0.0.
 
 TODO Phase 2: Wrap export scripts in GitHub Actions cron job. Frontend requires zero changes.
 
@@ -119,6 +152,7 @@ Features:
 | GLWD v2 | GLWD_v2_0_main_class.tif | HydroSHEDS | GeoTIFF | 33 classes, 500m resolution |
 | JRC GSW | occurrence_*_v1_4_2021.tif | JRC / Google | GeoTIFF tiles | Africa tiles downloading |
 | Species occurrences | GBIF API (live) | GBIF | API / GeoDataFrame | All species in SPECIES_CONFIG |
+| Roads (human pressure) | africa_roads.gpkg | Geofabrik / OSM | GeoPackage | 435,446 major-road segments; fetched via fetch_road_data.py |
 
 Natural Earth lakes retired — replaced by GLWD class 1 (freshwater lake).
 
@@ -155,10 +189,13 @@ Default water classes for elephants: `{2, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 1
 Classes 1 and 4 excluded from defaults — covered by Natural Earth with better geometry types.
 
 ### Current Test Coverage
-**311 unit tests, 100% coverage**
+**445 unit tests, 100% coverage** (+ integration tests marked `@pytest.mark.integration`, skipped in CI)
 **16 Playwright E2E tests (Streamlit) — 16 passing** ✅
-**25 Playwright E2E tests (Mapbox) — 25 passing** ✅
+**31 Playwright E2E tests (Mapbox) — 31 passing** ✅ (incl. 6 road-view tests)
 TDD strictly enforced — tests written before implementation on every change.
+Known TDD blind spots (see docs/TDD_CONTRACT.md addendum): external-format
+assumptions and WebGL visual rendering are not covered by the unit/DOM suites —
+see the two follow-up items under "Planned Refactoring / Next Steps".
 
 Test files:
 - `test_species_config.py` — registry structure, field constraints, validation error branches
@@ -176,6 +213,10 @@ Test files:
 - `test_export_country_aggregates.py` — load_countries, join_occurrences_to_countries, aggregate_by_country_year, export_country_counts, export_all_country_counts (9 tests)
 - `test_export_stress_scores.py` — compute_stress_scores, export_stress_scores, export_all_stress_scores, main (17 tests)
 - `test_generic_threader.py` / `test_threader.py` — GenericThreader parallel execution, error handling
+- `test_threat_scoring.py` — road_threat_score: boundaries, linear decay, class scaling, immune species, bounds, errors
+- `test_threats_ingest.py` — OSMRoads.load, OSM_HIGHWAY_MAP, load_all_threats, normalized schema, bbox, CRS
+- `test_fetch_road_data.py` — Geofabrik URL/download/extract, major-roads filter, per-country merge, main
+- `test_export_road_threats.py` — compute_road_threats, export_road_threat(s), build/export_backbone_roads, main
 - `test_water_real_data.py` — integration test, hits real filesystem, keep separated from CI fast runs
 
 Playwright configs:
@@ -205,12 +246,14 @@ All species in `SPECIES_CONFIG` with GBIF cache files:
 
 ### What the Mapbox App Shows Right Now
 - Dark Mapbox basemap (dark-v11)
-- ⬤ POINTS view: Blue occurrence dots with glow, year slider (autoplay ▶/⏸), species selector, icon clustering at low zoom
+- ⬤ POINTS view: occurrence dots colored by water stress (green/yellow/red from stress_scores GeoJSON), glow, year slider (autoplay ▶/⏸), species selector, icon clustering at low zoom
 - ▦ COUNTRIES view: Choropleth (cyan intensity by record count), year slider updates choropleth
+- ⚠ ROADS view: occurrences colored by road_threat_score (green→red ramp; dim = no threat / far from roads), with the backbone road network drawn as amber lines (motorway/trunk/primary, faded at overview zoom so points stay legible). Dedicated legend + road-class/distance tooltip; year slider + autoplay. Reads road_threats_gbif_{species}.geojson + roads_backbone.geojson
 - Trend chart: Click country → draggable modal with Canvas 2D line chart, trend line, slope/r²/classification badge
 - Fly-to-Africa animation on species switch
 - COVID-19 annotation (year 2020 only)
 - Water network: rivers (lines) + wetlands/lakes/pans (polygons) from GLWD v2 + Natural Earth
+- Road network: backbone (motorway/trunk/primary) amber lines in the ROADS view
 - 11 species including Hippopotamus and Cape Buffalo
 
 ### Mapbox App — Deployed URLs
@@ -234,8 +277,14 @@ Current stress scoring uses distance + species threshold only. Water reliability
 ### Gap: Performance — Raster Vectorization is Slow
 Caching implemented. `@st.cache_data` working.
 
-### Gap: Water Stress Not Visualized in Mapbox App
-The analytics pipeline (`overlap.py`, `scoring.py`) computes water stress scores per occurrence but this data is NOT yet exported to GeoJSON or visualized in the Mapbox app. Currently only occurrence counts and trend data are shown. Showing stress scores (color-coded points, heatmap, or grid layer) is the next major feature.
+### Water Stress Visualized — DONE ✅
+The POINTS view colors each occurrence by `stress_level` (green/yellow/red) from `stress_scores_gbif_*.geojson`. The namesake feature is live.
+
+### Road Threat / Human Pressure Layer — DONE ✅
+Roadmap item #7 (Pressure Type 2, roads). Full pipeline: `ingest/threats.py`, `analytics/threat_scoring.py`, `scripts/fetch_road_data.py` + `export_road_threats.py`, and the ⚠ ROADS view in the Mapbox app. Fences/settlements remain future work.
+
+### Test Gaps — external-format + visual rendering (follow-ups tracked below)
+Two bug classes escaped the green suites this session (see docs/TDD_CONTRACT.md addendum): a wrong Geofabrik layer name (unit fixture tested its own assumption) and an invisible 0.4px road layer (DOM tests passed, nothing rendered). Follow-up test items are listed under Next Steps.
 
 ### Gap: JRC GSW Multi-Tile Loading
 JRCTileDirectory source class planned for multiple 10-degree tiles.
@@ -249,15 +298,19 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 - **CI/CD pipeline**: unit tests + linting + vulnerability scans minimum on every push
 - **Never hardcode species names** anywhere in library code
 
-1. **Water stress visualization** — export stress scores per occurrence to GeoJSON, color-code points in Mapbox by stress level (low/moderate/high). This is the "killer feature" — the whole platform is named after it.
-2. **Multi-species overlay** — "Compare All Species" mode
-3. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
-4. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
-5. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
-6. **Additional water sources** — springs, reservoirs, boreholes
-7. **Human pressure layer** — roads, fences, settlements (Pressure Type 2)
-8. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
-9. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
+1. ~~**Water stress visualization**~~ — DONE ✅ (POINTS view colors by stress_level)
+2. ~~**Human pressure layer (roads)**~~ — DONE ✅ (ROADS view; fences/settlements still to come)
+3. **Integration test for the roads download** — `@pytest.mark.integration` that pulls one small Geofabrik country and asserts the roads layer loads. Guards the external-format assumption class of bug (the `gis_osm_roads_free` layer-name miss).
+4. **Visual smoke test for the Mapbox app** — render via software WebGL (SwiftShader) in the E2E path and assert the ROADS/road layers actually paint. Guards invisible-render regressions (the 0.4px width miss).
+5. **Multi-species overlay** — "Compare All Species" mode
+6. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
+7. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
+8. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
+9. **Additional water sources** — springs, reservoirs, boreholes
+10. **Human pressure — fences & settlements** (Pressure Type 2, remainder)
+11. **Road-threat model refinements** — nearest road *per class* (a nearby zero-weight footpath can currently mask a real road); optional path-level threat for amphibians; coordinate-precision rounding to shrink the committed GeoJSON
+12. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
+13. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
 
 ---
 
@@ -271,6 +324,7 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 | GLWD v2 | GeoTIFF | Global | Wetlands, pans, floodplains, saline lakes |
 | JRC Global Surface Water | GeoTIFF tiles | Global | Seasonal/ephemeral surface water |
 | GBIF API | REST API | Global | Species occurrences — 11 species cached |
+| Geofabrik / OSM roads | GeoPackage (`.gpkg.zip`) | Africa (26 countries) | Human pressure layer — major roads for road-threat scoring |
 
 ### Planned — Water Layers
 | Dataset | Type | Coverage | Key Use | URL |
@@ -378,19 +432,19 @@ python scripts/export_stress_scores.py
 - **Mapbox app file structure** — refactored from single 1500-line `index.html` to `index.html` + `css/styles.css` + `js/app.js`. Always run server from `apps/mapbox/` directory.
 - **Browser cache** — always test in incognito when debugging data changes. Regular browser caches `species_config.json` aggressively.
 
-### Session End State (May 18, 2026)
-- 311 unit tests, 100% coverage ✅
+### Session End State (June 30, 2026)
+- 445 unit tests, 100% coverage ✅
 - 16 Playwright E2E tests (Streamlit) ✅
-- 25 Playwright E2E tests (Mapbox) ✅
-- Mapbox app live on GitHub Pages ✅
-- Mapbox app refactored to 3-file structure ✅
-- Country choropleth + trend chart live ✅
-- Linear regression in core analytics library ✅
-- 11 species including Hippo + Cape Buffalo ✅
-- Icon clustering on points view ✅
-- All merged to main ✅
+- 31 Playwright E2E tests (Mapbox, incl. 6 road-view) ✅
+- Water stress visualized in POINTS view ✅
+- **Road threat / human pressure layer built end to end** ✅ (ingest → scoring → export → ⚠ ROADS view)
+- 435,446 major-road segments fetched (Geofabrik); per-species road-threat GeoJSON + backbone road layer exported ✅
+- On branch `feat/road-threat-pressure-layer` (pushed; PR pending merge)
+- TDD retro captured in docs/TDD_CONTRACT.md addendum ✅
+
+Prior session (May 18, 2026): Mapbox app live + 3-file refactor, country choropleth + trend chart, linear regression analytics, 11 species (Hippo + Cape Buffalo), icon clustering — all merged to main.
 
 Next session priorities:
-1. **Water stress visualization** — the namesake feature, still not shown in the app
-2. Multi-species overlay
-3. Human pressure layer
+1. Integration test for the roads download + SwiftShader visual smoke test (close the two TDD blind spots)
+2. Multi-species overlay ("Compare All Species")
+3. Human pressure — fences & settlements; road-model refinements (nearest-per-class)

@@ -30,19 +30,23 @@ The RED step is not optional. Skipping it means you are doing TAD, not TDD.
 
 ```
 src/wildlife_water_stress_atlas/   # Core library
-├── config/species.py              # Single source of truth: all 9 species parameters
-├── analytics/                     # overlap, scoring, spatial, water_access, trends
-├── ingest/                        # gbif.py, water.py
+├── config/species.py              # Single source of truth: all 11 species params
+│                                  #   (water AND road-threat fields; KNOWN_ROAD_CLASSES)
+├── analytics/                     # overlap, scoring, spatial, water_access, trends,
+│                                  #   apply, threat_scoring (road proximity)
+├── ingest/                        # gbif.py, water.py, threats.py (OSM roads)
 ├── visualization/maps.py
 └── utils/generic_threader.py
 
 apps/
 ├── streamlit/                     # Python/PyDeck interactive app
 └── mapbox/                        # Vanilla JS + static GeoJSON (no server required)
+                                   #   Views: POINTS (stress), COUNTRIES, ROADS (road threat)
 
 scripts/                           # Data processing and export (run once)
-tests/                             # 20 unit test files + e2e/ (Playwright)
-docs/TDD_CONTRACT.md               # Read this before coding
+                                   #   incl. fetch_road_data.py, export_road_threats.py
+tests/                             # 24 unit test files + e2e/ (Playwright)
+docs/TDD_CONTRACT.md               # Read this before coding (has a road-threat addendum)
 ```
 
 ---
