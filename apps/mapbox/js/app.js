@@ -834,7 +834,10 @@ map.on('load', async () => {
     paint: {
       'line-color':   '#F2A93B',
       'line-width':   ['interpolate', ['linear'], ['zoom'], 3, 1.4, 6, 2.2, 11, 4],
-      'line-opacity': 0.85,
+      // Roads are context, occurrences are the subject. Keep the network faint
+      // at the continental overview (where 137k segments would otherwise drown
+      // the points) and let it firm up as you zoom in for precise reference.
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.28, 5, 0.5, 8, 0.85],
     },
   });
 
