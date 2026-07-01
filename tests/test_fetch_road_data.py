@@ -86,6 +86,7 @@ def mock_response(content: bytes, status_code: int = 200) -> MagicMock:
     resp.raise_for_status = MagicMock()
     if status_code >= 400:
         import requests
+
         resp.raise_for_status.side_effect = requests.HTTPError(f"{status_code}")
     return resp
 
@@ -161,6 +162,7 @@ def test_download_gpkg_zip_returns_bytes(monkeypatch):
 
 def test_download_gpkg_zip_raises_on_http_error(monkeypatch):
     import requests as req
+
     from scripts.fetch_road_data import download_gpkg_zip
 
     monkeypatch.setattr(REQUESTS_GET, lambda url, **kw: mock_response(b"", 404))
@@ -457,7 +459,7 @@ def test_fetch_all_road_data_merges_all_countries(tmp_path):
         fetch_all_road_data(output_path=output_path, countries=["kenya", "tanzania"])
 
     result = gpd.read_file(output_path)
-    assert len(result) == 4   # 2 roads × 2 countries
+    assert len(result) == 4  # 2 roads × 2 countries
 
 
 def test_fetch_all_road_data_skips_failed_countries(tmp_path):
@@ -482,7 +484,7 @@ def test_fetch_all_road_data_skips_failed_countries(tmp_path):
         )
 
     result = gpd.read_file(output_path)
-    assert len(result) == 2   # only kenya + tanzania
+    assert len(result) == 2  # only kenya + tanzania
 
 
 def test_fetch_all_road_data_defaults_to_target_countries(tmp_path):
@@ -519,7 +521,7 @@ def test_fetch_all_road_data_does_nothing_when_all_countries_fail(tmp_path):
 
 
 def test_main_calls_fetch_with_correct_default_output():
-    from scripts.fetch_road_data import main, DEFAULT_OUTPUT_PATH
+    from scripts.fetch_road_data import DEFAULT_OUTPUT_PATH, main
 
     with patch("scripts.fetch_road_data.fetch_all_road_data") as mock_fetch:
         main()
@@ -528,12 +530,11 @@ def test_main_calls_fetch_with_correct_default_output():
 
 
 def test_main_uses_target_countries_by_default():
-    from scripts.fetch_road_data import main, TARGET_COUNTRIES
+    from scripts.fetch_road_data import TARGET_COUNTRIES, main
 
     with patch("scripts.fetch_road_data.fetch_all_road_data") as mock_fetch:
         main()
-        called_countries = mock_fetch.call_args.kwargs.get("countries") or mock_fetch.call_args.args[1] if len(mock_fetch.call_args.args) > 1 else TARGET_COUNTRIES
-        # Default countries must include the key East/Southern African nations
-        assert "kenya" in TARGET_COUNTRIES
-        assert "south-africa" in TARGET_COUNTRIES
-        assert "tanzania" in TARGET_COUNTRIES
+        # main() must pass the full TARGET_COUNTRIES list through to the fetch.
+        assert mock_fetch.call_args.kwargs["countries"] == TARGET_COUNTRIES
+        # sanity: that list covers key East/Southern African nations
+        assert {"kenya", "south-africa", "tanzania"}.issubset(TARGET_COUNTRIES)
