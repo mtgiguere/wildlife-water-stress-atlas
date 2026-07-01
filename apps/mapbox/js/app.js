@@ -832,9 +832,9 @@ map.on('load', async () => {
     source: 'roads-backbone',
     layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color':   '#E0A040',
-      'line-width':   ['interpolate', ['linear'], ['zoom'], 3, 0.4, 7, 1.2, 11, 2.5],
-      'line-opacity': 0.5,
+      'line-color':   '#F2A93B',
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 3, 1.4, 6, 2.2, 11, 4],
+      'line-opacity': 0.85,
     },
   });
 
