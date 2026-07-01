@@ -36,3 +36,46 @@ def add_distance_to_water(
     result["distance_to_water"] = result.geometry.apply(lambda point: water_projected.distance(point).min())
 
     return result.to_crs(epsg=4326)
+
+
+def add_distance_to_road(
+    occurrences: gpd.GeoDataFrame,
+    roads: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """
+    Add distance-to-nearest-road values and the nearest road's class.
+
+    Args:
+        occurrences: GeoDataFrame of species occurrence points (any species).
+        roads: Normalized roads GeoDataFrame as produced by OSMRoads.load() —
+               must carry a 'road_class' column.
+
+    Returns:
+        GeoDataFrame with two added columns:
+            distance_to_road_m : meters to the nearest road
+            road_class         : the class of that nearest road
+
+    Note:
+        Distance is computed in EPSG:3857 (Web Mercator) for metric accuracy,
+        then the result is re-projected back to EPSG:4326 for consistency
+        with the rest of the pipeline — mirrors add_distance_to_water().
+    """
+    occurrences_projected = occurrences.to_crs(epsg=3857)
+    roads_projected = roads.to_crs(epsg=3857)
+
+    # sjoin_nearest uses a spatial index (STRtree), so this is
+    # ~O(points · log roads) rather than the O(points · roads) of a
+    # per-point brute-force scan — essential for continental road networks.
+    joined = gpd.sjoin_nearest(
+        occurrences_projected,
+        roads_projected[["road_class", "geometry"]],
+        how="left",
+        distance_col="distance_to_road_m",
+    )
+
+    # Equidistant roads produce duplicate rows for one occurrence — keep the
+    # first match per original occurrence so the row count is preserved.
+    joined = joined[~joined.index.duplicated(keep="first")]
+    joined = joined.drop(columns="index_right", errors="ignore")
+
+    return joined.to_crs(epsg=4326)

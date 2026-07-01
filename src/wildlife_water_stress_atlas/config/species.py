@@ -50,7 +50,42 @@ water_dependency        : str — one of "low", "moderate", "high"
     Qualitative descriptor of how tightly this species depends on
     surface water availability. Used for weighting in composite stress
     scores when multiple pressure types are combined in future phases.
+road_sensitivity        : float in [0.0, 1.0]
+    Per-species multiplier for how strongly roads threaten this species.
+    0.0 means roads are irrelevant (e.g. flying species). Higher values
+    mean roads (mortality, fragmentation, poaching access) matter more.
+    A short-circuit: sensitivity 0.0 makes road_threat_score return 0.0
+    regardless of distance or road class.
+
+road_threshold_m        : int | float
+    Distance in meters beyond which a road has no measured effect on the
+    species. Inside this distance the threat decays linearly to 0.0 at
+    the threshold. Mirrors water_threshold_m but for the pressure layer.
+
+road_class_weights      : dict[str, float]
+    Per-class severity in [0.0, 1.0]. Keys must cover KNOWN_ROAD_CLASSES.
+    Larger/faster roads carry higher weight. A weight of 0.0 means that
+    road class poses no threat to this species (e.g. a footpath to a frog).
+    All road fields are heuristic placeholders pending ecological validation.
 """
+
+# ---------------------------------------------------------------------------
+# Road threat model — human pressure layer (Pressure Type 2)
+# ---------------------------------------------------------------------------
+# The canonical road classes used throughout the threat pipeline. These are
+# the normalized OSM highway classes after _link variants and minor footway
+# types are folded into their parents (see ingest/threats.OSM_HIGHWAY_MAP).
+# Every species' road_class_weights must provide a weight for each of these.
+KNOWN_ROAD_CLASSES: set[str] = {
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "track",
+    "path",
+}
+
 
 SPECIES_CONFIG: dict[str, dict] = {
     "Loxodonta africana": {
@@ -98,6 +133,21 @@ SPECIES_CONFIG: dict[str, dict] = {
         # Legacy CDN URL — kept for reference only.
         # icon_static_path is used for actual rendering (same-origin, no CORS).
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png",
+        # Roads fragment elephant corridors and — critically — open
+        # poaching access into formerly remote range. Elephants can
+        # physically cross most roads, so sensitivity is moderate, but
+        # the effect reaches far given their landscape-scale movement.
+        "road_sensitivity": 0.3,
+        "road_threshold_m": 5_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_loxodonta_africana.gpkg",
         "emoji": "🐘",
     },
@@ -149,6 +199,21 @@ SPECIES_CONFIG: dict[str, dict] = {
         # Legacy CDN URL — kept for reference only.
         # icon_static_path is used for actual rendering (same-origin, no CORS).
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f993.png",
+        # Zebra migrations are famously severed by linear infrastructure —
+        # roads paired with fences are a documented barrier that can
+        # collapse a migration route entirely. Higher sensitivity than
+        # the megafauna that can range around obstacles.
+        "road_sensitivity": 0.5,
+        "road_threshold_m": 8_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_equus_quagga.gpkg",
         "emoji": "🦓",
     },
@@ -190,6 +255,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "moderate",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f992.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-giraffe.svg.png",
+        # Giraffes cross roads but are vulnerable to vehicle collision
+        # given their size and slow acceleration. Moderate-low sensitivity,
+        # comparable to elephants.
+        "road_sensitivity": 0.3,
+        "road_threshold_m": 5_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_giraffa_camelopardalis.gpkg",
         "emoji": "🦒",
     },
@@ -232,6 +311,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "moderate",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f981.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-lion.svg.png",
+        # Roads bring human-wildlife conflict and retaliatory killing into
+        # lion range, plus direct collision mortality. Wide territories mean
+        # the disturbance footprint is large.
+        "road_sensitivity": 0.4,
+        "road_threshold_m": 8_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_panthera_leo.gpkg",
         "emoji": "🦁",
     },
@@ -274,6 +367,21 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "low",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f406.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-cheetah.svg.png",
+        # Vehicle collision is a documented and significant cause of
+        # cheetah mortality, and their exceptionally large home ranges
+        # mean roads intersect their movement constantly. Highest road
+        # sensitivity among the large cats; broad disturbance footprint.
+        "road_sensitivity": 0.6,
+        "road_threshold_m": 10_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_acinonyx_jubatus.gpkg",
         "emoji": "🐆",
     },
@@ -316,6 +424,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f40a.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-crocodile.svg.png",
+        # Crocodiles are aquatic and rarely range overland, so roads
+        # threaten them mainly where they cross rivers (bridges, bank
+        # disturbance). Low sensitivity with a tight effect distance.
+        "road_sensitivity": 0.3,
+        "road_threshold_m": 2_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_crocodylus_niloticus.gpkg",
         "emoji": "🐊",
     },
@@ -362,6 +484,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9a9.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-flamingo.svg.png",
+        # Flamingos fly between water bodies — roads present no barrier and
+        # no meaningful mortality risk. Sensitivity 0.0 short-circuits the
+        # road threat score to 0.0 for this species regardless of distance.
+        "road_sensitivity": 0.0,
+        "road_threshold_m": 1_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_phoenicopterus_roseus.gpkg",
         "emoji": "🦩",
     },
@@ -418,6 +554,22 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
+        # The most road-sensitive species in the atlas. Reed frogs are
+        # tiny, slow, and desiccation-prone; a paved road is both a lethal
+        # crossing and a barrier that fragments breeding populations.
+        # Maximum sensitivity. A footpath (path), by contrast, poses no
+        # barrier or mortality risk to a frog — weight 0.0.
+        "road_sensitivity": 1.0,
+        "road_threshold_m": 2_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.1,
+            "path": 0.0,
+        },
         "gbif_cache_file": "gbif_hyperolius_marmoratus.gpkg",
         "emoji": "🐸",
     },
@@ -476,6 +628,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
+        # Fully aquatic, but disperses overland during drought — where road
+        # crossings become lethal. High amphibian sensitivity, just below
+        # the reed frog. A footpath is no barrier — path weight 0.0.
+        "road_sensitivity": 0.9,
+        "road_threshold_m": 3_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.1,
+            "path": 0.0,
+        },
         "gbif_cache_file": "gbif_xenopus_laevis.gpkg",
         "emoji": "🐸",
     },
@@ -531,6 +697,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f99b.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-hippo.svg.png",
+        # Hippos leave water at night to graze and follow established
+        # trails — roads crossing these paths cause collision mortality.
+        # Moderate sensitivity over a modest distance from water.
+        "road_sensitivity": 0.5,
+        "road_threshold_m": 5_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_hippopotamus_amphibius.gpkg",
         "emoji": "🦛",
     },
@@ -587,6 +767,20 @@ SPECIES_CONFIG: dict[str, dict] = {
         "water_dependency": "high",
         "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f403.png",
         "icon_static_path": "app/static/Creative-Tail-Animal-buffalo.svg.png",
+        # Buffalo move in large herds whose seasonal movements are
+        # fragmented by roads and associated fencing. Moderate sensitivity,
+        # between the migratory zebra and the more sedentary megafauna.
+        "road_sensitivity": 0.4,
+        "road_threshold_m": 6_000,
+        "road_class_weights": {
+            "motorway": 1.0,
+            "trunk": 0.9,
+            "primary": 0.7,
+            "secondary": 0.5,
+            "tertiary": 0.3,
+            "track": 0.15,
+            "path": 0.05,
+        },
         "gbif_cache_file": "gbif_syncerus_caffer.gpkg",
         "emoji": "🐃",
     },

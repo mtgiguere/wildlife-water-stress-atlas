@@ -35,11 +35,25 @@ const STRESS_COLOR_EXPR = [
   STRESS_COLORS.fallback,
 ];
 
+// Road threat color ramp — continuous 0–1 road_threat_score.
+// 0 (no threat / immune species / beyond threshold) reads as dim slate;
+// any positive threat ramps green → yellow → red, reusing the stress palette.
+const ROAD_THREAT_NONE = '#2A4050';
+const ROAD_THREAT_COLOR_EXPR = [
+  'interpolate', ['linear'], ['get', 'road_threat_score'],
+  0,     ROAD_THREAT_NONE,
+  0.001, STRESS_COLORS.low,
+  0.33,  STRESS_COLORS.moderate,
+  0.66,  STRESS_COLORS.high,
+  1,     STRESS_COLORS.high,
+];
+
 // ─────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────
 let speciesConfig    = {};
 let allFeatures      = [];   // all occurrence features for current species
+let allThreatFeatures = [];  // all road-threat features for current species
 let currentSpecies   = 'Loxodonta africana';
 let currentYear      = 2020;
 let currentView      = 'points';
@@ -79,6 +93,13 @@ function getStressFile(scientificName) {
   return `data/stress_scores_gbif_${slug}.geojson`;
 }
 
+function getThreatFile(scientificName) {
+  // Load road threat GeoJSON — occurrences enriched with distance_to_road_m,
+  // road_class, and road_threat_score (0-1). May not exist for every species.
+  const slug = scientificName.toLowerCase().replace(' ', '_');
+  return `data/road_threats_gbif_${slug}.geojson`;
+}
+
 function filterByYear(features, year) {
   return features.filter(f => f.properties.year === year);
 }
@@ -114,6 +135,28 @@ function showTooltip(e, props) {
   moveTooltip(e);
 }
 
+function threatLevelLabel(score) {
+  if (score >= 0.66) return `<span style="color:${STRESS_COLORS.high}">● HIGH</span>`;
+  if (score >= 0.33) return `<span style="color:${STRESS_COLORS.moderate}">● MODERATE</span>`;
+  if (score > 0)     return `<span style="color:${STRESS_COLORS.low}">● LOW</span>`;
+  return `<span style="color:var(--text-muted)">● NONE</span>`;
+}
+
+function showThreatTooltip(e, props) {
+  const cfg = speciesConfig[currentSpecies] || {};
+  const distKm = props.distance_to_road_m != null ? (props.distance_to_road_m / 1000).toFixed(1) + ' km' : '—';
+  const score  = props.road_threat_score != null ? props.road_threat_score.toFixed(2) : '—';
+  tooltip.innerHTML = `
+    <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
+    Year: ${props.year || '—'}<br>
+    Nearest road: ${props.road_class || '—'}<br>
+    Distance to road: ${distKm}<br>
+    Road threat: ${threatLevelLabel(props.road_threat_score || 0)} (${score})
+  `;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
 function moveTooltip(e) {
   const x = e.originalEvent.clientX;
   const y = e.originalEvent.clientY;
@@ -144,6 +187,13 @@ function applyYearFilter(year) {
     map.getSource('occurrences').setData({
       type: 'FeatureCollection',
       features: yearFeatures,
+    });
+  }
+
+  if (map.getSource('threats')) {
+    map.getSource('threats').setData({
+      type: 'FeatureCollection',
+      features: filterByYear(allThreatFeatures, year),
     });
   }
 
@@ -245,6 +295,17 @@ async function loadSpecies(scientificName) {
 
   allFeatures = geojson.features;
 
+  // Fetch road threat GeoJSON — same occurrences enriched with road_threat_score.
+  // Not every species necessarily has an export yet, so fail soft to empty.
+  try {
+    const tres = await fetch(getThreatFile(scientificName));
+    const tgeo = await tres.json();
+    allThreatFeatures = tgeo.features || [];
+  } catch (e) {
+    console.warn('Could not load road threats for', scientificName, e);
+    allThreatFeatures = [];
+  }
+
   // Fly to Africa on species switch
   map.flyTo({ center: [20, 0], zoom: 3, duration: 1200 });
 
@@ -324,26 +385,62 @@ function applyCountryView(year) {
   map.getSource('countries').setData(getCountryGeoJSONForYear(year));
 }
 
+function setVisibility(layerId, visible) {
+  if (map.getLayer(layerId)) {
+    map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+  }
+}
+
+// Legend sections follow the active view: water-stress for POINTS,
+// road-threat for ROADS. (COUNTRIES keeps the stress legend, as before.)
+function updateLegend() {
+  document.getElementById('legend-stress').style.display = currentView === 'threats' ? 'none' : 'flex';
+  document.getElementById('legend-threat').style.display = currentView === 'threats' ? 'flex' : 'none';
+}
+
 function showPointsView() {
   currentView = 'points';
-  map.setLayoutProperty('occurrences-dot',  'visibility', 'visible');
-  map.setLayoutProperty('occurrences-glow', 'visibility', 'visible');
-  if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'none');
-  if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'none');
-  if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'visible');
-  if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'visible');
+  setVisibility('occurrences-dot',  true);
+  setVisibility('occurrences-glow', true);
+  setVisibility('clusters',         true);
+  setVisibility('cluster-count',    true);
+  setVisibility('countries-fill',   false);
+  setVisibility('countries-stroke', false);
+  setVisibility('threats-dot',      false);
+  setVisibility('threats-glow',     false);
+  setVisibility('roads-backbone-line', false);
+  updateLegend();
   stopPlay();
 }
 
 function showCountriesView() {
   currentView = 'countries';
-  map.setLayoutProperty('occurrences-dot',  'visibility', 'none');
-  map.setLayoutProperty('occurrences-glow', 'visibility', 'none');
-  if (map.getLayer('countries-fill'))   map.setLayoutProperty('countries-fill',   'visibility', 'visible');
-  if (map.getLayer('countries-stroke')) map.setLayoutProperty('countries-stroke', 'visibility', 'visible');
-  if (map.getLayer('clusters'))      map.setLayoutProperty('clusters',      'visibility', 'none');
-  if (map.getLayer('cluster-count')) map.setLayoutProperty('cluster-count', 'visibility', 'none');
+  setVisibility('occurrences-dot',  false);
+  setVisibility('occurrences-glow', false);
+  setVisibility('clusters',         false);
+  setVisibility('cluster-count',    false);
+  setVisibility('countries-fill',   true);
+  setVisibility('countries-stroke', true);
+  setVisibility('threats-dot',      false);
+  setVisibility('threats-glow',     false);
+  setVisibility('roads-backbone-line', false);
   applyCountryView(currentYear);
+  updateLegend();
+  stopPlay();
+}
+
+function showThreatsView() {
+  currentView = 'threats';
+  setVisibility('occurrences-dot',  false);
+  setVisibility('occurrences-glow', false);
+  setVisibility('clusters',         false);
+  setVisibility('cluster-count',    false);
+  setVisibility('countries-fill',   false);
+  setVisibility('countries-stroke', false);
+  setVisibility('roads-backbone-line', true);
+  setVisibility('threats-dot',      true);
+  setVisibility('threats-glow',     true);
+  updateLegend();
   stopPlay();
 }
 
@@ -351,8 +448,9 @@ document.querySelectorAll('.view-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (btn.dataset.view === 'points') showPointsView();
-    else showCountriesView();
+    if      (btn.dataset.view === 'points')    showPointsView();
+    else if (btn.dataset.view === 'countries') showCountriesView();
+    else                                       showThreatsView();
   });
 });
 
@@ -715,6 +813,80 @@ map.on('load', async () => {
       'circle-stroke-color':   '#FFFFFF',
       'circle-stroke-opacity': 0.3,
     },
+  });
+
+  // ── Backbone road network ─────────────────────────────────────
+  // Simplified motorway/trunk/primary lines — drawn beneath the threat
+  // points so a red occurrence is visibly "next to a road". Amber, to read
+  // distinctly from the blue water network. Shown only in the ROADS view.
+  map.addSource('roads-backbone', {
+    type: 'geojson',
+    data: 'data/roads_backbone.geojson',
+    buffer: 64,
+    tolerance: 0.5,
+  });
+
+  map.addLayer({
+    id: 'roads-backbone-line',
+    type: 'line',
+    source: 'roads-backbone',
+    layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color':   '#F2A93B',
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 3, 1.4, 6, 2.2, 11, 4],
+      // Roads are context, occurrences are the subject. Keep the network faint
+      // at the continental overview (where 137k segments would otherwise drown
+      // the points) and let it firm up as you zoom in for precise reference.
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.28, 5, 0.5, 8, 0.85],
+    },
+  });
+
+  // ── Road threat source + layers ───────────────────────────────
+  // Same occurrence points, colored by road_threat_score instead of stress.
+  // Not clustered — clustering would hide the per-point threat color.
+  map.addSource('threats', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addLayer({
+    id: 'threats-glow',
+    type: 'circle',
+    source: 'threats',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':  8,
+      'circle-color':   ROAD_THREAT_COLOR_EXPR,
+      'circle-opacity': 0.15,
+      'circle-blur':    1,
+    },
+  });
+
+  map.addLayer({
+    id: 'threats-dot',
+    type: 'circle',
+    source: 'threats',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':         3.5,
+      'circle-color':          ROAD_THREAT_COLOR_EXPR,
+      'circle-opacity':        0.85,
+      'circle-stroke-width':   0.5,
+      'circle-stroke-color':   '#FFFFFF',
+      'circle-stroke-opacity': 0.3,
+    },
+  });
+
+  map.on('mouseenter', 'threats-dot', e => {
+    map.getCanvas().style.cursor = 'pointer';
+    showThreatTooltip(e, e.features[0].properties);
+  });
+  map.on('mousemove', 'threats-dot', e => {
+    moveTooltip(e);
+  });
+  map.on('mouseleave', 'threats-dot', () => {
+    map.getCanvas().style.cursor = '';
+    hideTooltip();
   });
 
   // ── Occurrence tooltip events ─────────────────────────────────
