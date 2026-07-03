@@ -1,0 +1,26 @@
+name: QA
+
+# Delegates to central reusable workflows in mtgiguere/qa_pipeline.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write   # CodeQL
+
+jobs:
+  python:
+    uses: mtgiguere/qa_pipeline/.github/workflows/python-qa.yml@main
+    with:
+      package-manager: pip
+      enforce-coverage: false
+      run-format-check: true
+      audit-args: '--ignore-vuln CVE-2026-3219'
+
+  security:
+    uses: mtgiguere/qa_pipeline/.github/workflows/security-qa.yml@main
+    with:
+      codeql-languages: '["python","javascript"]'
