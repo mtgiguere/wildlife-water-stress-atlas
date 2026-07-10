@@ -284,7 +284,7 @@ The POINTS view colors each occurrence by `stress_level` (green/yellow/red) from
 Roadmap item #7 (Pressure Type 2, roads). Full pipeline: `ingest/threats.py`, `analytics/threat_scoring.py`, `scripts/fetch_road_data.py` + `export_road_threats.py`, and the ⚠ ROADS view in the Mapbox app. Fences/settlements remain future work.
 
 ### Test Gaps — external-format + visual rendering (follow-ups tracked below)
-Two bug classes escaped the green suites this session (see docs/TDD_CONTRACT.md addendum): a wrong Geofabrik layer name (unit fixture tested its own assumption) and an invisible 0.4px road layer (DOM tests passed, nothing rendered). Follow-up test items are listed under Next Steps.
+Two bug classes escaped the green suites this session (see docs/TDD_CONTRACT.md addendum): a wrong Geofabrik layer name (unit fixture tested its own assumption) and an invisible 0.4px road layer (DOM tests passed, nothing rendered). The external-format gap is now closed by `tests/test_fetch_road_data_integration.py` (item 3 below, DONE ✅). The visual-rendering gap (item 4) remains.
 
 ### Gap: JRC GSW Multi-Tile Loading
 JRCTileDirectory source class planned for multiple 10-degree tiles.
@@ -300,7 +300,7 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 
 1. ~~**Water stress visualization**~~ — DONE ✅ (POINTS view colors by stress_level)
 2. ~~**Human pressure layer (roads)**~~ — DONE ✅ (ROADS view; fences/settlements still to come)
-3. **Integration test for the roads download** — `@pytest.mark.integration` that pulls one small Geofabrik country and asserts the roads layer loads. Guards the external-format assumption class of bug (the `gis_osm_roads_free` layer-name miss).
+3. ~~**Integration test for the roads download**~~ — DONE ✅ (`tests/test_fetch_road_data_integration.py`) `@pytest.mark.integration` pulls one small real Geofabrik country (São Tomé) and asserts the roads layer loads from the *actual* shipped format — reading the real layer list off the download rather than re-confirming our own constant. Guards the external-format assumption class of bug (the `gis_osm_roads_free` layer-name miss). Verified RED by reintroducing the historical `_1` suffix.
 4. **Visual smoke test for the Mapbox app** — render via software WebGL (SwiftShader) in the E2E path and assert the ROADS/road layers actually paint. Guards invisible-render regressions (the 0.4px width miss).
 5. **Multi-species overlay** — "Compare All Species" mode
 6. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth

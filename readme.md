@@ -254,9 +254,11 @@ npx playwright test
 
 **Test coverage: 445 unit tests + 31 Mapbox E2E + 16 Streamlit E2E, 100% unit coverage**
 
-> Note: two bug classes escape these suites — external-format assumptions
-> (e.g. a data source's layer name) and WebGL visual rendering. See
-> `docs/TDD_CONTRACT.md` (road-threat addendum) for the two follow-up test items.
+> Note: two bug classes escape the unit/DOM suites — external-format assumptions
+> (e.g. a data source's layer name) and WebGL visual rendering. The first is now
+> guarded by `tests/test_fetch_road_data_integration.py` (an `@pytest.mark.integration`
+> test that pulls one small real Geofabrik country); the WebGL visual smoke test
+> remains the last follow-up. See `docs/TDD_CONTRACT.md` (road-threat addendum).
 
 ---
 
@@ -294,7 +296,7 @@ npx playwright test
 | Water stress visualization (POINTS colored by stress) | ✅ Done |
 | Human pressure layer — roads (ingest → scoring → export) | ✅ Done |
 | Road threat visualization (⚠ ROADS view) | ✅ Done |
-| Integration test for roads download (external-format guard) | 📋 Next |
+| Integration test for roads download (external-format guard) | ✅ Done |
 | Visual smoke test via software WebGL (render guard) | 📋 Next |
 | Multi-species overlay mode | 📋 Planned |
 | Data confidence layer | 📋 Planned |
