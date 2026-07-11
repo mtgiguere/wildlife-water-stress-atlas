@@ -48,12 +48,28 @@ const ROAD_THREAT_COLOR_EXPR = [
   1,     STRESS_COLORS.high,
 ];
 
+// Settlement threat color ramp — same green→red threat semantics as roads,
+// keyed on settlement_threat_score. Shown in the SETTLEMENTS view.
+const SETTLEMENT_THREAT_COLOR_EXPR = [
+  'interpolate', ['linear'], ['get', 'settlement_threat_score'],
+  0,     ROAD_THREAT_NONE,
+  0.001, STRESS_COLORS.low,
+  0.33,  STRESS_COLORS.moderate,
+  0.66,  STRESS_COLORS.high,
+  1,     STRESS_COLORS.high,
+];
+
+// Settlement context points (cities & towns) — a warm violet, distinct from
+// the amber road backbone and the blue water network.
+const SETTLEMENT_POINT_COLOR = '#C08BE0';
+
 // ─────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────
 let speciesConfig    = {};
 let allFeatures      = [];   // all occurrence features for current species
 let allThreatFeatures = [];  // all road-threat features for current species
+let allSettlementFeatures = [];  // all settlement-threat features for current species
 let currentSpecies   = 'Loxodonta africana';
 let currentYear      = 2020;
 let currentView      = 'points';
@@ -98,6 +114,13 @@ function getThreatFile(scientificName) {
   // road_class, and road_threat_score (0-1). May not exist for every species.
   const slug = scientificName.toLowerCase().replace(' ', '_');
   return `data/road_threats_gbif_${slug}.geojson`;
+}
+
+function getSettlementFile(scientificName) {
+  // Load settlement threat GeoJSON — occurrences enriched with
+  // distance_to_settlement_m, settlement_class, and settlement_threat_score.
+  const slug = scientificName.toLowerCase().replace(' ', '_');
+  return `data/settlement_threats_gbif_${slug}.geojson`;
 }
 
 function filterByYear(features, year) {
@@ -157,6 +180,21 @@ function showThreatTooltip(e, props) {
   moveTooltip(e);
 }
 
+function showSettlementTooltip(e, props) {
+  const cfg = speciesConfig[currentSpecies] || {};
+  const distKm = props.distance_to_settlement_m != null ? (props.distance_to_settlement_m / 1000).toFixed(1) + ' km' : '—';
+  const score  = props.settlement_threat_score != null ? props.settlement_threat_score.toFixed(2) : '—';
+  tooltip.innerHTML = `
+    <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
+    Year: ${props.year || '—'}<br>
+    Nearest settlement: ${props.settlement_class || '—'}<br>
+    Distance to settlement: ${distKm}<br>
+    Settlement threat: ${threatLevelLabel(props.settlement_threat_score || 0)} (${score})
+  `;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
 function moveTooltip(e) {
   const x = e.originalEvent.clientX;
   const y = e.originalEvent.clientY;
@@ -194,6 +232,13 @@ function applyYearFilter(year) {
     map.getSource('threats').setData({
       type: 'FeatureCollection',
       features: filterByYear(allThreatFeatures, year),
+    });
+  }
+
+  if (map.getSource('settlement-threats')) {
+    map.getSource('settlement-threats').setData({
+      type: 'FeatureCollection',
+      features: filterByYear(allSettlementFeatures, year),
     });
   }
 
@@ -306,6 +351,17 @@ async function loadSpecies(scientificName) {
     allThreatFeatures = [];
   }
 
+  // Fetch settlement threat GeoJSON — same occurrences enriched with
+  // settlement_threat_score. Fail soft to empty if not yet exported.
+  try {
+    const sres = await fetch(getSettlementFile(scientificName));
+    const sgeo = await sres.json();
+    allSettlementFeatures = sgeo.features || [];
+  } catch (e) {
+    console.warn('Could not load settlement threats for', scientificName, e);
+    allSettlementFeatures = [];
+  }
+
   // Fly to Africa on species switch
   map.flyTo({ center: [20, 0], zoom: 3, duration: 1200 });
 
@@ -391,39 +447,44 @@ function setVisibility(layerId, visible) {
   }
 }
 
-// Legend sections follow the active view: water-stress for POINTS,
-// road-threat for ROADS. (COUNTRIES keeps the stress legend, as before.)
+// Legend sections follow the active view: water-stress for POINTS/COUNTRIES,
+// road-threat for ROADS, settlement-threat for SETTLEMENTS.
 function updateLegend() {
-  document.getElementById('legend-stress').style.display = currentView === 'threats' ? 'none' : 'flex';
-  document.getElementById('legend-threat').style.display = currentView === 'threats' ? 'flex' : 'none';
+  const isThreats = currentView === 'threats';
+  const isSettlements = currentView === 'settlements';
+  document.getElementById('legend-stress').style.display = isThreats || isSettlements ? 'none' : 'flex';
+  document.getElementById('legend-threat').style.display = isThreats ? 'flex' : 'none';
+  document.getElementById('legend-settlement').style.display = isSettlements ? 'flex' : 'none';
+}
+
+// Hide every view-specific data layer. Each show*View() then re-enables only
+// the layers it needs — keeps the four views mutually exclusive without each
+// one having to remember every other view's layers.
+function hideAllDataLayers() {
+  [
+    'occurrences-dot', 'occurrences-glow', 'clusters', 'cluster-count',
+    'countries-fill', 'countries-stroke',
+    'roads-backbone-line', 'threats-dot', 'threats-glow',
+    'settlements-points-layer', 'settlement-threats-dot', 'settlement-threats-glow',
+  ].forEach(id => setVisibility(id, false));
 }
 
 function showPointsView() {
   currentView = 'points';
+  hideAllDataLayers();
   setVisibility('occurrences-dot',  true);
   setVisibility('occurrences-glow', true);
   setVisibility('clusters',         true);
   setVisibility('cluster-count',    true);
-  setVisibility('countries-fill',   false);
-  setVisibility('countries-stroke', false);
-  setVisibility('threats-dot',      false);
-  setVisibility('threats-glow',     false);
-  setVisibility('roads-backbone-line', false);
   updateLegend();
   stopPlay();
 }
 
 function showCountriesView() {
   currentView = 'countries';
-  setVisibility('occurrences-dot',  false);
-  setVisibility('occurrences-glow', false);
-  setVisibility('clusters',         false);
-  setVisibility('cluster-count',    false);
+  hideAllDataLayers();
   setVisibility('countries-fill',   true);
   setVisibility('countries-stroke', true);
-  setVisibility('threats-dot',      false);
-  setVisibility('threats-glow',     false);
-  setVisibility('roads-backbone-line', false);
   applyCountryView(currentYear);
   updateLegend();
   stopPlay();
@@ -431,15 +492,20 @@ function showCountriesView() {
 
 function showThreatsView() {
   currentView = 'threats';
-  setVisibility('occurrences-dot',  false);
-  setVisibility('occurrences-glow', false);
-  setVisibility('clusters',         false);
-  setVisibility('cluster-count',    false);
-  setVisibility('countries-fill',   false);
-  setVisibility('countries-stroke', false);
+  hideAllDataLayers();
   setVisibility('roads-backbone-line', true);
   setVisibility('threats-dot',      true);
   setVisibility('threats-glow',     true);
+  updateLegend();
+  stopPlay();
+}
+
+function showSettlementsView() {
+  currentView = 'settlements';
+  hideAllDataLayers();
+  setVisibility('settlements-points-layer', true);
+  setVisibility('settlement-threats-dot',   true);
+  setVisibility('settlement-threats-glow',  true);
   updateLegend();
   stopPlay();
 }
@@ -448,9 +514,10 @@ document.querySelectorAll('.view-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if      (btn.dataset.view === 'points')    showPointsView();
-    else if (btn.dataset.view === 'countries') showCountriesView();
-    else                                       showThreatsView();
+    if      (btn.dataset.view === 'points')      showPointsView();
+    else if (btn.dataset.view === 'countries')   showCountriesView();
+    else if (btn.dataset.view === 'settlements') showSettlementsView();
+    else                                         showThreatsView();
   });
 });
 
@@ -885,6 +952,84 @@ map.on('load', async () => {
     moveTooltip(e);
   });
   map.on('mouseleave', 'threats-dot', () => {
+    map.getCanvas().style.cursor = '';
+    hideTooltip();
+  });
+
+  // ── Settlement points (cities & towns) ────────────────────────
+  // Context layer for the SETTLEMENTS view — the city/town points the threat
+  // is measured against. Violet, to read distinctly from amber roads and blue
+  // water. Analytics score against ALL settlement classes; only city/town paint.
+  map.addSource('settlements-points', {
+    type: 'geojson',
+    data: 'data/settlements_points.geojson',
+    buffer: 64,
+    tolerance: 0.5,
+  });
+
+  map.addLayer({
+    id: 'settlements-points-layer',
+    type: 'circle',
+    source: 'settlements-points',
+    layout: { visibility: 'none' },
+    paint: {
+      // Cities read larger than towns; both firm up as you zoom in.
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        3, ['match', ['get', 'settlement_class'], 'city', 3, 1.5],
+        8, ['match', ['get', 'settlement_class'], 'city', 7, 4],
+      ],
+      'circle-color':          SETTLEMENT_POINT_COLOR,
+      'circle-opacity':        ['interpolate', ['linear'], ['zoom'], 3, 0.35, 6, 0.6, 9, 0.85],
+      'circle-stroke-width':   0.5,
+      'circle-stroke-color':   '#FFFFFF',
+      'circle-stroke-opacity': 0.25,
+    },
+  });
+
+  // ── Settlement threat source + layers ─────────────────────────
+  // Same occurrence points, colored by settlement_threat_score. Not clustered.
+  map.addSource('settlement-threats', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addLayer({
+    id: 'settlement-threats-glow',
+    type: 'circle',
+    source: 'settlement-threats',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':  8,
+      'circle-color':   SETTLEMENT_THREAT_COLOR_EXPR,
+      'circle-opacity': 0.15,
+      'circle-blur':    1,
+    },
+  });
+
+  map.addLayer({
+    id: 'settlement-threats-dot',
+    type: 'circle',
+    source: 'settlement-threats',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':         3.5,
+      'circle-color':          SETTLEMENT_THREAT_COLOR_EXPR,
+      'circle-opacity':        0.85,
+      'circle-stroke-width':   0.5,
+      'circle-stroke-color':   '#FFFFFF',
+      'circle-stroke-opacity': 0.3,
+    },
+  });
+
+  map.on('mouseenter', 'settlement-threats-dot', e => {
+    map.getCanvas().style.cursor = 'pointer';
+    showSettlementTooltip(e, e.features[0].properties);
+  });
+  map.on('mousemove', 'settlement-threats-dot', e => {
+    moveTooltip(e);
+  });
+  map.on('mouseleave', 'settlement-threats-dot', () => {
     map.getCanvas().style.cursor = '';
     hideTooltip();
   });

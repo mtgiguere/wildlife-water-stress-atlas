@@ -125,6 +125,42 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Settlement threat view
+  // ---------------------------------------------------------------------------
+
+  test('SETTLEMENTS view button is present', async ({ page }) => {
+    await expect(page.locator('.view-btn', { hasText: 'SETTLEMENTS' })).toBeVisible();
+  });
+
+  test('clicking SETTLEMENTS makes it active', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'SETTLEMENTS' }).click();
+    await expect(page.locator('.view-btn.active')).toContainText('SETTLEMENTS');
+  });
+
+  test('settlement threat legend is hidden by default', async ({ page }) => {
+    await expect(page.locator('#legend-settlement')).toBeHidden();
+  });
+
+  test('settlement threat legend appears in SETTLEMENTS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'SETTLEMENTS' }).click();
+    await expect(page.locator('#legend-settlement')).toBeVisible();
+  });
+
+  test('water stress legend is hidden in SETTLEMENTS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'SETTLEMENTS' }).click();
+    await expect(page.locator('#legend-stress')).toBeHidden();
+  });
+
+  test('road and settlement legends are mutually exclusive', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'SETTLEMENTS' }).click();
+    await expect(page.locator('#legend-settlement')).toBeVisible();
+    await expect(page.locator('#legend-threat')).toBeHidden();
+    await page.locator('.view-btn', { hasText: 'ROADS' }).click();
+    await expect(page.locator('#legend-threat')).toBeVisible();
+    await expect(page.locator('#legend-settlement')).toBeHidden();
+  });
+
+  // ---------------------------------------------------------------------------
   // Year slider
   // ---------------------------------------------------------------------------
 

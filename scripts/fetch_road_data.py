@@ -52,9 +52,23 @@ MAJOR_HIGHWAY_TAGS = {
     "tertiary_link",
 }
 
+# OSM `place` classes kept for the settlement pressure layer. Mirrors
+# MAJOR_HIGHWAY_TAGS: only real settlements (dropping suburb subdivisions,
+# localities, farms, islands, admin regions, etc. — see ingest.threats
+# OSM_PLACE_MAP for the downstream normalization). national_capital is kept
+# and folded into "city" downstream.
+SETTLEMENT_PLACE_TAGS = {
+    "city",
+    "national_capital",
+    "town",
+    "village",
+    "hamlet",
+}
+
 GEOFABRIK_BASE = "https://download.geofabrik.de/africa"
 
 DEFAULT_OUTPUT_PATH = Path("data/raw/threats/africa_roads.gpkg")
+DEFAULT_SETTLEMENTS_OUTPUT_PATH = Path("data/raw/threats/africa_settlements.gpkg")
 
 # Countries covering the geographic ranges of all 11 species.
 # Slugs match Geofabrik's Africa sub-region URL scheme.
@@ -93,7 +107,9 @@ TARGET_COUNTRIES = [
 # suffix — the '_1' suffix is the shapefile naming convention; the GPKG drops
 # it. Verified against the real Africa sub-region downloads.
 _ROADS_LAYER = "gis_osm_roads_free"
+_PLACES_LAYER = "gis_osm_places_free"
 _HIGHWAY_COL = "highway"
+_PLACE_COL = "place"
 _FCLASS_COL = "fclass"
 
 
@@ -136,20 +152,21 @@ def download_gpkg_zip(url: str) -> bytes:
     return b"".join(chunks)
 
 
-def extract_roads_from_zip(zip_bytes: bytes) -> gpd.GeoDataFrame:
+def _read_layer_from_zip(zip_bytes: bytes, layer: str) -> gpd.GeoDataFrame:
     """
-    Extract the lines layer from a Geofabrik GPKG zip.
+    Read one named layer from a Geofabrik GPKG zip.
 
-    Geofabrik GPKGs contain multiple layers (points, lines, multipolygons,
-    etc.). The lines layer holds roads, rivers, and other linear features
-    with an OSM highway tag where applicable.
+    Geofabrik GPKGs contain multiple layers (gis_osm_roads_free,
+    gis_osm_places_free, etc.). This unzips to a temp file and reads the
+    requested layer in its native CRS.
 
     Args:
-        zip_bytes: Raw bytes of the downloaded .gpkg.zip file.
+        zip_bytes : Raw bytes of the downloaded .gpkg.zip file.
+        layer     : GPKG layer name to read.
 
     Returns:
-        GeoDataFrame with all columns from the lines layer in EPSG:4326,
-        or an empty GeoDataFrame if extraction fails.
+        GeoDataFrame with all columns from the layer (native CRS), or an empty
+        EPSG:4326 GeoDataFrame if the zip is malformed or the layer is empty.
     """
     _empty = gpd.GeoDataFrame(geometry=gpd.GeoSeries([], crs="EPSG:4326"))
 
@@ -164,24 +181,88 @@ def extract_roads_from_zip(zip_bytes: bytes) -> gpd.GeoDataFrame:
                 temp_path = Path(f.name)
 
         try:
-            gdf = gpd.read_file(temp_path, layer=_ROADS_LAYER)
+            gdf = gpd.read_file(temp_path, layer=layer)
         finally:
             temp_path.unlink(missing_ok=True)
 
-        if gdf.empty:
-            return _empty
-
-        # Geofabrik free GPKG uses 'fclass' — rename to 'highway' so the
-        # rest of the pipeline (OSM_HIGHWAY_MAP, fetch_country_roads) is transparent
-        # to the difference between free and full GPKG formats.
-        if _FCLASS_COL in gdf.columns and _HIGHWAY_COL not in gdf.columns:
-            gdf = gdf.rename(columns={_FCLASS_COL: _HIGHWAY_COL})
-
-        return gdf.to_crs(epsg=4326)
+        return _empty if gdf.empty else gdf
 
     except Exception as e:
-        print(f"  Warning: could not extract roads from zip: {e}")
+        print(f"  Warning: could not extract layer '{layer}' from zip: {e}")
         return _empty
+
+
+def extract_roads_from_zip(zip_bytes: bytes) -> gpd.GeoDataFrame:
+    """
+    Extract the roads layer from a Geofabrik GPKG zip.
+
+    Reads the gis_osm_roads_free layer and renames its 'fclass' column to
+    'highway' so the rest of the pipeline (OSM_HIGHWAY_MAP, fetch_country_roads)
+    is transparent to the free vs full GPKG format difference.
+
+    Args:
+        zip_bytes: Raw bytes of the downloaded .gpkg.zip file.
+
+    Returns:
+        GeoDataFrame with all road columns in EPSG:4326, or an empty
+        GeoDataFrame if extraction fails.
+    """
+    gdf = _read_layer_from_zip(zip_bytes, _ROADS_LAYER)
+    if gdf.empty:
+        return gdf
+
+    if _FCLASS_COL in gdf.columns and _HIGHWAY_COL not in gdf.columns:
+        gdf = gdf.rename(columns={_FCLASS_COL: _HIGHWAY_COL})
+
+    return gdf.to_crs(epsg=4326)
+
+
+def extract_settlements_from_zip(zip_bytes: bytes) -> gpd.GeoDataFrame:
+    """
+    Extract the places (settlements) layer from a Geofabrik GPKG zip.
+
+    Reads the gis_osm_places_free layer and renames its 'fclass' column to
+    'place' so downstream ingestion (OSM_PLACE_MAP) sees a consistent schema.
+
+    Args:
+        zip_bytes: Raw bytes of the downloaded .gpkg.zip file.
+
+    Returns:
+        GeoDataFrame with all place columns in EPSG:4326, or an empty
+        GeoDataFrame if extraction fails.
+    """
+    gdf = _read_layer_from_zip(zip_bytes, _PLACES_LAYER)
+    if gdf.empty:
+        return gdf
+
+    if _FCLASS_COL in gdf.columns and _PLACE_COL not in gdf.columns:
+        gdf = gdf.rename(columns={_FCLASS_COL: _PLACE_COL})
+
+    return gdf.to_crs(epsg=4326)
+
+
+def _empty_gdf() -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame(geometry=gpd.GeoSeries([], crs="EPSG:4326"))
+
+
+def _filter_major_roads(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Keep only major road classes (MAJOR_HIGHWAY_TAGS); return geometry + highway."""
+    if gdf.empty or _HIGHWAY_COL not in gdf.columns:
+        return _empty_gdf()
+    gdf = gdf[gdf[_HIGHWAY_COL].isin(MAJOR_HIGHWAY_TAGS)].copy()
+    if gdf.empty:
+        return _empty_gdf()
+    return gdf[["geometry", _HIGHWAY_COL]].copy().to_crs(epsg=4326)
+
+
+def _filter_settlements(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Keep only real settlement classes (SETTLEMENT_PLACE_TAGS); return geometry + place."""
+    if gdf.empty or _PLACE_COL not in gdf.columns:
+        return _empty_gdf()
+    gdf = gdf[gdf[_PLACE_COL].isin(SETTLEMENT_PLACE_TAGS)].copy()
+    if gdf.empty:
+        return _empty_gdf()
+    return gdf[["geometry", _PLACE_COL]].copy().to_crs(epsg=4326)
 
 
 def fetch_country_roads(country_slug: str) -> gpd.GeoDataFrame:
@@ -199,26 +280,41 @@ def fetch_country_roads(country_slug: str) -> gpd.GeoDataFrame:
         GeoDataFrame with geometry and highway columns in EPSG:4326,
         or an empty GeoDataFrame if the download or extraction fails.
     """
-    _empty = gpd.GeoDataFrame(geometry=gpd.GeoSeries([], crs="EPSG:4326"))
-
     url = get_geofabrik_url(country_slug)
     try:
         zip_bytes = download_gpkg_zip(url)
     except Exception as e:
         print(f"  Warning: could not download {country_slug}: {e}")
-        return _empty
+        return _empty_gdf()
 
-    gdf = extract_roads_from_zip(zip_bytes)
+    return _filter_major_roads(extract_roads_from_zip(zip_bytes))
 
-    if gdf.empty or "highway" not in gdf.columns:
-        return _empty
 
-    gdf = gdf[gdf["highway"].isin(MAJOR_HIGHWAY_TAGS)].copy()
+def fetch_country_osm(country_slug: str) -> dict:
+    """
+    Download one country's Geofabrik GPKG ONCE and extract both pressure layers.
 
-    if gdf.empty:
-        return _empty
+    Roads and settlements live in the same GPKG, so a single download yields
+    both — avoiding a second continental fetch just for settlements.
 
-    return gdf[["geometry", "highway"]].copy().to_crs(epsg=4326)
+    Args:
+        country_slug: Geofabrik Africa sub-region slug (e.g. "kenya").
+
+    Returns:
+        {"roads": <major roads GDF>, "settlements": <settlements GDF>}, each in
+        EPSG:4326, each empty if download/extraction fails or nothing matched.
+    """
+    url = get_geofabrik_url(country_slug)
+    try:
+        zip_bytes = download_gpkg_zip(url)
+    except Exception as e:
+        print(f"  Warning: could not download {country_slug}: {e}")
+        return {"roads": _empty_gdf(), "settlements": _empty_gdf()}
+
+    return {
+        "roads": _filter_major_roads(extract_roads_from_zip(zip_bytes)),
+        "settlements": _filter_settlements(extract_settlements_from_zip(zip_bytes)),
+    }
 
 
 def fetch_all_road_data(
@@ -262,9 +358,63 @@ def fetch_all_road_data(
     print(f"  -> {output_path} ({len(result):,} road segments total)")
 
 
+def _write_merged(layers: list, output_path: Path, label: str) -> None:
+    """Concatenate per-country layers and write one merged GeoPackage."""
+    if not layers:
+        print(f"  No {label} retrieved - check country slugs and network.")
+        return
+
+    merged = pd.concat(layers, ignore_index=True)
+    result = gpd.GeoDataFrame(merged, geometry="geometry", crs="EPSG:4326")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    result.to_file(output_path, driver="GPKG")
+    print(f"  -> {output_path} ({len(result):,} {label} total)")
+
+
+def fetch_all_osm_data(
+    roads_output_path: Path = DEFAULT_OUTPUT_PATH,
+    settlements_output_path: Path = DEFAULT_SETTLEMENTS_OUTPUT_PATH,
+    countries: list | None = None,
+) -> None:
+    """
+    Download every target country ONCE and write both pressure layers.
+
+    Each country's GPKG is fetched a single time; roads and settlements are
+    extracted from the same download and merged into two output GeoPackages.
+    Countries that fail to download are skipped with a warning — the run
+    continues so no human intervention is needed.
+
+    Args:
+        roads_output_path       : Path for the merged roads GeoPackage.
+        settlements_output_path : Path for the merged settlements GeoPackage.
+        countries               : Geofabrik slugs. Defaults to TARGET_COUNTRIES.
+    """
+    if countries is None:
+        countries = TARGET_COUNTRIES
+
+    road_layers = []
+    settlement_layers = []
+
+    for slug in countries:
+        print(f"  {slug}...", end=" ", flush=True)
+        result = fetch_country_osm(slug)
+        roads = result["roads"]
+        settlements = result["settlements"]
+        if not roads.empty:
+            road_layers.append(roads)
+        if not settlements.empty:
+            settlement_layers.append(settlements)
+        print(f"-> {len(roads):,} roads, {len(settlements):,} settlements")
+
+    _write_merged(road_layers, roads_output_path, "road segments")
+    _write_merged(settlement_layers, settlements_output_path, "settlements")
+
+
 def main() -> None:
-    fetch_all_road_data(
-        output_path=DEFAULT_OUTPUT_PATH,
+    fetch_all_osm_data(
+        roads_output_path=DEFAULT_OUTPUT_PATH,
+        settlements_output_path=DEFAULT_SETTLEMENTS_OUTPUT_PATH,
         countries=TARGET_COUNTRIES,
     )
 
