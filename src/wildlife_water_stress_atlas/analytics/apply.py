@@ -66,3 +66,36 @@ def apply_road_threat_score(gdf, scoring_func):
     )
 
     return result
+
+
+def apply_settlement_threat_score(gdf, scoring_func):
+    """
+    Return a copy of the GeoDataFrame with a settlement threat score column.
+
+    Parameters
+    ----------
+    gdf : GeoDataFrame
+        GeoDataFrame containing at least 'distance_to_settlement_m',
+        'settlement_class', and 'species'.
+    scoring_func : callable
+        Function accepting (distance_m, settlement_class, species) and
+        returning a score.
+
+    Returns
+    -------
+    GeoDataFrame
+        Copy of the input GeoDataFrame with a new
+        'settlement_threat_score' column.
+    """
+    result = gdf.copy()
+
+    result["settlement_threat_score"] = result.apply(
+        lambda row: scoring_func(
+            row["distance_to_settlement_m"],
+            row["settlement_class"],
+            row["species"],
+        ),
+        axis=1,
+    )
+
+    return result

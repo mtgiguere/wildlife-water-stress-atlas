@@ -67,6 +67,24 @@ road_class_weights      : dict[str, float]
     Larger/faster roads carry higher weight. A weight of 0.0 means that
     road class poses no threat to this species (e.g. a footpath to a frog).
     All road fields are heuristic placeholders pending ecological validation.
+
+settlement_sensitivity  : float in [0.0, 1.0]
+    Per-species multiplier for how strongly human settlements threaten this
+    species (habitat conversion, human-wildlife conflict, retaliatory
+    killing, disturbance). 0.0 short-circuits settlement_threat_score to 0.0
+    regardless of distance or class. Mirrors road_sensitivity for the second
+    human-pressure layer (Pressure Type 2, settlements).
+
+settlement_threshold_m  : int | float
+    Distance in meters beyond which a settlement has no measured effect on
+    the species. Inside this distance the threat decays linearly to 0.0 at
+    the threshold. Mirrors road_threshold_m.
+
+settlement_class_weights: dict[str, float]
+    Per-class severity in [0.0, 1.0]. Keys must cover KNOWN_SETTLEMENT_CLASSES.
+    Larger, more permanent settlements carry higher weight
+    (city > town > village > hamlet). All settlement fields are heuristic
+    placeholders pending ecological validation.
 """
 
 # ---------------------------------------------------------------------------
@@ -84,6 +102,21 @@ KNOWN_ROAD_CLASSES: set[str] = {
     "tertiary",
     "track",
     "path",
+}
+
+
+# ---------------------------------------------------------------------------
+# Settlement threat model — human pressure layer (Pressure Type 2, settlements)
+# ---------------------------------------------------------------------------
+# Canonical settlement classes after OSM place tags are normalized (see
+# ingest/threats — gis_osm_places fclass values folded into these). Ordered
+# by human footprint: city (largest) → hamlet (smallest). Every species'
+# settlement_class_weights must provide a weight for each of these.
+KNOWN_SETTLEMENT_CLASSES: set[str] = {
+    "city",
+    "town",
+    "village",
+    "hamlet",
 }
 
 
@@ -147,6 +180,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Settlements bring crop-raiding conflict and range compression, but
+        # elephants are large and can persist in human-adjacent mosaics —
+        # moderate sensitivity over a wide conflict footprint.
+        "settlement_sensitivity": 0.5,
+        "settlement_threshold_m": 10_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_loxodonta_africana.gpkg",
         "emoji": "🐘",
@@ -214,6 +258,16 @@ SPECIES_CONFIG: dict[str, dict] = {
             "track": 0.15,
             "path": 0.05,
         },
+        # Settlements convert rangeland and, with associated fencing, sever
+        # migration corridors — a documented collapse risk for zebra routes.
+        "settlement_sensitivity": 0.5,
+        "settlement_threshold_m": 8_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
+        },
         "gbif_cache_file": "gbif_equus_quagga.gpkg",
         "emoji": "🦓",
     },
@@ -268,6 +322,16 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Giraffes tolerate some human presence but lose browse habitat to
+        # settlement expansion and face snaring pressure near villages.
+        "settlement_sensitivity": 0.4,
+        "settlement_threshold_m": 8_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_giraffa_camelopardalis.gpkg",
         "emoji": "🦒",
@@ -324,6 +388,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Retaliatory and pre-emptive killing near settlements over livestock
+        # is THE dominant lion threat — highest settlement sensitivity in the
+        # atlas, over a broad conflict footprint.
+        "settlement_sensitivity": 0.7,
+        "settlement_threshold_m": 12_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_panthera_leo.gpkg",
         "emoji": "🦁",
@@ -382,6 +457,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "track": 0.15,
             "path": 0.05,
         },
+        # Cheetahs range widely across farmland and are killed as perceived
+        # livestock threats; their huge ranges mean settlements intersect them
+        # constantly. High sensitivity, broad footprint.
+        "settlement_sensitivity": 0.6,
+        "settlement_threshold_m": 12_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
+        },
         "gbif_cache_file": "gbif_acinonyx_jubatus.gpkg",
         "emoji": "🐆",
     },
@@ -437,6 +523,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Crocodiles persist near people but face targeted killing and nest
+        # disturbance where settlements meet water. Low sensitivity, tight
+        # footprint (the conflict is at the water's edge).
+        "settlement_sensitivity": 0.3,
+        "settlement_threshold_m": 3_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_crocodylus_niloticus.gpkg",
         "emoji": "🐊",
@@ -497,6 +594,19 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Treated as immune to ground-based human pressure: flamingos fly
+        # between remote saline lakes. sensitivity 0.0 short-circuits the
+        # settlement score to 0.0. HONEST LIMITATION: development at the lakes
+        # themselves (e.g. soda-ash extraction at Lake Natron) IS a real
+        # threat this atlas does not yet capture — see the data-gaps caveat.
+        "settlement_sensitivity": 0.0,
+        "settlement_threshold_m": 1_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_phoenicopterus_roseus.gpkg",
         "emoji": "🦩",
@@ -570,6 +680,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "track": 0.1,
             "path": 0.0,
         },
+        # Settlements drive wetland drainage, infilling, and pollution — the
+        # exact habitat loss reed frogs cannot survive. High sensitivity over
+        # a tight radius (their whole world is a small wetland).
+        "settlement_sensitivity": 0.6,
+        "settlement_threshold_m": 3_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
+        },
         "gbif_cache_file": "gbif_hyperolius_marmoratus.gpkg",
         "emoji": "🐸",
     },
@@ -642,6 +763,18 @@ SPECIES_CONFIG: dict[str, dict] = {
             "track": 0.1,
             "path": 0.0,
         },
+        # Unlike the reed frog, Xenopus is a human-TOLERANT generalist — it
+        # thrives in farm dams, irrigation ponds, and urban water bodies, and
+        # is invasive precisely because of this. So settlement sensitivity is
+        # LOW despite being an amphibian: settlements often ADD habitat for it.
+        "settlement_sensitivity": 0.35,
+        "settlement_threshold_m": 3_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
+        },
         "gbif_cache_file": "gbif_xenopus_laevis.gpkg",
         "emoji": "🐸",
     },
@@ -710,6 +843,17 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Human-hippo conflict is severe where settlements meet water — hippos
+        # raid crops at night and are among Africa's most dangerous animals to
+        # people, drawing retaliatory killing. Moderate sensitivity near water.
+        "settlement_sensitivity": 0.5,
+        "settlement_threshold_m": 6_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_hippopotamus_amphibius.gpkg",
         "emoji": "🦛",
@@ -780,6 +924,16 @@ SPECIES_CONFIG: dict[str, dict] = {
             "tertiary": 0.3,
             "track": 0.15,
             "path": 0.05,
+        },
+        # Buffalo lose habitat to settlement expansion and are hunted for meat
+        # near villages; large herds fare poorly in fragmented human mosaics.
+        "settlement_sensitivity": 0.5,
+        "settlement_threshold_m": 8_000,
+        "settlement_class_weights": {
+            "city": 1.0,
+            "town": 0.7,
+            "village": 0.4,
+            "hamlet": 0.2,
         },
         "gbif_cache_file": "gbif_syncerus_caffer.gpkg",
         "emoji": "🐃",

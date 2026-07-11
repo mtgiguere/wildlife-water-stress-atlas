@@ -32,10 +32,12 @@ import geopandas as gpd
 import pytest
 
 from scripts.fetch_road_data import (
+    _PLACES_LAYER,
     _ROADS_LAYER,
     MAJOR_HIGHWAY_TAGS,
     download_gpkg_zip,
     extract_roads_from_zip,
+    extract_settlements_from_zip,
     fetch_country_roads,
     get_geofabrik_url,
 )
@@ -69,6 +71,21 @@ def test_real_geofabrik_gpkg_contains_the_layer_we_read(real_gpkg_zip):
         temp_path.unlink(missing_ok=True)
 
     assert _ROADS_LAYER in real_layers, f"Our code reads layer {_ROADS_LAYER!r}, but the real Geofabrik GPKG ships layers {real_layers}. The external format has drifted."
+    # Same external-format guard for the settlements layer (Pressure Type 2).
+    assert _PLACES_LAYER in real_layers, f"Our code reads layer {_PLACES_LAYER!r}, but the real Geofabrik GPKG ships layers {real_layers}. The external format has drifted."
+
+
+@pytest.mark.integration
+def test_extract_settlements_from_real_download_is_nonempty_wgs84(real_gpkg_zip):
+    """extract_settlements_from_zip on a REAL download returns places (not empty),
+    renames Geofabrik's 'fclass' to 'place', and reprojects to WGS84. Guards the
+    settlement external-format assumption the same way the roads test does."""
+    result = extract_settlements_from_zip(real_gpkg_zip)
+
+    assert not result.empty, "Real download produced zero settlements — layer name or format drift"
+    assert "place" in result.columns
+    assert "fclass" not in result.columns
+    assert result.crs.to_string() == "EPSG:4326"
 
 
 @pytest.mark.integration

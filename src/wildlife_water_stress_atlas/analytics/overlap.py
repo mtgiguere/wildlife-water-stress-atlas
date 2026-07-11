@@ -79,3 +79,44 @@ def add_distance_to_road(
     joined = joined.drop(columns="index_right", errors="ignore")
 
     return joined.to_crs(epsg=4326)
+
+
+def add_distance_to_settlement(
+    occurrences: gpd.GeoDataFrame,
+    settlements: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """
+    Add distance-to-nearest-settlement values and the nearest settlement's class.
+
+    Mirrors add_distance_to_road for the settlement human-pressure layer.
+
+    Args:
+        occurrences: GeoDataFrame of species occurrence points (any species).
+        settlements: Normalized settlements GeoDataFrame as produced by
+                     OSMSettlements.load() — must carry a 'settlement_class' column.
+
+    Returns:
+        GeoDataFrame with two added columns:
+            distance_to_settlement_m : meters to the nearest settlement
+            settlement_class         : the class of that nearest settlement
+
+    Note:
+        Distance is computed in EPSG:3857 (Web Mercator) for metric accuracy,
+        then re-projected back to EPSG:4326 — mirrors add_distance_to_road().
+    """
+    occurrences_projected = occurrences.to_crs(epsg=3857)
+    settlements_projected = settlements.to_crs(epsg=3857)
+
+    joined = gpd.sjoin_nearest(
+        occurrences_projected,
+        settlements_projected[["settlement_class", "geometry"]],
+        how="left",
+        distance_col="distance_to_settlement_m",
+    )
+
+    # Equidistant settlements produce duplicate rows for one occurrence — keep
+    # the first match per original occurrence so the row count is preserved.
+    joined = joined[~joined.index.duplicated(keep="first")]
+    joined = joined.drop(columns="index_right", errors="ignore")
+
+    return joined.to_crs(epsg=4326)

@@ -11,10 +11,16 @@ GeoDataFrame. load_all_threats() combines multiple sources via a config dict.
 
 NORMALIZED SCHEMA:
 ------------------
-    geometry   : LineString (or Polygon) in EPSG:4326
-    source_id  : str — unique identifier per feature
-    road_class : str — one of KNOWN_ROAD_CLASSES
-    region     : str — geographic region label (default "africa")
+Each source produces geometry + source_id + region plus a class column
+specific to the pressure type:
+    OSMRoads       → geometry (LineString), source_id, road_class, region
+    OSMSettlements → geometry (Point),      source_id, settlement_class, region
+
+    geometry         : in EPSG:4326
+    source_id        : str — unique identifier per feature
+    road_class       : str — one of KNOWN_ROAD_CLASSES (roads)
+    settlement_class : str — one of KNOWN_SETTLEMENT_CLASSES (settlements)
+    region           : str — geographic region label (default "africa")
 
 ADDING A NEW THREAT SOURCE TYPE:
 ---------------------------------
@@ -123,11 +129,97 @@ class OSMRoads:
 
 
 # ---------------------------------------------------------------------------
+# OSM place tag → KNOWN_SETTLEMENT_CLASSES mapping
+# ---------------------------------------------------------------------------
+# Maps OSM `place` tag values (from the gis_osm_places layer) to our threat
+# model's settlement classes. national_capital folds into city. Sub-city
+# subdivisions (suburb) and non-settlement place types (locality, farm,
+# island, region, county, ...) are absent from this map and silently dropped
+# during ingestion — including suburb points would double-count within a city.
+
+OSM_PLACE_MAP: dict[str, str] = {
+    "city": "city",
+    "national_capital": "city",
+    "town": "town",
+    "village": "village",
+    "hamlet": "hamlet",
+}
+
+
+# ---------------------------------------------------------------------------
+# OSMSettlements source class
+# ---------------------------------------------------------------------------
+
+
+class OSMSettlements:
+    """
+    Loads settlement points from an OSM-derived GeoPackage or Shapefile.
+
+    Maps the OSM `place` tag to our KNOWN_SETTLEMENT_CLASSES via OSM_PLACE_MAP.
+    Unknown place values are silently dropped — they are not in our threat model.
+    Mirrors OSMRoads for the settlement human-pressure layer (Pressure Type 2).
+
+    Args:
+        filepath : Path to the OSM GeoPackage or Shapefile.
+        bbox     : Optional (min_lon, min_lat, max_lon, max_lat) in WGS84.
+                   Features outside the bbox are dropped after loading.
+        region   : Region label stored in the output schema. Default "africa".
+    """
+
+    def __init__(
+        self,
+        filepath: str,
+        bbox: tuple | None = None,
+        region: str = "africa",
+    ):
+        self.filepath = filepath
+        self.bbox = bbox
+        self.region = region
+
+    def load(self) -> gpd.GeoDataFrame:
+        """
+        Load and normalize OSM settlement data.
+
+        Returns:
+            GeoDataFrame with normalized schema:
+            geometry, source_id, settlement_class, region — all in EPSG:4326.
+        """
+        raw = gpd.read_file(self.filepath)
+
+        if raw.crs is None:
+            raw = raw.set_crs("EPSG:4326")
+        elif raw.crs.to_epsg() != 4326:
+            raw = raw.to_crs(epsg=4326)
+
+        # Map OSM place tag to settlement_class — drop any unknown values
+        raw["settlement_class"] = raw["place"].map(OSM_PLACE_MAP)
+        raw = raw[raw["settlement_class"].notna()].copy()
+
+        if raw.empty:
+            return gpd.GeoDataFrame(
+                columns=["geometry", "source_id", "settlement_class", "region"],
+                geometry="geometry",
+                crs="EPSG:4326",
+            )
+
+        if self.bbox is not None:
+            bbox_polygon = box(*self.bbox)
+            raw = raw[raw.geometry.intersects(bbox_polygon)].copy()
+
+        result = raw[["geometry", "settlement_class"]].copy()
+        result["source_id"] = [f"settlement_{i}" for i in range(len(result))]
+        result["region"] = self.region
+
+        return gpd.GeoDataFrame(result, geometry="geometry", crs="EPSG:4326")
+
+
+# ---------------------------------------------------------------------------
 # Registry and load_all_threats
 # ---------------------------------------------------------------------------
 
 THREAT_SOURCE_REGISTRY: dict[str, type] = {
     "osm_roads": OSMRoads,
+    "osm_settlements": OSMSettlements,
 }
 
 
