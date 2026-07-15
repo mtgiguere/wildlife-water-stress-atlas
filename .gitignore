@@ -79,3 +79,11 @@ test-results/
 
 cache/
 pw_results*.txt
+
+# Subset/dev settlement threat GeoJSON — generated from a PARTIAL Geofabrik fetch
+# (kenya/tanzania/south-africa only) for building & verifying the SETTLEMENTS view.
+# Do NOT ship as deploy data. Before deploy: run the FULL continental fetch
+# (scripts/fetch_road_data.py, all 26 countries) + export_settlement_threats.py,
+# then remove these ignores and commit the regenerated continental files.
+apps/mapbox/data/settlement_threats_gbif_*.geojson
+apps/mapbox/data/settlements_points.geojson
