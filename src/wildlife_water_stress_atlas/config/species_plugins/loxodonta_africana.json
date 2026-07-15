@@ -1,0 +1,51 @@
+{
+  "scientific_name": "Loxodonta africana",
+  "common_name": "African Elephant",
+  "water_threshold_m": 300000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "pan",
+    "permanent_water",
+    "river",
+    "saline_lake",
+    "surface_water",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "river": 1.0,
+    "lake": 1.0,
+    "pan": 0.4,
+    "wetland": 0.7,
+    "floodplain": 0.7,
+    "surface_water": 0.6,
+    "saline_lake": 0.4,
+    "permanent_water": 0.8
+  },
+  "daily_range_m": 50000,
+  "water_dependency": "high",
+  "icon_static_path": "app/static/Creative-Tail-Animal-elephant.svg.png",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png",
+  "road_sensitivity": 0.3,
+  "road_threshold_m": 5000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.15,
+    "path": 0.05
+  },
+  "settlement_sensitivity": 0.5,
+  "settlement_threshold_m": 10000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_loxodonta_africana.gpkg",
+  "emoji": "🐘",
+  "rationale": "African Elephant\nElephants are among the most water-dependent large mammals.\nAdults drink 150–300 litres per day and rarely stray more than\n~50km from water in dry conditions, though tracked individuals\nhave been recorded up to ~180km from permanent water during\nexceptional dry-season movements.\nThe 300km threshold is a conservative upper bound that ensures\nthose extreme cases score at or near 1.0 without capping too\naggressively in normal conditions. This is a placeholder — see\nSection 4 of the project bible for the full gap acknowledgment.\nPans, wetlands, floodplains, and surface_water added here —\nthis is the config change that fixes the phantom thirst bug.\nThese types are now visible to filter_accessible_water() and\nwill be included in the distance calculation once their source\nclasses are loaded in the pipeline.\nPermanent sources weighted at 1.0 — fully reliable year-round.\nSeasonal sources weighted lower — less reliable in dry season.\nThese are heuristic placeholders, honest about being estimates.\nEcological validation from Save the Elephants / IUCN is a future step.\n50km is a commonly cited upper bound for elephant daily range.\nElephants are highly water-dependent — drinking daily is\nnon-negotiable for adults.\nLegacy CDN URL — kept for reference only.\nicon_static_path is used for actual rendering (same-origin, no CORS).\nRoads fragment elephant corridors and — critically — open\npoaching access into formerly remote range. Elephants can\nphysically cross most roads, so sensitivity is moderate, but\nthe effect reaches far given their landscape-scale movement.\nSettlements bring crop-raiding conflict and range compression, but\nelephants are large and can persist in human-adjacent mosaics —\nmoderate sensitivity over a wide conflict footprint."
+}
