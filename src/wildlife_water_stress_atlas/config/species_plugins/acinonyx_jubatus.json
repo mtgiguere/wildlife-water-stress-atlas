@@ -1,0 +1,47 @@
+{
+  "scientific_name": "Acinonyx jubatus",
+  "common_name": "Cheetah",
+  "water_threshold_m": 250000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "permanent_water",
+    "river",
+    "surface_water",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "river": 1.0,
+    "lake": 1.0,
+    "wetland": 0.5,
+    "floodplain": 0.6,
+    "surface_water": 0.5,
+    "permanent_water": 0.9
+  },
+  "daily_range_m": 50000,
+  "water_dependency": "low",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f406.png",
+  "icon_static_path": "app/static/Creative-Tail-Animal-cheetah.svg.png",
+  "road_sensitivity": 0.6,
+  "road_threshold_m": 10000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.15,
+    "path": 0.05
+  },
+  "settlement_sensitivity": 0.6,
+  "settlement_threshold_m": 12000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_acinonyx_jubatus.gpkg",
+  "emoji": "🐆",
+  "rationale": "Cheetah\nCheetahs are the most water-independent of the large African\ncats — they obtain most of their moisture from prey and can\nsurvive without drinking for extended periods. However they\nare not truly water-independent and will drink when water is\navailable. Their distribution is more strongly driven by prey\navailability (which tracks water) than by direct water access.\nThe 250km threshold reflects their large home ranges —\ncheetahs are the most wide-ranging of the African cats with\nmales covering up to 800km² and following prey herds across\nvast distances. A cheetah 250km from water is likely in a\ntruly arid system with very limited prey.\nCheetahs drink from permanent surface water when available\nbut are less dependent than lions. They avoid saline sources\nand rarely use seasonal pans — they get most moisture from prey.\nPermanent sources weighted at 1.0 — fully reliable year-round.\nLower weights overall reflect cheetah's reduced direct water\ndependency compared to other species.\n50km typical daily range — cheetahs are fast and wide-ranging.\nLow water dependency — obtains most moisture from prey.\nVehicle collision is a documented and significant cause of\ncheetah mortality, and their exceptionally large home ranges\nmean roads intersect their movement constantly. Highest road\nsensitivity among the large cats; broad disturbance footprint.\nCheetahs range widely across farmland and are killed as perceived\nlivestock threats; their huge ranges mean settlements intersect them\nconstantly. High sensitivity, broad footprint."
+}

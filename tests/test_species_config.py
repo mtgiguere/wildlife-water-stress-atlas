@@ -1,6 +1,11 @@
 import pytest
 
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG, _validate_species_config
+from wildlife_water_stress_atlas.config.species import (
+    KNOWN_ROAD_CLASSES,
+    KNOWN_SETTLEMENT_CLASSES,
+    SPECIES_CONFIG,
+    _validate_species_config,
+)
 
 # ---------------------------------------------------------------------------
 # Registry structure
@@ -402,3 +407,99 @@ def test_buffalo_water_type_weights_are_correct():
     assert weights["floodplain"] == 0.9
     assert weights["surface_water"] == 0.6
     assert weights["permanent_water"] == 0.9
+
+
+# ---------------------------------------------------------------------------
+# Road & settlement stressor validation — previously an UNVALIDATED gap
+# (see docs/TDD_CONTRACT.md; road/settlement fields were never checked at import)
+# ---------------------------------------------------------------------------
+
+
+def _valid_entry() -> dict:
+    """A complete, valid single-species entry — the base for negative tests so
+    each isolates exactly one bad field regardless of validation check order."""
+    return {
+        "water_threshold_m": 100_000,
+        "accessible_water_types": {"river"},
+        "water_type_weights": {"river": 1.0},
+        "daily_range_m": 50_000,
+        "water_dependency": "high",
+        "icon_url": "https://example.com/icon.png",
+        "icon_static_path": "app/static/fake.png",
+        "gbif_cache_file": "gbif_fake.gpkg",
+        "emoji": "🦁",
+        "road_sensitivity": 0.5,
+        "road_threshold_m": 5_000,
+        "road_class_weights": {c: 0.5 for c in KNOWN_ROAD_CLASSES},
+        "settlement_sensitivity": 0.5,
+        "settlement_threshold_m": 5_000,
+        "settlement_class_weights": {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES},
+    }
+
+
+def test_valid_full_entry_passes_validation():
+    _validate_species_config({"Fake species": _valid_entry()})  # must not raise
+
+
+def test_all_species_have_road_and_settlement_fields():
+    for species, cfg in SPECIES_CONFIG.items():
+        for key in ("road_sensitivity", "road_threshold_m", "road_class_weights", "settlement_sensitivity", "settlement_threshold_m", "settlement_class_weights"):
+            assert key in cfg, f"{species} is missing {key}"
+
+
+def test_missing_road_sensitivity_raises_value_error():
+    entry = _valid_entry()
+    del entry["road_sensitivity"]
+    with pytest.raises(ValueError, match="road_sensitivity"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_road_sensitivity_out_of_range_raises_value_error():
+    with pytest.raises(ValueError, match="road_sensitivity"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "road_sensitivity": 1.5}})
+
+
+def test_road_threshold_not_positive_raises_value_error():
+    with pytest.raises(ValueError, match="road_threshold_m"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "road_threshold_m": 0}})
+
+
+def test_road_class_weights_missing_class_raises_value_error():
+    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
+    weights.pop(next(iter(weights)))  # drop one required class
+    with pytest.raises(ValueError, match="road_class_weights"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})
+
+
+def test_road_class_weight_out_of_range_raises_value_error():
+    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
+    weights[next(iter(weights))] = 2.0
+    with pytest.raises(ValueError, match="road_class_weights"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})
+
+
+def test_road_class_weight_zero_is_allowed():
+    """A 0.0 class weight is valid (e.g. a footpath poses no threat to a frog) —
+    unlike water weights, which must be > 0."""
+    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
+    weights["path"] = 0.0
+    _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})  # must not raise
+
+
+def test_missing_settlement_sensitivity_raises_value_error():
+    entry = _valid_entry()
+    del entry["settlement_sensitivity"]
+    with pytest.raises(ValueError, match="settlement_sensitivity"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_settlement_sensitivity_out_of_range_raises_value_error():
+    with pytest.raises(ValueError, match="settlement_sensitivity"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "settlement_sensitivity": -0.1}})
+
+
+def test_settlement_class_weights_missing_class_raises_value_error():
+    weights = {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES}
+    weights.pop(next(iter(weights)))
+    with pytest.raises(ValueError, match="settlement_class_weights"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "settlement_class_weights": weights}})

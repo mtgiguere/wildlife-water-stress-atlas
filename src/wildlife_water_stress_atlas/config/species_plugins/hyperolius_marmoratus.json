@@ -1,0 +1,47 @@
+{
+  "scientific_name": "Hyperolius marmoratus",
+  "common_name": "Painted Reed Frog",
+  "water_threshold_m": 2000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "permanent_water",
+    "river",
+    "surface_water",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "wetland": 1.0,
+    "floodplain": 0.9,
+    "river": 0.6,
+    "lake": 0.5,
+    "surface_water": 0.8,
+    "permanent_water": 0.7
+  },
+  "daily_range_m": 2000,
+  "water_dependency": "high",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
+  "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
+  "road_sensitivity": 1.0,
+  "road_threshold_m": 2000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.1,
+    "path": 0.0
+  },
+  "settlement_sensitivity": 0.6,
+  "settlement_threshold_m": 3000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_hyperolius_marmoratus.gpkg",
+  "emoji": "🐸",
+  "rationale": "Painted Reed Frog\nPainted reed frogs are among the most water-stress-sensitive\nvertebrates in Africa and serve as a critical early warning\nindicator species for wetland degradation. As amphibians they\nrequire water at every stage of their lifecycle — eggs and\ntadpoles are fully aquatic, adults require high humidity and\nproximity to water for reproduction and skin respiration.\nThey are the \"canary in the coal mine\" for this atlas —\nwhere elephants can survive 300km from water, reed frogs\ncannot survive more than ~2km from a wetland or water body.\nTheir disappearance from a region signals ecosystem collapse\nwell before megafauna are affected.\nThe 2km threshold reflects their extremely limited dispersal\nability — reed frogs are small, slow, and desiccation-prone.\nA reed frog 2km from water in dry season is functionally dead.\nReed frogs require seasonal and permanent wetlands for breeding.\nThey are found in reed beds, marshes, and vegetation adjacent\nto water. Critically they depend on SEASONAL water — they breed\nin response to rainfall and seasonal flooding, making them\nsensitive to changes in seasonal water availability as well\nas permanent water loss.\nWetlands and floodplains weighted highest — reed beds and\nemergent vegetation are essential breeding habitat.\nRivers and lakes used for dispersal corridors between wetlands.\nAll values are heuristic placeholders — amphibian ecological\nvalidation is a future step with herpetology collaborators.\n2km typical dispersal range — reed frogs are extremely\nsedentary compared to megafauna. This tight range means\ngrid cell sizing needs to be much finer for amphibians\nthan for elephants — a future Phase 2 consideration.\nHighest water dependency of any species in the atlas —\namphibians require water for respiration, reproduction,\nand temperature regulation. No water = no reed frogs.\nThe most road-sensitive species in the atlas. Reed frogs are\ntiny, slow, and desiccation-prone; a paved road is both a lethal\ncrossing and a barrier that fragments breeding populations.\nMaximum sensitivity. A footpath (path), by contrast, poses no\nbarrier or mortality risk to a frog — weight 0.0.\nSettlements drive wetland drainage, infilling, and pollution — the\nexact habitat loss reed frogs cannot survive. High sensitivity over\na tight radius (their whole world is a small wetland)."
+}
