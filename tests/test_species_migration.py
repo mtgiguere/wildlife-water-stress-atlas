@@ -13,12 +13,14 @@ regenerate tests/_species_config_snapshot.py in the same commit.
 from tests._species_config_snapshot import SNAPSHOT
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
+_ADDITIVE_KEYS = {"rationale", "realm"}  # new metadata, not pre-migration scoring data
+
 
 def test_registry_data_deep_equals_frozen_snapshot():
     """Every scoring-relevant value is byte-identical to the pre-migration
-    config. `rationale` is new metadata (the ecological reasoning promoted from
-    inline comments to a data field), excluded from the value comparison."""
-    stripped = {name: {k: v for k, v in entry.items() if k != "rationale"} for name, entry in SPECIES_CONFIG.items()}
+    config. `rationale` (ecological reasoning promoted from comments) and `realm`
+    (new classification) are additive metadata, excluded from the comparison."""
+    stripped = {name: {k: v for k, v in entry.items() if k not in _ADDITIVE_KEYS} for name, entry in SPECIES_CONFIG.items()}
     assert stripped == SNAPSHOT
 
 
