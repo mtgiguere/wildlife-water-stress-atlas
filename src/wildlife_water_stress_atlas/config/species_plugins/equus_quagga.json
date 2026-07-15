@@ -1,6 +1,7 @@
 {
   "scientific_name": "Equus quagga",
   "common_name": "Plains Zebra",
+  "realm": "terrestrial",
   "water_threshold_m": 150000,
   "accessible_water_types": [
     "floodplain",

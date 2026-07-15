@@ -1,6 +1,7 @@
 {
   "scientific_name": "Xenopus laevis",
   "common_name": "African Clawed Frog",
+  "realm": "freshwater",
   "water_threshold_m": 5000,
   "accessible_water_types": [
     "lake",

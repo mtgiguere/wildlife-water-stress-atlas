@@ -1,6 +1,7 @@
 {
   "scientific_name": "Hippopotamus amphibius",
   "common_name": "Hippopotamus",
+  "realm": "freshwater",
   "water_threshold_m": 15000,
   "accessible_water_types": [
     "floodplain",

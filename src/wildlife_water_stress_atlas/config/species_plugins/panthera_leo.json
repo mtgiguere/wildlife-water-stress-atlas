@@ -1,6 +1,7 @@
 {
   "scientific_name": "Panthera leo",
   "common_name": "Lion",
+  "realm": "terrestrial",
   "water_threshold_m": 200000,
   "accessible_water_types": [
     "floodplain",
