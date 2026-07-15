@@ -1,6 +1,7 @@
 {
   "scientific_name": "Loxodonta africana",
   "common_name": "African Elephant",
+  "realm": "terrestrial",
   "water_threshold_m": 300000,
   "accessible_water_types": [
     "floodplain",
