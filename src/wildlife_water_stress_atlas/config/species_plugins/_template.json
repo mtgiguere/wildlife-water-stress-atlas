@@ -1,33 +1,47 @@
 {
   "scientific_name": "Genus species",
   "common_name": "Common Name",
+  "realm": "terrestrial",
   "emoji": "🐾",
-  "water_threshold_m": 100000,
-  "accessible_water_types": ["river", "lake"],
-  "water_type_weights": { "river": 1.0, "lake": 0.8 },
   "daily_range_m": 30000,
   "water_dependency": "high",
   "icon_url": "https://example.com/icon.png",
   "icon_static_path": "app/static/your-icon.png",
   "gbif_cache_file": "gbif_genus_species.gpkg",
-  "road_sensitivity": 0.5,
-  "road_threshold_m": 5000,
-  "road_class_weights": {
-    "motorway": 1.0,
-    "trunk": 0.9,
-    "primary": 0.7,
-    "secondary": 0.5,
-    "tertiary": 0.3,
-    "track": 0.15,
-    "path": 0.05
-  },
-  "settlement_sensitivity": 0.5,
-  "settlement_threshold_m": 8000,
-  "settlement_class_weights": {
-    "city": 1.0,
-    "town": 0.7,
-    "village": 0.4,
-    "hamlet": 0.2
-  },
-  "rationale": "A sentence or two on the ecology behind these values, with sources where possible. This shows in the UI and documents your expert judgment."
+  "stressors": [
+    {
+      "stressor_id": "water",
+      "sensitivity": 1.0,
+      "params": {
+        "threshold_m": 100000,
+        "accessible_types": ["river", "lake"],
+        "type_weights": { "river": 1.0, "lake": 0.8 }
+      }
+    },
+    {
+      "stressor_id": "roads",
+      "sensitivity": 0.5,
+      "params": {
+        "threshold_m": 5000,
+        "class_weights": {
+          "motorway": 1.0,
+          "trunk": 0.9,
+          "primary": 0.7,
+          "secondary": 0.5,
+          "tertiary": 0.3,
+          "track": 0.15,
+          "path": 0.05
+        }
+      }
+    },
+    {
+      "stressor_id": "settlements",
+      "sensitivity": 0.5,
+      "params": {
+        "threshold_m": 8000,
+        "class_weights": { "city": 1.0, "town": 0.7, "village": 0.4, "hamlet": 0.2 }
+      }
+    }
+  ],
+  "rationale": "A sentence or two on the ecology behind these values, with sources where possible. Shows in the UI and documents your expert judgment."
 }

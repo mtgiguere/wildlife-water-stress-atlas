@@ -2,49 +2,67 @@
   "scientific_name": "Syncerus caffer",
   "common_name": "Cape Buffalo",
   "realm": "terrestrial",
-  "water_threshold_m": 100000,
-  "accessible_water_types": [
-    "floodplain",
-    "lake",
-    "pan",
-    "permanent_water",
-    "river",
-    "surface_water",
-    "wetland"
-  ],
-  "water_type_weights": {
-    "river": 1.0,
-    "lake": 1.0,
-    "pan": 0.5,
-    "wetland": 0.7,
-    "floodplain": 0.9,
-    "surface_water": 0.6,
-    "permanent_water": 0.9
-  },
   "daily_range_m": 20000,
   "water_dependency": "high",
   "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f403.png",
   "icon_static_path": "app/static/Creative-Tail-Animal-buffalo.svg.png",
-  "road_sensitivity": 0.4,
-  "road_threshold_m": 6000,
-  "road_class_weights": {
-    "motorway": 1.0,
-    "trunk": 0.9,
-    "primary": 0.7,
-    "secondary": 0.5,
-    "tertiary": 0.3,
-    "track": 0.15,
-    "path": 0.05
-  },
-  "settlement_sensitivity": 0.5,
-  "settlement_threshold_m": 8000,
-  "settlement_class_weights": {
-    "city": 1.0,
-    "town": 0.7,
-    "village": 0.4,
-    "hamlet": 0.2
-  },
   "gbif_cache_file": "gbif_syncerus_caffer.gpkg",
   "emoji": "🐃",
+  "stressors": [
+    {
+      "stressor_id": "water",
+      "sensitivity": 1.0,
+      "params": {
+        "threshold_m": 100000,
+        "accessible_types": [
+          "floodplain",
+          "lake",
+          "pan",
+          "permanent_water",
+          "river",
+          "surface_water",
+          "wetland"
+        ],
+        "type_weights": {
+          "river": 1.0,
+          "lake": 1.0,
+          "pan": 0.5,
+          "wetland": 0.7,
+          "floodplain": 0.9,
+          "surface_water": 0.6,
+          "permanent_water": 0.9
+        }
+      }
+    },
+    {
+      "stressor_id": "roads",
+      "sensitivity": 0.4,
+      "params": {
+        "threshold_m": 6000,
+        "class_weights": {
+          "motorway": 1.0,
+          "trunk": 0.9,
+          "primary": 0.7,
+          "secondary": 0.5,
+          "tertiary": 0.3,
+          "track": 0.15,
+          "path": 0.05
+        }
+      }
+    },
+    {
+      "stressor_id": "settlements",
+      "sensitivity": 0.5,
+      "params": {
+        "threshold_m": 8000,
+        "class_weights": {
+          "city": 1.0,
+          "town": 0.7,
+          "village": 0.4,
+          "hamlet": 0.2
+        }
+      }
+    }
+  ],
   "rationale": "African Buffalo (Cape Buffalo)\nAfrican buffalo are highly water-dependent grazers that drink\ndaily and structure their movements tightly around water\navailability. Tracking studies in the Okavango Delta and Ruaha\nNational Park show buffalo contract their home ranges dramatically\nduring the dry season, concentrating near permanent water as\nseasonal sources dry up. They are classic dry-season indicators —\nwhere buffalo congregate, permanent water is present.\nUnlike zebras which migrate long distances tracking rainfall,\nbuffalo tend to hold smaller territories and wait out the dry\nseason near reliable water. Their 95% home ranges vary from\n73–601km² across studies, with larger ranges in wet season when\nthey can range freely from water.\nThe 100km threshold reflects their moderate range — tighter than\nlions (200km) but looser than hippos. A buffalo 100km from water\nin dry season has effectively lost access to its critical resource.\nBuffalo drink from all permanent and seasonal surface water.\nFloodplains are particularly important — buffalo in flood-pulse\necosystems (e.g. Okavango) select seasonally-flooded habitats\nduring the early and late flood seasons for high-quality forage.\nSaline lakes excluded — buffalo require fresh water.\nFloodplains weighted very high (0.9) — buffalo in flood-pulse\necosystems strongly select flooded habitats when available.\nPermanent water weighted high (0.9) — critical dry-season refuge.\nPans moderate (0.5) — used opportunistically but too ephemeral\nto sustain large herds through dry season.\nAll values are heuristic placeholders pending ecological review.\n20km typical dry-season daily range — buffalo move less than\nzebras but more than hippos. Herds of hundreds can cover\nsignificant ground tracking forage near water.\nHigh water dependency — drinks daily, contracts range to\npermanent water in dry season.\nBuffalo move in large herds whose seasonal movements are\nfragmented by roads and associated fencing. Moderate sensitivity,\nbetween the migratory zebra and the more sedentary megafauna.\nBuffalo lose habitat to settlement expansion and are hunted for meat\nnear villages; large herds fare poorly in fragmented human mosaics."
 }

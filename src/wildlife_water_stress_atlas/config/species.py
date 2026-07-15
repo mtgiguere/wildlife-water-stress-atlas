@@ -264,15 +264,61 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         _validate_proximity_stressor(species, cfg, "settlement", KNOWN_SETTLEMENT_CLASSES)
 
 
+# ---------------------------------------------------------------------------
+# Stressors-list bridge (Phase C)
+# ---------------------------------------------------------------------------
+# Plugins now declare a `stressors` list (the source of truth). Legacy consumers
+# (scoring / water_access / threat_scoring / exports) still read the flat keys,
+# so we derive those keys from the list here. This bridge is temporary: it goes
+# away once every consumer reads via the generic engine. Defensive-by-design —
+# it never raises on a malformed stressor; the validator then catches the
+# resulting missing/invalid flat key and the loader skips that plugin.
+
+
+def _flatten_stressors(entry: dict) -> dict:
+    """Derive the legacy flat keys (water_*/road_*/settlement_*) from a species
+    entry's `stressors` list, preserving the list and all other fields."""
+    out = dict(entry)
+    by_id = {s.get("stressor_id"): s for s in entry.get("stressors", []) if isinstance(s, dict)}
+
+    water = by_id.get("water")
+    if water:
+        p = water.get("params", {})
+        if "threshold_m" in p:
+            out["water_threshold_m"] = p["threshold_m"]
+        if "accessible_types" in p:
+            out["accessible_water_types"] = p["accessible_types"]
+        if "type_weights" in p:
+            out["water_type_weights"] = p["type_weights"]
+
+    for stressor_id, prefix in (("roads", "road"), ("settlements", "settlement")):
+        s = by_id.get(stressor_id)
+        if s:
+            p = s.get("params", {})
+            if "sensitivity" in s:
+                out[f"{prefix}_sensitivity"] = s["sensitivity"]
+            if "threshold_m" in p:
+                out[f"{prefix}_threshold_m"] = p["threshold_m"]
+            if "class_weights" in p:
+                out[f"{prefix}_class_weights"] = p["class_weights"]
+
+    return out
+
+
+def _prepare_entry(entry: dict) -> dict:
+    """Loader transform: flatten the stressors list to legacy keys, then coerce
+    accessible_water_types (a JSON array) to the set the pipeline expects."""
+    out = _flatten_stressors(entry)
+    if "accessible_water_types" in out and not isinstance(out["accessible_water_types"], set):
+        out["accessible_water_types"] = set(out["accessible_water_types"])
+    return out
+
+
 # Build the registry from per-species plugin files (JSON) under species_plugins/.
 # Each plugin is validated independently; a malformed one is skipped and logged
 # (see species_loader), not fatal. Adding a species = adding one JSON file.
-#
-# transform: JSON has no set type, so accessible_water_types arrives as a list —
-# coerce it back to a set (the shape the validator and water_access expect).
-# This domain-specific coercion lives here, keeping the loader schema-agnostic.
 SPECIES_CONFIG = load_species_plugins(
     PLUGINS_DIR,
     validate=lambda entry: _validate_species_config({entry["scientific_name"]: entry}),
-    transform=lambda entry: {**entry, "accessible_water_types": set(entry["accessible_water_types"])},
+    transform=_prepare_entry,
 )

@@ -2,45 +2,63 @@
   "scientific_name": "Xenopus laevis",
   "common_name": "African Clawed Frog",
   "realm": "freshwater",
-  "water_threshold_m": 5000,
-  "accessible_water_types": [
-    "lake",
-    "permanent_water",
-    "river",
-    "surface_water",
-    "wetland"
-  ],
-  "water_type_weights": {
-    "lake": 1.0,
-    "river": 0.5,
-    "wetland": 0.8,
-    "surface_water": 0.7,
-    "permanent_water": 1.0
-  },
   "daily_range_m": 5000,
   "water_dependency": "high",
   "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f438.png",
   "icon_static_path": "app/static/Creative-Tail-Animal-frog.svg.png",
-  "road_sensitivity": 0.9,
-  "road_threshold_m": 3000,
-  "road_class_weights": {
-    "motorway": 1.0,
-    "trunk": 0.9,
-    "primary": 0.7,
-    "secondary": 0.5,
-    "tertiary": 0.3,
-    "track": 0.1,
-    "path": 0.0
-  },
-  "settlement_sensitivity": 0.35,
-  "settlement_threshold_m": 3000,
-  "settlement_class_weights": {
-    "city": 1.0,
-    "town": 0.7,
-    "village": 0.4,
-    "hamlet": 0.2
-  },
   "gbif_cache_file": "gbif_xenopus_laevis.gpkg",
   "emoji": "🐸",
+  "stressors": [
+    {
+      "stressor_id": "water",
+      "sensitivity": 1.0,
+      "params": {
+        "threshold_m": 5000,
+        "accessible_types": [
+          "lake",
+          "permanent_water",
+          "river",
+          "surface_water",
+          "wetland"
+        ],
+        "type_weights": {
+          "lake": 1.0,
+          "river": 0.5,
+          "wetland": 0.8,
+          "surface_water": 0.7,
+          "permanent_water": 1.0
+        }
+      }
+    },
+    {
+      "stressor_id": "roads",
+      "sensitivity": 0.9,
+      "params": {
+        "threshold_m": 3000,
+        "class_weights": {
+          "motorway": 1.0,
+          "trunk": 0.9,
+          "primary": 0.7,
+          "secondary": 0.5,
+          "tertiary": 0.3,
+          "track": 0.1,
+          "path": 0.0
+        }
+      }
+    },
+    {
+      "stressor_id": "settlements",
+      "sensitivity": 0.35,
+      "params": {
+        "threshold_m": 3000,
+        "class_weights": {
+          "city": 1.0,
+          "town": 0.7,
+          "village": 0.4,
+          "hamlet": 0.2
+        }
+      }
+    }
+  ],
   "rationale": "African Clawed Frog\nThe African clawed frog is the most scientifically studied\namphibian in the world — it was the first vertebrate cloned\nand has been used in laboratories globally since the 1930s.\nThis gives it an exceptionally large and well-documented GBIF\ndataset, making it an ideal indicator species for the atlas.\nUnlike the painted reed frog which lives IN vegetation adjacent\nto water, Xenopus laevis is fully aquatic — it spends its entire\nlife in water, only leaving during drought to aestivate in mud\nor disperse to new water bodies. It is a permanent water obligate\nin the truest sense.\nThe 5km threshold reflects its limited overland dispersal ability\nduring drought-driven migration. A Xenopus more than 5km from\npermanent water during dry season is in severe stress — it will\ndesiccate rapidly without water for skin respiration.\nNOTE: Xenopus laevis is also an invasive species outside Africa —\nGBIF records include European and American populations from\nescaped laboratory specimens. These are intentionally preserved\nin the dataset — they are a data quality story, not noise.\nThe Prescribe layer will flag non-African records as low-confidence.\nXenopus is fully aquatic — it requires permanent standing water.\nUnlike reed frogs it does not use seasonal floodplains for\nbreeding — it needs year-round water bodies deep enough to\nremain after seasonal drying. Highly tolerant of turbid,\nlow-oxygen water but not saline sources.\nPermanent deep water bodies weighted highest — Xenopus needs\nwater that persists through the dry season. Rivers weighted\nlower than lakes — Xenopus prefers still or slow-moving water.\nAll values are heuristic placeholders pending herpetology review.\n5km overland dispersal range during drought aestivation.\nIn water Xenopus can travel much further but overland movement\nis slow and dangerous — desiccation risk limits dispersal.\nHighest water dependency — fully aquatic obligate.\nCannot survive outside water except during brief drought\ndispersal events.\nFully aquatic, but disperses overland during drought — where road\ncrossings become lethal. High amphibian sensitivity, just below\nthe reed frog. A footpath is no barrier — path weight 0.0.\nUnlike the reed frog, Xenopus is a human-TOLERANT generalist — it\nthrives in farm dams, irrigation ponds, and urban water bodies, and\nis invasive precisely because of this. So settlement sensitivity is\nLOW despite being an amphibian: settlements often ADD habitat for it."
 }
