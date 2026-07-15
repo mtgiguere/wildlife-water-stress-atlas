@@ -1,7 +1,6 @@
 {
   "scientific_name": "Acinonyx jubatus",
   "common_name": "Cheetah",
-  "realm": "terrestrial",
   "water_threshold_m": 250000,
   "accessible_water_types": [
     "floodplain",

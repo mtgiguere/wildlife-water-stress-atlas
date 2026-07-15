@@ -90,7 +90,6 @@ settlement_class_weights: dict[str, float]
     placeholders pending ecological validation.
 """
 
-from enum import Enum
 from pathlib import Path
 
 from wildlife_water_stress_atlas.config.species_loader import load_species_plugins
@@ -128,21 +127,6 @@ KNOWN_SETTLEMENT_CLASSES: set[str] = {
     "village",
     "hamlet",
 }
-
-
-# ---------------------------------------------------------------------------
-# Realm — ecological classification
-# ---------------------------------------------------------------------------
-# Groups species (UI) and — once the generic stressor system lands — gates which
-# stressor types a species must supply (a marine species needn't declare road or
-# settlement stressors). Unlocks marine/aquatic species without a redesign.
-class Realm(Enum):
-    TERRESTRIAL = "terrestrial"
-    FRESHWATER = "freshwater"
-    MARINE = "marine"
-
-
-VALID_REALMS: set[str] = {r.value for r in Realm}
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +236,6 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         # emoji must be a string — used in UI labels and chart headers.
         if not isinstance(cfg["emoji"], str):
             raise ValueError(f"{species}: emoji must be a string")
-
-        # realm — ecological classification (gates stressor applicability in
-        # future; groups species in the UI).
-        if cfg.get("realm") not in VALID_REALMS:
-            raise ValueError(f"{species}: realm must be one of {VALID_REALMS}, got {cfg.get('realm')!r}")
 
         # Human-pressure stressor fields (road, settlement) — previously
         # unvalidated. Both share the sensitivity/threshold/class_weights shape.

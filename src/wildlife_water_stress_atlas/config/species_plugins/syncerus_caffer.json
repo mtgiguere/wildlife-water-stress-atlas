@@ -1,7 +1,6 @@
 {
   "scientific_name": "Syncerus caffer",
   "common_name": "Cape Buffalo",
-  "realm": "terrestrial",
   "water_threshold_m": 100000,
   "accessible_water_types": [
     "floodplain",

@@ -1,7 +1,6 @@
 {
   "scientific_name": "Giraffa camelopardalis",
   "common_name": "Giraffe",
-  "realm": "terrestrial",
   "water_threshold_m": 80000,
   "accessible_water_types": [
     "floodplain",

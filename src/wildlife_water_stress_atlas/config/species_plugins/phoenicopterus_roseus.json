@@ -1,7 +1,6 @@
 {
   "scientific_name": "Phoenicopterus roseus",
   "common_name": "Greater Flamingo",
-  "realm": "freshwater",
   "water_threshold_m": 50000,
   "accessible_water_types": [
     "lake",

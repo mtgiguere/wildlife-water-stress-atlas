@@ -20,12 +20,9 @@
   actions/setup-python v6, @playwright/test 1.61.1, @types/node 26.1.1). Safe to
   merge; run the two Playwright suites after the playwright bump (a visual test
   imports `playwright-core/lib/utilsBundle`).
-- **Architecture v2 (extensible):** **Phase A DONE** (species are JSON plugins,
-  committed + pushed on `feat/species-plugins`). **Phase B CORE DONE** (generic
-  kind-aware scoring engine, reproduces today's scores — on branch
-  `feat/stressor-plugins`, uncommitted). Next is **Phase C** (genericize
-  export/frontend; realm gating + consumer migration land there). Design decided
-  and locked (do not re-litigate): stressor **kinds**
+- **Architecture v2 (extensible):** **Phase A DONE** (species are plugins);
+  next is **Phase B**. On branch `feat/species-plugins` (uncommitted at time of
+  writing). Design decided and locked (do not re-litigate): stressor **kinds**
   (hazard/resource/ambient); **noisy-OR** aggregation `1−∏(1−sᵢ)` as the single
   house formula; scores carry **coverage** (no-data ≠ no-stress). Rationale in
   `docs/ARCHITECTURE.md`.
@@ -58,35 +55,30 @@ Kept the registry OUTPUT shape identical so scoring/export/frontend didn't chang
       snapshot (`test_species_migration.py` + `tests/_species_config_snapshot.py`)
 - [ ] `SpeciesConfig` dataclass + `Realm` enum → **moved to Phase B** (see note above)
 
-## Phase B — Stressors become plugins + generic scoring engine  ✅ CORE DONE
+## Phase B — Stressors become plugins + generic scoring engine
 
-Goal: stressor types are kind-aware; the engine aggregates a species' stressors.
-Built ADDITIVELY — the engine reads the existing flat config via a builder and
-reproduces today's scores; the legacy pipeline (scoring/threat_scoring) is
-untouched. All in `analytics/stressors.py` + `analytics/stress_engine.py`.
+Goal: stressor types are plugins; the engine is kind-aware; species reference
+stressors + expert params. **This is the real scoring-layer rewrite.**
 
-- [x] `StressorKind` enum (hazard / resource / ambient)
-- [x] Reference stressor types: `HazardStressor`, `ResourceStressor`,
-      `AmbientStressor` (each owns its kind's math; `score()→Score`)
-- [x] `Measurement` abstraction (`FeatureProximity` / `FieldSample`)
-- [x] `StressorConfig` (sensitivity, params, `source`, `validated`)
-- [x] `Score(value, covered)` + `aggregate_stress` = noisy-OR over covered
-      (cumulative, no-data honest) (`test_stress_aggregation.py`, 12)
-- [x] Generic engine `score_species_stress(species, measurements)` →
-      per-stressor breakdown + noisy-OR aggregate + coverage (`stress_engine.py`)
-- [x] **Engine is QUERY-shaped** (per species×location), not batch `export_all()`
-- [x] `Realm` enum + `realm` on all 11 plugins + validated (`species.py`)
-- [x] **GOLDEN**: engine reproduces road/settlement/water scores EXACTLY for all
-      11 species × every class (`test_stress_engine.py`, 148 tests)
-- [x] Per-kind behavior tests (hazard decays, resource inverts, ambient ignores
-      distance) (`test_stressor_types.py`, 43)
-
-Deferred to Phase C (need the generic path to be the consumer first):
-- [ ] `realm` GATING of required stressors — needs the plugin config to move from
-      flat fields to a `stressors` list (a marine species then omits road fields).
-      Realm is added + validated now; gating lands with that restructure.
-- [ ] Migrate consumers (export scripts, frontend) onto the engine, then retire
-      the flat fields / legacy scoring functions.
+- [ ] `StressorKind` enum (hazard / resource / ambient)
+- [ ] `StressorType` protocol/plugin (`stressor_id`, `name`, `kind`,
+      `class_keys`, `score()→Score(value,coverage)`, `validate()`)
+- [ ] `Measurement` abstraction (FeatureProximity / FieldSample; series-capable)
+- [ ] `StressorConfig` (sensitivity, type-validated params, `source`, `validated`)
+- [ ] Refactor water (RESOURCE) and roads+settlements (HAZARD) into reference
+      stressor-type plugins
+- [ ] Generic scoring engine: iterate `cfg.stressors` → look up type → score →
+      aggregate via noisy-OR → carry coverage
+- [ ] **Engine interface is QUERY-shaped** — `score(species, region/tile, year)`,
+      NOT a batch `export_all()`. The one scale-critical decision (ARCHITECTURE
+      §10): keeps precompute-to-static and compute-on-demand a seam-3 swap, not a
+      rewrite. A thin batch driver calls it to bake tiles today.
+- [ ] `realm` gating in validation (marine species not required to supply
+      terrestrial stressors)
+- [ ] **GOLDEN regression test**: the generic engine reproduces today's EXACT
+      road/settlement/water scores for all 11 species (the safety net)
+- [ ] RED-first per-kind behavior tests (hazard decays with distance; resource
+      inverts; ambient ignores distance entirely)
 
 ## Phase C — Genericize export + frontend
 

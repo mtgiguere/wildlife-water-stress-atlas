@@ -1,7 +1,6 @@
 {
   "scientific_name": "Hyperolius marmoratus",
   "common_name": "Painted Reed Frog",
-  "realm": "freshwater",
   "water_threshold_m": 2000,
   "accessible_water_types": [
     "floodplain",

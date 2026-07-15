@@ -434,35 +434,11 @@ def _valid_entry() -> dict:
         "settlement_sensitivity": 0.5,
         "settlement_threshold_m": 5_000,
         "settlement_class_weights": {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES},
-        "realm": "terrestrial",
     }
 
 
 def test_valid_full_entry_passes_validation():
     _validate_species_config({"Fake species": _valid_entry()})  # must not raise
-
-
-# ---------------------------------------------------------------------------
-# Realm — species classification that (in future) gates which stressors apply
-# ---------------------------------------------------------------------------
-
-
-def test_all_species_have_a_valid_realm():
-    valid = {"terrestrial", "freshwater", "marine"}
-    for species, cfg in SPECIES_CONFIG.items():
-        assert cfg.get("realm") in valid, f"{species}: realm must be one of {valid}, got {cfg.get('realm')!r}"
-
-
-def test_missing_realm_raises_value_error():
-    entry = _valid_entry()
-    del entry["realm"]
-    with pytest.raises(ValueError, match="realm"):
-        _validate_species_config({"Fake species": entry})
-
-
-def test_invalid_realm_raises_value_error():
-    with pytest.raises(ValueError, match="realm"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "realm": "atmospheric"}})
 
 
 def test_all_species_have_road_and_settlement_fields():

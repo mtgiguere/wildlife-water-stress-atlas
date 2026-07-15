@@ -1,7 +1,6 @@
 {
   "scientific_name": "Crocodylus niloticus",
   "common_name": "Nile Crocodile",
-  "realm": "freshwater",
   "water_threshold_m": 10000,
   "accessible_water_types": [
     "floodplain",
