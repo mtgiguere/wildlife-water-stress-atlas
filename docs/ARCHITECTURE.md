@@ -190,7 +190,50 @@ Decided refinements:
   the Global Freshwater Intelligence stack, so not a new stack to learn.
   **Last phase**, and **gated on the plugin-submission-flow decision** (§11).
 
-## 10. Non-goals (this era)
+## 10. Scale & data growth
+
+The data *will* eventually get too large for the current "bake everything into
+static files" approach. **This does not require a different architecture** — the
+seams in §3 are the standard answer to geospatial scale. It requires getting
+*one interface shape* right now and *not* building scale infra prematurely.
+
+**Where "too large" actually hits — three distinct places:**
+
+1. **Occurrence data shipped to the browser** (GBIF points × many species ×
+   decades). Breaks first — a repo/host can't hold GBs and a browser can't parse
+   a huge GeoJSON. Covered by **PMTiles delivery (Phase F)**: the map fetches
+   only the tiles for the current view/zoom.
+2. **Stressor *input* data** (roads are already ~346 MB; add climate rasters,
+   marine layers). Never shipped to the browser — inputs to the compute layer,
+   stored in object storage / PostGIS and queried. Covered by **seam 3**.
+3. **Computed *output*** — the real combinatorial growth, and a byproduct of
+   *our own* design: `species × stressors × years × grid-cells` (× global, once
+   marine lands). This is what grows without bound.
+
+**The one decision to get right now (Phase B) — the scoring engine is
+*query-shaped*, not *batch-shaped*:**
+
+- ❌ `export_all_stress()` — "score everything up front, write static files."
+  Bakes in precompute-the-whole-world. (This is what the prototype does today.)
+- ✅ `score(species, region_or_tile, year) → stress surface` — the engine answers
+  a *bounded* question.
+
+The query shape makes the eventual scale move a **seam-3 swap, not a rewrite**:
+the *same* engine function is driven by a thin batch loop that bakes PMTiles
+today, and can run in AWS Lambda answering on-demand (compute only the tiles
+someone looks at) later. Costs nothing now — it's just the function signature.
+
+**Bonus already baked in:** because aggregation is noisy-OR *per location* (§6)
+and we keep the per-stressor breakdown, per-stressor scores can be tiled and
+**combined on read** — so we never precompute every aggregation/scenario
+combination, and "toggle a stressor, recompute live" stays cheap.
+
+**Explicit JIT boundary — do NOT build these until there is real volume:** no
+tile/DB tech choice, no materialization/caching layer, no sharding, no premature
+PostGIS. None of it is blocked by Phase A or B as long as the engine interface
+is query-shaped.
+
+## 11. Non-goals (this era)
 
 - Do **not** source/wire real poaching-incident or disease-prevalence data —
   both largely non-public; out of scope until a conservation-org data partner.
@@ -200,7 +243,7 @@ Decided refinements:
   target authoring UX is "an ecologist copies a template file and fills in
   values," not "a form generates the file."
 
-## 11. Open questions (resolve when reached — do NOT guess)
+## 12. Open questions (resolve when reached — do NOT guess)
 
 - **Plugin submission flow:** how a new species/stressor file gets from
   "written" to "validated, running, live." GitHub PR + CI validation? A backend

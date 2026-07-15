@@ -59,6 +59,10 @@ stressors + expert params. **This is the real scoring-layer rewrite.**
       stressor-type plugins
 - [ ] Generic scoring engine: iterate `cfg.stressors` → look up type → score →
       aggregate via noisy-OR → carry coverage
+- [ ] **Engine interface is QUERY-shaped** — `score(species, region/tile, year)`,
+      NOT a batch `export_all()`. The one scale-critical decision (ARCHITECTURE
+      §10): keeps precompute-to-static and compute-on-demand a seam-3 swap, not a
+      rewrite. A thin batch driver calls it to bake tiles today.
 - [ ] `realm` gating in validation (marine species not required to supply
       terrestrial stressors)
 - [ ] **GOLDEN regression test**: the generic engine reproduces today's EXACT
