@@ -1,0 +1,45 @@
+{
+  "scientific_name": "Crocodylus niloticus",
+  "common_name": "Nile Crocodile",
+  "water_threshold_m": 10000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "permanent_water",
+    "river",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "river": 1.0,
+    "lake": 1.0,
+    "wetland": 0.9,
+    "floodplain": 0.7,
+    "permanent_water": 1.0
+  },
+  "daily_range_m": 5000,
+  "water_dependency": "high",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f40a.png",
+  "icon_static_path": "app/static/Creative-Tail-Animal-crocodile.svg.png",
+  "road_sensitivity": 0.3,
+  "road_threshold_m": 2000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.15,
+    "path": 0.05
+  },
+  "settlement_sensitivity": 0.3,
+  "settlement_threshold_m": 3000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_crocodylus_niloticus.gpkg",
+  "emoji": "🐊",
+  "rationale": "Nile Crocodile\nNile crocodiles are permanent water obligates — they cannot\nsurvive without direct access to water and spend the majority\nof their lives in or immediately adjacent to rivers, lakes,\nand wetlands. They are ectothermic and depend on water for\nthermoregulation as well as hunting.\nThe 10km threshold is extremely tight — a crocodile more than\n10km from permanent water is almost certainly dead or displaced\nby catastrophic drought. They are the ultimate indicator species\nfor permanent surface water presence. If crocs are gone from a\nriver system, the river is effectively gone.\nCrocodiles require permanent surface water exclusively.\nThey do not use seasonal pans or ephemeral water — they need\nyear-round access for thermoregulation, nesting, and hunting.\nSaline lakes excluded — Nile crocodiles are freshwater obligates.\nAll sources weighted very high — crocodiles are so water-dependent\nthat any accessible water source is critical. Floodplains slightly\nlower — seasonal inundation means temporary habitat only.\n5km typical daily range — crocodiles are ambush predators,\nnot long-distance movers. They rarely stray far from water.\nHighest possible water dependency — permanent water obligate.\nCrocodiles are aquatic and rarely range overland, so roads\nthreaten them mainly where they cross rivers (bridges, bank\ndisturbance). Low sensitivity with a tight effect distance.\nCrocodiles persist near people but face targeted killing and nest\ndisturbance where settlements meet water. Low sensitivity, tight\nfootprint (the conflict is at the water's edge)."
+}

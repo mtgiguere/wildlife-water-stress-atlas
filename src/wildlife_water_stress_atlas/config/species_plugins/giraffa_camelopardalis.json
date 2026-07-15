@@ -1,0 +1,47 @@
+{
+  "scientific_name": "Giraffa camelopardalis",
+  "common_name": "Giraffe",
+  "water_threshold_m": 80000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "permanent_water",
+    "river",
+    "surface_water",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "river": 1.0,
+    "lake": 1.0,
+    "wetland": 0.6,
+    "floodplain": 0.7,
+    "surface_water": 0.6,
+    "permanent_water": 0.9
+  },
+  "daily_range_m": 15000,
+  "water_dependency": "moderate",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f992.png",
+  "icon_static_path": "app/static/Creative-Tail-Animal-giraffe.svg.png",
+  "road_sensitivity": 0.3,
+  "road_threshold_m": 5000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.15,
+    "path": 0.05
+  },
+  "settlement_sensitivity": 0.4,
+  "settlement_threshold_m": 8000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_giraffa_camelopardalis.gpkg",
+  "emoji": "🦒",
+  "rationale": "Giraffe\nGiraffes are surprisingly vulnerable to water stress despite\ntheir reputation as drought-tolerant browsers. Adults must\nsplay or bend awkwardly to drink, making them highly vulnerable\nto predation at water points — they avoid drinking unless\nnecessary, but still require water every 2-3 days in dry season.\nThe 80km threshold reflects their moderate range — giraffes\ncan cover ~15km/day but rarely venture far from permanent water\nin the dry season. They cannot tolerate brackish or saline water.\nGiraffes prefer permanent surface water — rivers and lakes.\nThey will use wetlands and floodplains opportunistically but\navoid saline sources entirely. No pan usage — their drinking\nposture makes shallow ephemeral pans impractical.\nPermanent sources weighted at 1.0 — fully reliable year-round.\nWetlands and floodplains lower — seasonal availability and\npredation risk at dense vegetation makes them less reliable.\n15km typical daily range — giraffes are not long-distance movers.\nModerate water dependency — can extract moisture from browsing\nbut still requires surface water regularly.\nGiraffes cross roads but are vulnerable to vehicle collision\ngiven their size and slow acceleration. Moderate-low sensitivity,\ncomparable to elephants.\nGiraffes tolerate some human presence but lose browse habitat to\nsettlement expansion and face snaring pressure near villages."
+}

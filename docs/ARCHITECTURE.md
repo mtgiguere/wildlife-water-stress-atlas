@@ -75,6 +75,13 @@ generic stressor system needs **kinds**: the stressor *type* owns its own math,
 and the **species-facing contract bakes in no distance/decay assumption**, so
 ambient and future kinds fit with no redesign.
 
+> **Plugin file format: JSON** (decided during Phase A). Plugins are inert data,
+> not executable Python — safe to accept from contributors, machine-generatable
+> by a future submission form, and portable across the Python pipeline, the JS
+> frontend, and a future backend/DB. The dataclasses below are the in-memory
+> shapes the loader builds *from* that JSON; a `rationale` field carries the
+> expert's ecological reasoning (surfaced in the UI).
+
 ## 5. The contract (target shapes)
 
 ```python

@@ -1,0 +1,45 @@
+{
+  "scientific_name": "Hippopotamus amphibius",
+  "common_name": "Hippopotamus",
+  "water_threshold_m": 15000,
+  "accessible_water_types": [
+    "floodplain",
+    "lake",
+    "permanent_water",
+    "river",
+    "wetland"
+  ],
+  "water_type_weights": {
+    "river": 1.0,
+    "lake": 1.0,
+    "wetland": 0.8,
+    "floodplain": 0.9,
+    "permanent_water": 1.0
+  },
+  "daily_range_m": 3000,
+  "water_dependency": "high",
+  "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f99b.png",
+  "icon_static_path": "app/static/Creative-Tail-Animal-hippo.svg.png",
+  "road_sensitivity": 0.5,
+  "road_threshold_m": 5000,
+  "road_class_weights": {
+    "motorway": 1.0,
+    "trunk": 0.9,
+    "primary": 0.7,
+    "secondary": 0.5,
+    "tertiary": 0.3,
+    "track": 0.15,
+    "path": 0.05
+  },
+  "settlement_sensitivity": 0.5,
+  "settlement_threshold_m": 6000,
+  "settlement_class_weights": {
+    "city": 1.0,
+    "town": 0.7,
+    "village": 0.4,
+    "hamlet": 0.2
+  },
+  "gbif_cache_file": "gbif_hippopotamus_amphibius.gpkg",
+  "emoji": "🦛",
+  "rationale": "Common Hippopotamus\nHippos are among the most water-dependent large mammals on Earth —\narguably more so than even elephants. Their unique skin lacks sweat\nglands and desiccates rapidly when exposed to direct sunlight;\nregular immersion in water is essential for thermoregulation.\nThey also have unusually high faecal water loss, making continuous\naccess to water a physiological necessity, not just a preference.\nPublished tracking studies show hippos seldom move more than 3km\nfrom water under normal conditions, emerging only at night to graze\non grass within a few kilometres of their daytime pools. During\nsevere drought, sub-adult males have been tracked making dispersal\nmovements of ~15km upstream to find alternative pools — this\ndefines the upper bound for our threshold.\nThe 15km threshold is tight but ecologically grounded: a hippo\nmore than 15km from permanent water is almost certainly dead,\ndisplaced by catastrophic drought, or a very rare dispersal event.\nThis makes hippos a near-crocodile-tier permanent water indicator.\nHippos require deep permanent water for daytime refuge — rivers\nand lakes are primary. Floodplains are critical secondary habitat\nfor nocturnal grazing and wet-season wallowing. Wetlands used\nfor wallowing and as dispersal corridors between river pools.\nSaline lakes excluded — hippos are freshwater obligates.\nPans excluded — too shallow for thermoregulatory immersion.\nRivers and permanent water weighted at 1.0 — hippos' primary\ndaytime refuge. Floodplains high (0.9) — essential grazing habitat\nand wet-season habitat. Wetlands moderate (0.8) — used for\nwallowing and dispersal but less reliable than rivers.\nAll values are heuristic placeholders pending validation.\n3km typical nightly grazing range from water — hippos are not\nlong-distance movers. During drought dispersal, sub-adult males\nmay cover ~15km but this is exceptional.\nHighest water dependency — permanent water obligate for\nthermoregulation, not just drinking.\nHippos leave water at night to graze and follow established\ntrails — roads crossing these paths cause collision mortality.\nModerate sensitivity over a modest distance from water.\nHuman-hippo conflict is severe where settlements meet water — hippos\nraid crops at night and are among Africa's most dangerous animals to\npeople, drawing retaliatory killing. Moderate sensitivity near water."
+}

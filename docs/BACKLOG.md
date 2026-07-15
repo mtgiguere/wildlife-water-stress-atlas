@@ -20,30 +20,40 @@
   actions/setup-python v6, @playwright/test 1.61.1, @types/node 26.1.1). Safe to
   merge; run the two Playwright suites after the playwright bump (a visual test
   imports `playwright-core/lib/utilsBundle`).
-- **Architecture v2 (extensible):** **DESIGN AGREED, BUILD NOT STARTED.**
-  ⇒ next work begins at **Phase A** below. Design decided and locked (do not
-  re-litigate): stressor **kinds** (hazard/resource/ambient); **noisy-OR**
-  aggregation `1−∏(1−sᵢ)` as the single house formula; scores carry
-  **coverage** (no-data ≠ no-stress). Rationale in `docs/ARCHITECTURE.md`.
+- **Architecture v2 (extensible):** **Phase A DONE** (species are plugins);
+  next is **Phase B**. On branch `feat/species-plugins` (uncommitted at time of
+  writing). Design decided and locked (do not re-litigate): stressor **kinds**
+  (hazard/resource/ambient); **noisy-OR** aggregation `1−∏(1−sᵢ)` as the single
+  house formula; scores carry **coverage** (no-data ≠ no-stress). Rationale in
+  `docs/ARCHITECTURE.md`.
+  - JIT deviation from the original Phase-A plan: the `SpeciesConfig` **dataclass
+    + `realm`** were deferred to **Phase B**, where the stressor restructure
+    finalizes their shape (writing them in A then rewriting in B = wasted churn).
+    Phase A stayed a pure, golden-verified structural refactor.
 
 ---
 
-## Phase A — Species become plugins  *(foundation — start here)*
+## Phase A — Species become plugins  ✅ DONE
 
 Goal: one file per species; dynamic discovery; adding a species = adding a file.
-Lowest-risk, highest-leverage; keeps the registry OUTPUT shape identical so
-scoring/export/frontend don't change yet.
+Kept the registry OUTPUT shape identical so scoring/export/frontend didn't change.
 
-- [ ] `SpeciesConfig` dataclass + `Realm` enum
-- [ ] Loader in `config/species/__init__.py`: discover plugins, validate each
-      independently, **skip + log** a malformed one (don't crash the app), build
-      the existing `SPECIES_CONFIG`-shaped registry
-- [ ] `plugins/_template.py` with every field documented for a non-maintainer
-- [ ] Migrate all 11 existing species into plugin files
-- [ ] Close today's validation gap (road/settlement fields are currently
-      **unvalidated** at import)
-- [ ] RED-first tests: unknown/malformed plugin skipped-not-crashed; registry
-      shape identical to today; "add a file" works with no other edits
+- [x] Loader `config/species_loader.py`: discover `species_plugins/*.json`, key by
+      `scientific_name`, validate each independently, **skip + log** a malformed
+      one (don't crash), reject duplicate names, `transform` hook for coercion.
+      (`test_species_loader.py`, 12 tests)
+- [x] Plugins are **JSON, not Python** — inert data (safe from contributors),
+      machine-generatable (future submission form), portable (frontend/DB/API).
+      Ecological rationale promoted from code comments to a `rationale` data field.
+- [x] `species_plugins/_template.json` + `README.md` field docs for a non-maintainer
+- [x] Migrated all 11 species into `species_plugins/*.json` (rationale preserved)
+- [x] Wired `config/species.py` to build `SPECIES_CONFIG` via the loader
+      (1021 → 251 lines); public import surface unchanged
+- [x] Closed the validation gap: road/settlement fields now validated
+      (`_validate_proximity_stressor`); `test_species_config.py` extended
+- [x] Golden regression test: loaded registry deep-equals a frozen pre-migration
+      snapshot (`test_species_migration.py` + `tests/_species_config_snapshot.py`)
+- [ ] `SpeciesConfig` dataclass + `Realm` enum → **moved to Phase B** (see note above)
 
 ## Phase B — Stressors become plugins + generic scoring engine
 
