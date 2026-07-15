@@ -1,3 +1,13 @@
+> **⭐ Going forward, the project is being re-architected for extensibility.**
+> This bible documents the Phase-1 prototype (current state + history). For the
+> **target design** read [`ARCHITECTURE.md`](ARCHITECTURE.md); for **phased work
+> + current status** read [`BACKLOG.md`](BACKLOG.md). Where this bible and
+> ARCHITECTURE.md disagree, ARCHITECTURE.md wins (it reflects a corrected
+> understanding of the code — e.g. water is a *resource* stressor, not the same
+> shape as roads/settlements).
+
+---
+
 Source classes:
 - `ShapefileRivers` — Natural Earth rivers (line geometries)
 - `ShapefileLakes` — Natural Earth lakes (polygon geometries) — RETIRED, replaced by GLWD class 1

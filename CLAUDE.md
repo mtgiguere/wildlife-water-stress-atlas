@@ -2,12 +2,26 @@
 
 ## What This Project Is
 
-A geospatial decision-support platform mapping freshwater access stress for 9 African species (elephants, zebras, giraffes, lions, cheetahs, crocodiles, flamingos, frogs). Computes distance from GBIF occurrence records to nearest accessible water, scored against species-specific thresholds.
+A geospatial decision-support platform mapping environmental stress for 11 African species (elephant, zebra, giraffe, lion, cheetah, crocodile, flamingo, painted reed frog, clawed frog, hippo, buffalo). Computes distance from GBIF occurrence records to nearest accessible water (and to roads/settlements) scored against species-specific thresholds.
 
 **Three-phase roadmap:**
 - Phase 1 — Describe (current water stress) ✅ working
 - Phase 2 — Predict (climate modeling) 🔲 planned
 - Phase 3 — Prescribe (conservation interventions) 🔲 planned
+
+---
+
+## ⭐ Direction: v2 Extensible Architecture (design agreed 2026-07-15, build not started)
+
+The project is being re-architected from this fixed prototype into an
+**extensible wildlife stress atlas**: ecologists add **species AND stressor
+types** as plugin files (incl. **marine** realms), stressors aggregate into one
+comparable stress score per animal, and the compute layer is designed to move to
+AWS later behind a stable seam. End goal: hand it to a conservation org (TNC/WWF).
+
+- **Target design → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — read before touching `config/species.py`, `analytics/scoring.py`, or any threat/stressor module.
+- **Phased work + current status → [`docs/BACKLOG.md`](docs/BACKLOG.md)** — next work starts at **Phase A (species-as-plugins)**.
+- **Decided & locked (do not re-litigate; see ARCHITECTURE.md for why):** stressor **kinds** — hazard / resource / ambient (water is a RESOURCE, inverted from roads/settlements; ambient = climate/pollution with no distance); aggregation = **noisy-OR** `1−∏(1−sᵢ)` (one house formula for comparability; experts set per-stressor weights); scores carry **coverage** so no-data ≠ no-stress.
 
 ---
 
