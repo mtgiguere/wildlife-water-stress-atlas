@@ -520,21 +520,7 @@ def test_fetch_all_road_data_does_nothing_when_all_countries_fail(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_main_calls_fetch_with_correct_default_output():
-    from scripts.fetch_road_data import DEFAULT_OUTPUT_PATH, main
-
-    with patch("scripts.fetch_road_data.fetch_all_road_data") as mock_fetch:
-        main()
-        mock_fetch.assert_called_once()
-        assert mock_fetch.call_args.kwargs["output_path"] == DEFAULT_OUTPUT_PATH
-
-
-def test_main_uses_target_countries_by_default():
-    from scripts.fetch_road_data import TARGET_COUNTRIES, main
-
-    with patch("scripts.fetch_road_data.fetch_all_road_data") as mock_fetch:
-        main()
-        # main() must pass the full TARGET_COUNTRIES list through to the fetch.
-        assert mock_fetch.call_args.kwargs["countries"] == TARGET_COUNTRIES
-        # sanity: that list covers key East/Southern African nations
-        assert {"kenya", "south-africa", "tanzania"}.issubset(TARGET_COUNTRIES)
+# NOTE: main() now drives the combined single-download fetch (fetch_all_osm_data,
+# writing both roads and settlements). Its contract is tested in
+# test_fetch_osm_data.py. fetch_all_road_data remains as a roads-only building
+# block and is covered by the tests above.

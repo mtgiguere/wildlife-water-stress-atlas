@@ -281,10 +281,10 @@ Caching implemented. `@st.cache_data` working.
 The POINTS view colors each occurrence by `stress_level` (green/yellow/red) from `stress_scores_gbif_*.geojson`. The namesake feature is live.
 
 ### Road Threat / Human Pressure Layer — DONE ✅
-Roadmap item #7 (Pressure Type 2, roads). Full pipeline: `ingest/threats.py`, `analytics/threat_scoring.py`, `scripts/fetch_road_data.py` + `export_road_threats.py`, and the ⚠ ROADS view in the Mapbox app. Fences/settlements remain future work.
+Roadmap item #7 (Pressure Type 2). Roads AND settlements are DONE ✅ — full parallel pipelines: `ingest/threats.py` (`OSMRoads` + `OSMSettlements`), `analytics/threat_scoring.py` (`road_threat_score` + `settlement_threat_score`), overlap/apply, `scripts/fetch_road_data.py` (one download pass extracts both) + `export_road_threats.py` / `export_settlement_threats.py`, and the ⚠ ROADS and 🏘 SETTLEMENTS views in the Mapbox app. Settlements is a separate view for now; future work composes pressure layers. **Fences deferred** — no reliable continental fence dataset (OSM `barrier=fence` is sparse/inconsistent) and they change too often to model usefully now.
 
 ### Test Gaps — external-format + visual rendering (follow-ups tracked below)
-Two bug classes escaped the green suites this session (see docs/TDD_CONTRACT.md addendum): a wrong Geofabrik layer name (unit fixture tested its own assumption) and an invisible 0.4px road layer (DOM tests passed, nothing rendered). Follow-up test items are listed under Next Steps.
+Two bug classes escaped the green suites this session (see docs/TDD_CONTRACT.md addendum): a wrong Geofabrik layer name (unit fixture tested its own assumption) and an invisible 0.4px road layer (DOM tests passed, nothing rendered). Both gaps are now closed: the external-format gap by `tests/test_fetch_road_data_integration.py` (item 3 below, DONE ✅) and the visual-rendering gap by `tests/e2e/test_mapbox_visual.spec.ts` (item 4 below, DONE ✅). Both are reality-dependent and run on demand, not in CI.
 
 ### Gap: JRC GSW Multi-Tile Loading
 JRCTileDirectory source class planned for multiple 10-degree tiles.
@@ -299,15 +299,16 @@ JRCTileDirectory source class planned for multiple 10-degree tiles.
 - **Never hardcode species names** anywhere in library code
 
 1. ~~**Water stress visualization**~~ — DONE ✅ (POINTS view colors by stress_level)
-2. ~~**Human pressure layer (roads)**~~ — DONE ✅ (ROADS view; fences/settlements still to come)
-3. **Integration test for the roads download** — `@pytest.mark.integration` that pulls one small Geofabrik country and asserts the roads layer loads. Guards the external-format assumption class of bug (the `gis_osm_roads_free` layer-name miss).
-4. **Visual smoke test for the Mapbox app** — render via software WebGL (SwiftShader) in the E2E path and assert the ROADS/road layers actually paint. Guards invisible-render regressions (the 0.4px width miss).
+2. ~~**Human pressure layer (roads)**~~ — DONE ✅ (ROADS view)
+2b. ~~**Human pressure layer (settlements)**~~ — DONE ✅ (🏘 SETTLEMENTS view; separate view, TDD, one-download fetch extracts roads+settlements together; fences deferred — no reliable data)
+3. ~~**Integration test for the roads download**~~ — DONE ✅ (`tests/test_fetch_road_data_integration.py`) `@pytest.mark.integration` pulls one small real Geofabrik country (São Tomé) and asserts the roads layer loads from the *actual* shipped format — reading the real layer list off the download rather than re-confirming our own constant. Guards the external-format assumption class of bug (the `gis_osm_roads_free` layer-name miss). Verified RED by reintroducing the historical `_1` suffix.
+4. ~~**Visual smoke test for the Mapbox app**~~ — DONE ✅ (`tests/e2e/test_mapbox_visual.spec.ts` + `playwright.visual.config.ts`) renders via software WebGL (SwiftShader) and asserts the road backbone actually paints. Metric is floor-immune: toggles only the backbone layer on/off and counts changed pixels (healthy ~51–54k, broken 0.4px ~15–21k; threshold 35k). Runs on demand, not in CI. Verified RED by reintroducing the 0.4px width. Guards invisible-render regressions (the 0.4px width miss).
 5. **Multi-species overlay** — "Compare All Species" mode
 6. **Auto-play in COUNTRIES view** — currently stops autoplay when switching to countries view; could animate choropleth
 7. **JRC GSW multi-tile support** — `JRCTileDirectory` source class
 8. **Data confidence layer** — `record_count` + `coordinate_precision` per grid cell
 9. **Additional water sources** — springs, reservoirs, boreholes
-10. **Human pressure — fences & settlements** (Pressure Type 2, remainder)
+10. **Human pressure — fences** (Pressure Type 2, remainder) — BLOCKED on data: no reliable continental fence dataset. ~~Settlements~~ DONE ✅ (item 2b)
 11. **Road-threat model refinements** — nearest road *per class* (a nearby zero-weight footpath can currently mask a real road); optional path-level threat for amphibians; coordinate-precision rounding to shrink the committed GeoJSON
 12. **Phase 2 — Predict**: CHIRPS rainfall as reliability modifier; CMIP6 climate projections; monthly water layer (JRC GSW monthly recurrence)
 13. **Phase 3 — Prescribe**: WDPA protected areas; intervention zones; refuge viability
@@ -445,6 +446,7 @@ python scripts/export_stress_scores.py
 Prior session (May 18, 2026): Mapbox app live + 3-file refactor, country choropleth + trend chart, linear regression analytics, 11 species (Hippo + Cape Buffalo), icon clustering — all merged to main.
 
 Next session priorities:
-1. Integration test for the roads download + SwiftShader visual smoke test (close the two TDD blind spots)
-2. Multi-species overlay ("Compare All Species")
-3. Human pressure — fences & settlements; road-model refinements (nearest-per-class)
+1. ~~Integration test for the roads download + SwiftShader visual smoke test (close the two TDD blind spots)~~ — DONE ✅ (both merged/landed)
+2. ~~Settlements pressure layer~~ — DONE ✅ (🏘 SETTLEMENTS view, full TDD pipeline)
+3. Multi-species overlay ("Compare All Species"); composable pressure layers (roads + settlements together)
+4. Human pressure — fences (blocked on data); road-model refinements (nearest-per-class)

@@ -74,6 +74,31 @@
       <span>No threat (far from roads)</span>
     </div>
   </div>
+  <!-- Settlement threat legend — shown in SETTLEMENTS view -->
+  <div id="legend-settlement" style="display:none">
+    <div class="legend-section-label" style="margin-top:6px">Cities &amp; towns</div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#C08BE0; box-shadow:0 0 6px rgba(192,139,224,0.4)"></div>
+      <span>Settlement (city / town)</span>
+    </div>
+    <div class="legend-section-label" style="margin-top:6px">Settlement threat</div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#00C87A; box-shadow:0 0 6px rgba(0,200,122,0.4)"></div>
+      <span>Low</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#FFB800; box-shadow:0 0 6px rgba(255,184,0,0.4)"></div>
+      <span>Moderate</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#FF5A3C; box-shadow:0 0 6px rgba(255,90,60,0.4)"></div>
+      <span>High</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#2A4050; box-shadow:none"></div>
+      <span>No threat (far from settlements)</span>
+    </div>
+  </div>
   <div class="legend-item" style="margin-top:4px; opacity:0.5">
     <div class="legend-dot" style="background:var(--accent)"></div>
     <span id="legend-species-label" style="font-size:10px; font-style:italic">Species occurrences</span>
@@ -95,6 +120,7 @@
       <button class="view-btn active" data-view="points">⬤ POINTS</button>
       <button class="view-btn" data-view="countries">▦ COUNTRIES</button>
       <button class="view-btn" data-view="threats">⚠ ROADS</button>
+      <button class="view-btn" data-view="settlements">🏘 SETTLEMENTS</button>
     </div>
 
     <!-- Species -->
