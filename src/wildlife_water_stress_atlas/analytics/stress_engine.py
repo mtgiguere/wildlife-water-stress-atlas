@@ -59,6 +59,29 @@ def species_stressors(species: str) -> list[StressorConfig]:
     return [StressorConfig(stressor_id=s["stressor_id"], sensitivity=s["sensitivity"], params=s["params"]) for s in cfg["stressors"]]
 
 
+def score_stressor(species: str, stressor_id: str, measurement) -> float:
+    """
+    Scalar stress for ONE stressor of a species — the single per-view number the
+    legacy scoring functions returned (scoring.water_stress_score,
+    threat_scoring.road_threat_score / settlement_threat_score), now from the one
+    kind-aware engine path. This is the seam the `apply_*` export helpers score
+    through, so there is exactly one scoring truth (no engine⇔legacy drift).
+
+    Args:
+        species     : Scientific name (must be in SPECIES_CONFIG).
+        stressor_id : One of the species' configured stressors (e.g. "roads").
+        measurement : The Measurement for that stressor (e.g. FeatureProximity).
+
+    Returns:
+        The stressor's stress value in [0, 1].
+
+    Raises:
+        KeyError / StopIteration: If species or stressor_id is not configured.
+    """
+    cfg = next(c for c in species_stressors(species) if c.stressor_id == stressor_id)
+    return STRESSOR_TYPES[stressor_id].score(measurement, cfg).value
+
+
 def score_species_stress(species: str, measurements: dict) -> StressResult:
     """
     Score one species at one location.
