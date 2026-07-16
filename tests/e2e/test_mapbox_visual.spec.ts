@@ -26,6 +26,25 @@ const MIN_BACKBONE_FOOTPRINT = 35000;
 // ~0 if the layer silently fails to load. Threshold sits well between.
 const MIN_SETTLEMENT_POINTS_FOOTPRINT = 6000;
 
+// Cumulative-stress dots (STRESS view). Fed by an INLINE fixture injected into
+// the map source (below), so this guard needs no generated data file — it runs
+// anywhere the app + SwiftShader do. ~a few hundred px when painting, ~0 if the
+// layer/view is broken.
+const MIN_STRESS_FOOTPRINT = 200;
+
+// A small inline stress FeatureCollection near the pinned camera. High aggregate
+// (red) but low roads (green) so the per-stressor toggle produces a visible
+// recolor. Injected via map.getSource('stress-aggregate').setData(...) — the
+// robust way to guard the frontend without depending on gitignored dev data.
+const STRESS_FIXTURE = {
+  type: 'FeatureCollection',
+  features: Array.from({ length: 24 }, (_, i) => ({
+    type: 'Feature',
+    properties: { species: 'Test', year: 2020, stress_aggregate: 0.85, stress_water: 0.7, stress_roads: 0.08, stress_settlements: 0.2 },
+    geometry: { type: 'Point', coordinates: [33.2 + (i % 6) * 0.6, -3.2 + Math.floor(i / 6) * 0.9] },
+  })),
+};
+
 // Camera pinned over road/settlement-dense East/Central Africa so the
 // measurement does not depend on where the fly-to animation happens to land.
 const PINNED = { center: [34, -2] as [number, number], zoom: 6 };
@@ -134,5 +153,46 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
       `settlement points footprint ${footprint}px is below ${MIN_SETTLEMENT_POINTS_FOOTPRINT}px — ` +
         'the settlement layer is effectively invisible or failed to load',
     ).toBeGreaterThan(MIN_SETTLEMENT_POINTS_FOOTPRINT);
+  });
+
+  // --- STRESS view: fed by an inline fixture (no generated-data dependency) ---
+
+  async function openStressViewWithFixture(page) {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await page.waitForTimeout(1500);
+    await page.evaluate((fc) => map.getSource('stress-aggregate').setData(fc), STRESS_FIXTURE);
+    await page.evaluate((p) => map.jumpTo(p), { center: [34.5, -2], zoom: 6 });
+    await page.waitForTimeout(2500);
+  }
+
+  test('cumulative-stress dots paint in the STRESS view', async ({ page }) => {
+    await openStressViewWithFixture(page);
+
+    const withDots = await page.locator('#map canvas').screenshot();
+    await setLayerVisible(page, 'stress-aggregate-dot', false);
+    await setLayerVisible(page, 'stress-aggregate-glow', false);
+    await page.waitForTimeout(1200);
+    const withoutDots = await page.locator('#map canvas').screenshot();
+    await setLayerVisible(page, 'stress-aggregate-dot', true);
+    await setLayerVisible(page, 'stress-aggregate-glow', true);
+
+    const footprint = changedPixels(withDots, withoutDots);
+    expect(
+      footprint,
+      `stress dots footprint ${footprint}px is below ${MIN_STRESS_FOOTPRINT}px — STRESS view not painting`,
+    ).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
+  });
+
+  test('per-stressor toggle recolors the STRESS dots', async ({ page }) => {
+    await openStressViewWithFixture(page);
+
+    const totalShot = await page.locator('#map canvas').screenshot();
+    // Fixture is high aggregate (red) but low roads (green): switching must recolor.
+    await page.locator('.stressby-btn', { hasText: 'Roads' }).click();
+    await page.waitForTimeout(1500);
+    const roadsShot = await page.locator('#map canvas').screenshot();
+
+    const recolor = changedPixels(totalShot, roadsShot);
+    expect(recolor, `toggle recolor changed only ${recolor}px — the colour-by toggle isn't recoloring`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
   });
 });
