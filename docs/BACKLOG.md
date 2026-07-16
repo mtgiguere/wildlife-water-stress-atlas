@@ -110,8 +110,18 @@ Branch `feat/stressors-list-config`.
       per-stressor + aggregate columns (`scripts/export_stress.py`,
       `test_export_stress.py`). (Retiring the special-case export scripts happens
       at cutover, once the frontend reads the generic output.)
-- [ ] **C4** — stressor-driven map views + legends (aggregate layer **plus**
-      per-stressor toggle) — VISUAL-GUARD territory (SwiftShader screenshots)
+- [~] **C4** — stressor-driven map views + legends. **C4a done:** ⚑ STRESS view
+      colors occurrences by `stress_aggregate` (cumulative noisy-OR) with a
+      per-stressor breakdown in the hover tooltip + legend, consuming the generic
+      `stress_gbif_*.geojson`. DOM e2e tests added; **visually verified via
+      SwiftShader**. Remaining: per-stressor **layer toggle**, committed-fixture
+      **visual guard** (stress data is gitignored dev data — manual verify only).
+- [x] **C5** — stressor TYPES are plugins: JSON declarations {stressor_id, kind}
+      referencing hazard/resource/ambient scorers; `stressor_type_loader.py`
+      discovers them (skip+log malformed) and the engine builds STRESSOR_TYPES
+      from `config/stressor_plugins/`. Adding a stressor type of an existing kind
+      is now one JSON file, no code (demonstrated with a `fences` drop-in). Closes
+      the retro gap; golden reproduction holds. (`test_stressor_type_loader.py`, 8)
 - [ ] Species compare mode (Savannah vs Forest elephant)
 - [ ] Scenario toggles: stressor on/off, reweight, live re-aggregate
 

@@ -16,23 +16,21 @@ is untouched; migrating consumers onto this engine is a later phase.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from wildlife_water_stress_atlas.analytics.stressor_type_loader import load_stressor_types
 from wildlife_water_stress_atlas.analytics.stressors import (
-    HazardStressor,
-    ResourceStressor,
     Score,
     StressorConfig,
     aggregate_stress,
 )
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
-# Registry of stressor types by id. New stressor types register here (and, in a
-# later phase, are discovered as plugins — mirroring species plugins).
-STRESSOR_TYPES = {
-    "water": ResourceStressor(),
-    "roads": HazardStressor(),
-    "settlements": HazardStressor(),
-}
+# Registry of stressor types by id, discovered from plugin declarations under
+# config/stressor_plugins/. Adding a stressor type of an existing kind is one
+# JSON file, no code (see stressor_type_loader / the plugins README).
+STRESSOR_PLUGINS_DIR = Path(__file__).parent.parent / "config" / "stressor_plugins"
+STRESSOR_TYPES = load_stressor_types(STRESSOR_PLUGINS_DIR)
 
 
 @dataclass(frozen=True)
