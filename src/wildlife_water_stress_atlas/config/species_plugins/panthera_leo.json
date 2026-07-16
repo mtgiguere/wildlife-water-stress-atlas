@@ -2,49 +2,67 @@
   "scientific_name": "Panthera leo",
   "common_name": "Lion",
   "realm": "terrestrial",
-  "water_threshold_m": 200000,
-  "accessible_water_types": [
-    "floodplain",
-    "lake",
-    "pan",
-    "permanent_water",
-    "river",
-    "surface_water",
-    "wetland"
-  ],
-  "water_type_weights": {
-    "river": 1.0,
-    "lake": 1.0,
-    "pan": 0.5,
-    "wetland": 0.7,
-    "floodplain": 0.8,
-    "surface_water": 0.6,
-    "permanent_water": 0.9
-  },
   "daily_range_m": 30000,
   "water_dependency": "moderate",
   "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f981.png",
   "icon_static_path": "app/static/Creative-Tail-Animal-lion.svg.png",
-  "road_sensitivity": 0.4,
-  "road_threshold_m": 8000,
-  "road_class_weights": {
-    "motorway": 1.0,
-    "trunk": 0.9,
-    "primary": 0.7,
-    "secondary": 0.5,
-    "tertiary": 0.3,
-    "track": 0.15,
-    "path": 0.05
-  },
-  "settlement_sensitivity": 0.7,
-  "settlement_threshold_m": 12000,
-  "settlement_class_weights": {
-    "city": 1.0,
-    "town": 0.7,
-    "village": 0.4,
-    "hamlet": 0.2
-  },
   "gbif_cache_file": "gbif_panthera_leo.gpkg",
   "emoji": "🦁",
+  "stressors": [
+    {
+      "stressor_id": "water",
+      "sensitivity": 1.0,
+      "params": {
+        "threshold_m": 200000,
+        "accessible_types": [
+          "floodplain",
+          "lake",
+          "pan",
+          "permanent_water",
+          "river",
+          "surface_water",
+          "wetland"
+        ],
+        "type_weights": {
+          "river": 1.0,
+          "lake": 1.0,
+          "pan": 0.5,
+          "wetland": 0.7,
+          "floodplain": 0.8,
+          "surface_water": 0.6,
+          "permanent_water": 0.9
+        }
+      }
+    },
+    {
+      "stressor_id": "roads",
+      "sensitivity": 0.4,
+      "params": {
+        "threshold_m": 8000,
+        "class_weights": {
+          "motorway": 1.0,
+          "trunk": 0.9,
+          "primary": 0.7,
+          "secondary": 0.5,
+          "tertiary": 0.3,
+          "track": 0.15,
+          "path": 0.05
+        }
+      }
+    },
+    {
+      "stressor_id": "settlements",
+      "sensitivity": 0.7,
+      "params": {
+        "threshold_m": 12000,
+        "class_weights": {
+          "city": 1.0,
+          "town": 0.7,
+          "village": 0.4,
+          "hamlet": 0.2
+        }
+      }
+    }
+  ],
   "rationale": "Lion\nLions are the apex predator of the African savanna and their\ndistribution closely tracks prey availability — which in turn\ntracks water. Lions themselves drink daily when water is\navailable but can survive 4-5 days without water by obtaining\nmoisture from prey. Their presence is a strong proxy indicator\nof a functioning water-dependent ecosystem.\nThe 200km threshold reflects their large territory size —\nlion prides maintain ranges of 20-400km² and will follow\nprey herds considerable distances during dry season movements.\nLions drink from all permanent surface water sources.\nThey avoid saline lakes but will use seasonal pans and\nfloodplains when following prey herds.\nPermanent sources weighted at 1.0 — fully reliable year-round.\nPans weighted moderately — lions use them opportunistically\nwhen following prey but don't depend on them exclusively.\n30km typical daily range when actively hunting or following prey.\nModerate water dependency — can extract moisture from prey\nbut still requires surface water regularly.\nRoads bring human-wildlife conflict and retaliatory killing into\nlion range, plus direct collision mortality. Wide territories mean\nthe disturbance footprint is large.\nRetaliatory and pre-emptive killing near settlements over livestock\nis THE dominant lion threat — highest settlement sensitivity in the\natlas, over a broad conflict footprint."
 }

@@ -47,22 +47,18 @@ class StressResult:
 
 def species_stressors(species: str) -> list[StressorConfig]:
     """
-    Build the generic StressorConfig list for a species from its current config.
+    Build the StressorConfig list for a species from its `stressors` config.
 
-    Bridges the flat config (water_*/road_*/settlement_* fields) to the generic
-    stressor system without changing the plugin shape. Water had no sensitivity
-    field and a `min(dist/threshold, 1)` formula — reproduced by a RESOURCE with
-    sensitivity 1.0.
+    Reads the plugin's stressors list directly (Phase C). Each stressor type
+    reads only the params it needs (a RESOURCE uses threshold_m; extra water
+    params like accessible_types are ignored by the scorer), so water — a
+    RESOURCE with sensitivity 1.0 — reproduces the legacy min(dist/threshold, 1).
 
     Raises:
         KeyError: If species is not in SPECIES_CONFIG.
     """
     cfg = SPECIES_CONFIG[species]
-    return [
-        StressorConfig("water", sensitivity=1.0, params={"threshold_m": cfg["water_threshold_m"]}),
-        StressorConfig("roads", sensitivity=cfg["road_sensitivity"], params={"threshold_m": cfg["road_threshold_m"], "class_weights": cfg["road_class_weights"]}),
-        StressorConfig("settlements", sensitivity=cfg["settlement_sensitivity"], params={"threshold_m": cfg["settlement_threshold_m"], "class_weights": cfg["settlement_class_weights"]}),
-    ]
+    return [StressorConfig(stressor_id=s["stressor_id"], sensitivity=s["sensitivity"], params=s["params"]) for s in cfg["stressors"]]
 
 
 def score_species_stress(species: str, measurements: dict) -> StressResult:

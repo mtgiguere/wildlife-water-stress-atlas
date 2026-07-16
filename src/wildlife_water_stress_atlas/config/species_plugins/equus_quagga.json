@@ -2,49 +2,67 @@
   "scientific_name": "Equus quagga",
   "common_name": "Plains Zebra",
   "realm": "terrestrial",
-  "water_threshold_m": 150000,
-  "accessible_water_types": [
-    "floodplain",
-    "lake",
-    "pan",
-    "permanent_water",
-    "river",
-    "surface_water",
-    "wetland"
-  ],
-  "water_type_weights": {
-    "river": 1.0,
-    "lake": 1.0,
-    "pan": 0.5,
-    "wetland": 0.7,
-    "floodplain": 0.8,
-    "surface_water": 0.6,
-    "permanent_water": 0.9
-  },
   "daily_range_m": 30000,
   "water_dependency": "high",
   "icon_static_path": "app/static/Creative-Tail-Animal-zebra.svg.png",
   "icon_url": "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f993.png",
-  "road_sensitivity": 0.5,
-  "road_threshold_m": 8000,
-  "road_class_weights": {
-    "motorway": 1.0,
-    "trunk": 0.9,
-    "primary": 0.7,
-    "secondary": 0.5,
-    "tertiary": 0.3,
-    "track": 0.15,
-    "path": 0.05
-  },
-  "settlement_sensitivity": 0.5,
-  "settlement_threshold_m": 8000,
-  "settlement_class_weights": {
-    "city": 1.0,
-    "town": 0.7,
-    "village": 0.4,
-    "hamlet": 0.2
-  },
   "gbif_cache_file": "gbif_equus_quagga.gpkg",
   "emoji": "🦓",
+  "stressors": [
+    {
+      "stressor_id": "water",
+      "sensitivity": 1.0,
+      "params": {
+        "threshold_m": 150000,
+        "accessible_types": [
+          "floodplain",
+          "lake",
+          "pan",
+          "permanent_water",
+          "river",
+          "surface_water",
+          "wetland"
+        ],
+        "type_weights": {
+          "river": 1.0,
+          "lake": 1.0,
+          "pan": 0.5,
+          "wetland": 0.7,
+          "floodplain": 0.8,
+          "surface_water": 0.6,
+          "permanent_water": 0.9
+        }
+      }
+    },
+    {
+      "stressor_id": "roads",
+      "sensitivity": 0.5,
+      "params": {
+        "threshold_m": 8000,
+        "class_weights": {
+          "motorway": 1.0,
+          "trunk": 0.9,
+          "primary": 0.7,
+          "secondary": 0.5,
+          "tertiary": 0.3,
+          "track": 0.15,
+          "path": 0.05
+        }
+      }
+    },
+    {
+      "stressor_id": "settlements",
+      "sensitivity": 0.5,
+      "params": {
+        "threshold_m": 8000,
+        "class_weights": {
+          "city": 1.0,
+          "town": 0.7,
+          "village": 0.4,
+          "hamlet": 0.2
+        }
+      }
+    }
+  ],
   "rationale": "Plains Zebra\nPlains zebras are highly water-dependent, typically drinking\ndaily and rarely moving more than ~30km from water during the\ndry season. They are famous for long seasonal migrations\n(e.g. Serengeti–Masai Mara) that closely track rainfall and\nsurface water availability across the savanna.\nThe 150km threshold reflects their smaller range compared to\nelephants — zebras lack the physiological ability to endure\nextended dry-season movements to distant water. A zebra 150km\nfrom water is almost certainly in severe stress or already dead.\nThis is a heuristic placeholder pending ecological validation.\nZebras drink from rivers, lakes, pans and floodplains.\nThey do NOT use saline lakes — unlike elephants they cannot\ntolerate brackish water at all. Pan reliability is slightly\nhigher than for elephants (0.5 vs 0.4) because zebras are\nmore mobile and can exploit ephemeral pans opportunistically\nduring migration.\nPermanent sources weighted at 1.0 — fully reliable year-round.\nFloodplains weighted higher than for elephants (0.8 vs 0.7) —\nzebra migrations closely track seasonal floodplain inundation.\nAll values are heuristic placeholders — ecological validation\nfrom IUCN Equid Specialist Group is a future step.\n30km is a commonly cited dry-season daily range for plains zebra.\nMigration legs can exceed this but are driven by water-seeking\nbehaviour — the daily range reflects normal foraging conditions.\nZebras are highly water-dependent — daily drinking is essential.\nLegacy CDN URL — kept for reference only.\nicon_static_path is used for actual rendering (same-origin, no CORS).\nZebra migrations are famously severed by linear infrastructure —\nroads paired with fences are a documented barrier that can\ncollapse a migration route entirely. Higher sensitivity than\nthe megafauna that can range around obstacles.\nSettlements convert rangeland and, with associated fencing, sever\nmigration corridors — a documented collapse risk for zebra routes."
 }
