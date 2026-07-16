@@ -8,31 +8,37 @@
 
 ---
 
-## Current status — 2026-07-15
+## Current status — 2026-07 (Phase C in progress)
 
-- **Phase-1 prototype: SHIPPED.** 11 African species; water / road / settlement
-  stressors; Mapbox static site (GitHub Pages) + Streamlit app.
-- **Settlements feature:** committed + pushed on branch
-  `feat/settlements-pressure-layer` (**not merged**). Its subset settlement
-  GeoJSON is **gitignored** — a full continental fetch + export must run before
-  that data ships. See `[[project-settlements-pressure]]` memory.
-- **Dependabot:** 4 open PRs, all inspected and **kosher** (actions/checkout v7,
-  actions/setup-python v6, @playwright/test 1.61.1, @types/node 26.1.1). Safe to
-  merge; run the two Playwright suites after the playwright bump (a visual test
-  imports `playwright-core/lib/utilsBundle`).
-- **Architecture v2 (extensible):** **Phase A DONE** (species are JSON plugins,
-  committed + pushed on `feat/species-plugins`). **Phase B CORE DONE** (generic
-  kind-aware scoring engine, reproduces today's scores — on branch
-  `feat/stressor-plugins`, uncommitted). Next is **Phase C** (genericize
-  export/frontend; realm gating + consumer migration land there). Design decided
-  and locked (do not re-litigate): stressor **kinds**
-  (hazard/resource/ambient); **noisy-OR** aggregation `1−∏(1−sᵢ)` as the single
-  house formula; scores carry **coverage** (no-data ≠ no-stress). Rationale in
-  `docs/ARCHITECTURE.md`.
-  - JIT deviation from the original Phase-A plan: the `SpeciesConfig` **dataclass
-    + `realm`** were deferred to **Phase B**, where the stressor restructure
-    finalizes their shape (writing them in A then rewriting in B = wasted churn).
-    Phase A stayed a pure, golden-verified structural refactor.
+**All merged to `main`:** Phase-1 prototype (11 species; water/road/settlement;
+Mapbox + Streamlit), the settlements feature (#24), the 4 dependabot bumps
+(#21–23), **Phase A** (species = JSON plugins, #26) and **Phase B** (generic
+kind-aware scoring engine, #27). `main` is green (796 tests) with the full
+extensible engine that reproduces today's scores.
+
+- **Phase C — IN PROGRESS** on branch `feat/stressors-list-config` (off `main`):
+  - ✅ **C1** — plugins restructured to a `stressors` list (source of truth); a
+    `_flatten_stressors` bridge derives legacy flat keys so consumers stay green.
+  - ✅ **C2** — `compute_species_stress` (scripts/export_stress.py): the engine
+    is now a real consumer over geo data (per-stressor breakdown + noisy-OR
+    aggregate), golden-verified against the legacy pipelines.
+  - ⏭️ **C3** — generic file-writing export (one GeoJSON/species, all stressors +
+    aggregate); still pure-Python/TDD-safe.
+  - ⏭️ **C4** — stressor-driven frontend (views/legends from whatever stressors
+    exist; aggregate layer + per-stressor toggle; compare/scenario). **Re-enters
+    visual-guard territory** — a green Python suite is NOT enough; use the
+    SwiftShader screenshot discipline (see `[[reference-swiftshader-render]]`).
+  - 808 tests on the branch; lint clean.
+- **Deferred: realm gating** — blocked on marine stressor *types* that don't
+  exist yet, and redundant with current validation for the existing (all
+  terrestrial/freshwater) species. Revisit when a marine species/stressor lands.
+- **Data caveat:** the committed settlement GeoJSON is a SUBSET (kenya/tanzania/
+  south-africa); run the full continental fetch + export before shipping.
+
+**Design decided and locked (do not re-litigate):** stressor **kinds**
+(hazard/resource/ambient); **noisy-OR** aggregation `1−∏(1−sᵢ)` as the single
+house formula; scores carry **coverage** (no-data ≠ no-stress); plugins are
+**JSON**; the scoring engine is **query-shaped**. Rationale in `docs/ARCHITECTURE.md`.
 
 ---
 
@@ -88,14 +94,24 @@ Deferred to Phase C (need the generic path to be the consumer first):
 - [ ] Migrate consumers (export scripts, frontend) onto the engine, then retire
       the flat fields / legacy scoring functions.
 
-## Phase C — Genericize export + frontend
+## Phase C — Genericize export + frontend  🟡 IN PROGRESS
 
 Goal: views/legends/export driven by which stressors exist, not hardcoded.
+Branch `feat/stressors-list-config`.
 
-- [ ] Generic per-stressor export (replace the `export_road_threats` /
-      `export_settlement_threats` special-casing)
-- [ ] Stressor-driven map views + legends: an aggregate-stress layer **plus**
-      per-stressor breakdown/toggle
+- [x] **C1** — plugins → `stressors` list (source of truth); `_flatten_stressors`
+      bridge keeps legacy consumers green; engine reads the list.
+      (`test_stressors_list_config.py`; golden guards hold)
+- [x] **C2** — `compute_species_stress` composes overlap + engine over occurrences
+      → per-stressor breakdown + noisy-OR aggregate; golden-verified vs legacy
+      pipelines (`scripts/export_stress.py`, `test_export_stress.py`)
+- [x] **C3** — generic file-writing export: `export_species_stress` /
+      `export_all_stress` write one `stress_gbif_<slug>.geojson` per species with
+      per-stressor + aggregate columns (`scripts/export_stress.py`,
+      `test_export_stress.py`). (Retiring the special-case export scripts happens
+      at cutover, once the frontend reads the generic output.)
+- [ ] **C4** — stressor-driven map views + legends (aggregate layer **plus**
+      per-stressor toggle) — VISUAL-GUARD territory (SwiftShader screenshots)
 - [ ] Species compare mode (Savannah vs Forest elephant)
 - [ ] Scenario toggles: stressor on/off, reweight, live re-aggregate
 

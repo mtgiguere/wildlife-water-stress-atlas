@@ -13,7 +13,7 @@ regenerate tests/_species_config_snapshot.py in the same commit.
 from tests._species_config_snapshot import SNAPSHOT
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
-_ADDITIVE_KEYS = {"rationale", "realm"}  # new metadata, not pre-migration scoring data
+_ADDITIVE_KEYS = {"rationale", "realm", "stressors"}  # new metadata/structure, not pre-migration scoring data
 
 
 def test_registry_data_deep_equals_frozen_snapshot():

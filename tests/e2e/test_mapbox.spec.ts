@@ -161,6 +161,35 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Cumulative stress view
+  // ---------------------------------------------------------------------------
+
+  test('STRESS view button is present', async ({ page }) => {
+    await expect(page.locator('.view-btn', { hasText: 'STRESS' })).toBeVisible();
+  });
+
+  test('clicking STRESS makes it active', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('.view-btn.active')).toContainText('STRESS');
+  });
+
+  test('cumulative stress legend is hidden by default', async ({ page }) => {
+    await expect(page.locator('#legend-aggregate')).toBeHidden();
+  });
+
+  test('cumulative stress legend appears in STRESS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('#legend-aggregate')).toBeVisible();
+  });
+
+  test('other legends are hidden in STRESS view', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('#legend-stress')).toBeHidden();
+    await expect(page.locator('#legend-threat')).toBeHidden();
+    await expect(page.locator('#legend-settlement')).toBeHidden();
+  });
+
+  // ---------------------------------------------------------------------------
   // Year slider
   // ---------------------------------------------------------------------------
 
