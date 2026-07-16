@@ -105,9 +105,11 @@ Branch `feat/stressors-list-config`.
 - [x] **C2** — `compute_species_stress` composes overlap + engine over occurrences
       → per-stressor breakdown + noisy-OR aggregate; golden-verified vs legacy
       pipelines (`scripts/export_stress.py`, `test_export_stress.py`)
-- [ ] **C3** — generic file-writing export: one GeoJSON per species with all
-      stressors + aggregate; retire the special-case export scripts
-      (`export_road_threats` / `export_settlement_threats`)
+- [x] **C3** — generic file-writing export: `export_species_stress` /
+      `export_all_stress` write one `stress_gbif_<slug>.geojson` per species with
+      per-stressor + aggregate columns (`scripts/export_stress.py`,
+      `test_export_stress.py`). (Retiring the special-case export scripts happens
+      at cutover, once the frontend reads the generic output.)
 - [ ] **C4** — stressor-driven map views + legends (aggregate layer **plus**
       per-stressor toggle) — VISUAL-GUARD territory (SwiftShader screenshots)
 - [ ] Species compare mode (Savannah vs Forest elephant)
