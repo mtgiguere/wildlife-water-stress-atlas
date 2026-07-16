@@ -22,8 +22,8 @@ from shapely.geometry import LineString, Point
 from scripts.export_road_threats import compute_road_threats
 from scripts.export_settlement_threats import compute_settlement_threats
 from scripts.export_stress import compute_species_stress
+from tests._scoring_oracle import water_stress_score
 from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
-from wildlife_water_stress_atlas.analytics.scoring import water_stress_score
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 _FROG = "Hyperolius marmoratus"
