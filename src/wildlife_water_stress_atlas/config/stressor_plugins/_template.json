@@ -1,0 +1,5 @@
+{
+  "stressor_id": "your_stressor_id",
+  "name": "Human-readable name",
+  "kind": "hazard"
+}
