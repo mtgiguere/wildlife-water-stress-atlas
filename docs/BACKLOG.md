@@ -114,9 +114,10 @@ Branch `feat/stressors-list-config`.
       occurrences by `stress_aggregate` (cumulative noisy-OR) with a per-stressor
       breakdown in the hover tooltip, **plus a "colour by" toggle** to recolor by
       any single stressor's contribution (Total / Water / Roads / Settlements) —
-      the map-layer form of the breakdown. DOM e2e tests; **visually verified via
-      SwiftShader** (aggregate + toggle recolor). Note: committed-fixture visual
-      guard still deferred (stress data is gitignored dev data — manual verify).
+      the map-layer form of the breakdown. DOM e2e tests; **permanent SwiftShader
+      visual guards** (aggregate paints + toggle recolors) fed by an INLINE stress
+      fixture, so they need no gitignored data file — RED-verified by zeroing the
+      dot radii. (`test_mapbox_visual.spec.ts`)
 - [x] **C5** — stressor TYPES are plugins: JSON declarations {stressor_id, kind}
       referencing hazard/resource/ambient scorers; `stressor_type_loader.py`
       discovers them (skip+log malformed) and the engine builds STRESSOR_TYPES
