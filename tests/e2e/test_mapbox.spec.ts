@@ -190,6 +190,30 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Per-stressor colour toggle (within STRESS view)
+  // ---------------------------------------------------------------------------
+
+  test('colour-by toggle is hidden outside STRESS view', async ({ page }) => {
+    await expect(page.locator('#stress-colorby')).toBeHidden();
+  });
+
+  test('colour-by toggle appears in STRESS view with Total active', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('#stress-colorby')).toBeVisible();
+    await expect(page.locator('.stressby-btn.active')).toContainText('Total');
+  });
+
+  test('clicking a stressor recolors: active button + legend label update', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await page.locator('.stressby-btn', { hasText: 'Roads' }).click();
+    await expect(page.locator('.stressby-btn.active')).toContainText('Roads');
+    await expect(page.locator('#legend-aggregate-label')).toHaveText('Road stress');
+    // and back to Total
+    await page.locator('.stressby-btn', { hasText: 'Total' }).click();
+    await expect(page.locator('#legend-aggregate-label')).toHaveText('Cumulative stress');
+  });
+
+  // ---------------------------------------------------------------------------
   // Year slider
   // ---------------------------------------------------------------------------
 

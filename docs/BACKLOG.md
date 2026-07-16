@@ -110,12 +110,14 @@ Branch `feat/stressors-list-config`.
       per-stressor + aggregate columns (`scripts/export_stress.py`,
       `test_export_stress.py`). (Retiring the special-case export scripts happens
       at cutover, once the frontend reads the generic output.)
-- [~] **C4** — stressor-driven map views + legends. **C4a done:** ⚑ STRESS view
-      colors occurrences by `stress_aggregate` (cumulative noisy-OR) with a
-      per-stressor breakdown in the hover tooltip + legend, consuming the generic
-      `stress_gbif_*.geojson`. DOM e2e tests added; **visually verified via
-      SwiftShader**. Remaining: per-stressor **layer toggle**, committed-fixture
-      **visual guard** (stress data is gitignored dev data — manual verify only).
+- [x] **C4** — stressor-driven map views + legends. ⚑ STRESS view colors
+      occurrences by `stress_aggregate` (cumulative noisy-OR) with a per-stressor
+      breakdown in the hover tooltip, **plus a "colour by" toggle** to recolor by
+      any single stressor's contribution (Total / Water / Roads / Settlements) —
+      the map-layer form of the breakdown. DOM e2e tests; **permanent SwiftShader
+      visual guards** (aggregate paints + toggle recolors) fed by an INLINE stress
+      fixture, so they need no gitignored data file — RED-verified by zeroing the
+      dot radii. (`test_mapbox_visual.spec.ts`)
 - [x] **C5** — stressor TYPES are plugins: JSON declarations {stressor_id, kind}
       referencing hazard/resource/ambient scorers; `stressor_type_loader.py`
       discovers them (skip+log malformed) and the engine builds STRESSOR_TYPES

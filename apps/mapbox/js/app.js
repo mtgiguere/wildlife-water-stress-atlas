@@ -63,16 +63,29 @@ const SETTLEMENT_THREAT_COLOR_EXPR = [
 // the amber road backbone and the blue water network.
 const SETTLEMENT_POINT_COLOR = '#C08BE0';
 
-// Cumulative stress color ramp — keyed on stress_aggregate (0–1), the noisy-OR
-// combination of ALL of a species' stressors. Shown in the STRESS view.
-const STRESS_AGGREGATE_COLOR_EXPR = [
-  'interpolate', ['linear'], ['get', 'stress_aggregate'],
-  0,     ROAD_THREAT_NONE,
-  0.001, STRESS_COLORS.low,
-  0.33,  STRESS_COLORS.moderate,
-  0.66,  STRESS_COLORS.high,
-  1,     STRESS_COLORS.high,
-];
+// Stress color ramp keyed on any 0–1 stress property. The STRESS view colors by
+// stress_aggregate (cumulative) by default; the per-stressor toggle recolors the
+// same points by a single stressor's contribution (stress_water/roads/settlements).
+function stressColorBy(prop) {
+  return [
+    'interpolate', ['linear'], ['get', prop],
+    0,     ROAD_THREAT_NONE,
+    0.001, STRESS_COLORS.low,
+    0.33,  STRESS_COLORS.moderate,
+    0.66,  STRESS_COLORS.high,
+    1,     STRESS_COLORS.high,
+  ];
+}
+const STRESS_AGGREGATE_COLOR_EXPR = stressColorBy('stress_aggregate');
+
+// Which stress property the STRESS view currently colors by.
+let currentStressBy = 'stress_aggregate';
+const STRESS_BY_LABELS = {
+  stress_aggregate:   'Cumulative stress',
+  stress_water:       'Water stress',
+  stress_roads:       'Road stress',
+  stress_settlements: 'Settlement stress',
+};
 
 // ─────────────────────────────────────────────────────────────────
 // STATE
@@ -512,7 +525,27 @@ function updateLegend() {
   document.getElementById('legend-threat').style.display = isThreats ? 'flex' : 'none';
   document.getElementById('legend-settlement').style.display = isSettlements ? 'flex' : 'none';
   document.getElementById('legend-aggregate').style.display = isStress ? 'flex' : 'none';
+  document.getElementById('stress-colorby').style.display = isStress ? 'flex' : 'none';
 }
+
+// Per-stressor toggle: recolor the STRESS dots by any single stressor's
+// contribution (or the cumulative total), so you can see WHICH stressor drives
+// the pattern — the map-layer form of the tooltip breakdown.
+function setStressColorBy(prop) {
+  currentStressBy = prop;
+  const expr = stressColorBy(prop);
+  ['stress-aggregate-dot', 'stress-aggregate-glow'].forEach(id => {
+    if (map.getLayer(id)) map.setPaintProperty(id, 'circle-color', expr);
+  });
+  document.querySelectorAll('.stressby-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.prop === prop));
+  const label = document.getElementById('legend-aggregate-label');
+  if (label) label.textContent = STRESS_BY_LABELS[prop] || 'Stress';
+}
+
+document.querySelectorAll('.stressby-btn').forEach(btn => {
+  btn.addEventListener('click', () => setStressColorBy(btn.dataset.prop));
+});
 
 // Hide every view-specific data layer. Each show*View() then re-enables only
 // the layers it needs — keeps the four views mutually exclusive without each
