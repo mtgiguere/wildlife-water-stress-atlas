@@ -110,14 +110,8 @@ Branch `feat/stressors-list-config`.
       per-stressor + aggregate columns (`scripts/export_stress.py`,
       `test_export_stress.py`). (Retiring the special-case export scripts happens
       at cutover, once the frontend reads the generic output.)
-- [~] **C4** — stressor-driven map views + legends. **C4a done:** ⚑ STRESS view
-      colors occurrences by `stress_aggregate` (cumulative noisy-OR), with a
-      per-stressor breakdown in the hover tooltip + legend, consuming the generic
-      `stress_gbif_*.geojson`. DOM e2e tests added; **visually verified via
-      SwiftShader** (aggregate dots paint, legend shows — Lion/East Africa).
-      Remaining C4: per-stressor **layer toggle** (not just tooltip), and a
-      committed-fixture **visual guard** (current stress data is gitignored dev
-      data, so no permanent pixel test yet — manual verify only for now).
+- [ ] **C4** — stressor-driven map views + legends (aggregate layer **plus**
+      per-stressor toggle) — VISUAL-GUARD territory (SwiftShader screenshots)
 - [ ] Species compare mode (Savannah vs Forest elephant)
 - [ ] Scenario toggles: stressor on/off, reweight, live re-aggregate
 
