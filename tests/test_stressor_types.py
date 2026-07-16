@@ -16,7 +16,7 @@ stressor with no distance/decay assumption.
 
 import pytest
 
-from wildlife_water_stress_atlas.analytics.scoring import water_stress_score
+from tests._scoring_oracle import road_threat_score, water_stress_score
 from wildlife_water_stress_atlas.analytics.stressors import (
     AmbientStressor,
     FeatureProximity,
@@ -27,7 +27,6 @@ from wildlife_water_stress_atlas.analytics.stressors import (
     StressorConfig,
     StressorKind,
 )
-from wildlife_water_stress_atlas.analytics.threat_scoring import road_threat_score
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 _FROG = "Hyperolius marmoratus"
