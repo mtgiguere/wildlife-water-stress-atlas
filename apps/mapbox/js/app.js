@@ -63,6 +63,17 @@ const SETTLEMENT_THREAT_COLOR_EXPR = [
 // the amber road backbone and the blue water network.
 const SETTLEMENT_POINT_COLOR = '#C08BE0';
 
+// Cumulative stress color ramp — keyed on stress_aggregate (0–1), the noisy-OR
+// combination of ALL of a species' stressors. Shown in the STRESS view.
+const STRESS_AGGREGATE_COLOR_EXPR = [
+  'interpolate', ['linear'], ['get', 'stress_aggregate'],
+  0,     ROAD_THREAT_NONE,
+  0.001, STRESS_COLORS.low,
+  0.33,  STRESS_COLORS.moderate,
+  0.66,  STRESS_COLORS.high,
+  1,     STRESS_COLORS.high,
+];
+
 // ─────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────
@@ -70,6 +81,7 @@ let speciesConfig    = {};
 let allFeatures      = [];   // all occurrence features for current species
 let allThreatFeatures = [];  // all road-threat features for current species
 let allSettlementFeatures = [];  // all settlement-threat features for current species
+let allAggregateFeatures = [];   // all cumulative-stress features for current species
 let currentSpecies   = 'Loxodonta africana';
 let currentYear      = 2020;
 let currentView      = 'points';
@@ -121,6 +133,13 @@ function getSettlementFile(scientificName) {
   // distance_to_settlement_m, settlement_class, and settlement_threat_score.
   const slug = scientificName.toLowerCase().replace(' ', '_');
   return `data/settlement_threats_gbif_${slug}.geojson`;
+}
+
+function getAggregateStressFile(scientificName) {
+  // Load cumulative-stress GeoJSON — occurrences enriched with per-stressor
+  // scores (stress_water/roads/settlements) and stress_aggregate (0-1).
+  const slug = scientificName.toLowerCase().replace(' ', '_');
+  return `data/stress_gbif_${slug}.geojson`;
 }
 
 function filterByYear(features, year) {
@@ -195,6 +214,24 @@ function showSettlementTooltip(e, props) {
   moveTooltip(e);
 }
 
+function pct(v) {
+  return v == null ? '—' : Math.round(v * 100) + '%';
+}
+
+function showAggregateStressTooltip(e, props) {
+  const cfg = speciesConfig[currentSpecies] || {};
+  // The per-stressor breakdown is the whole point of cumulative (not worst-wins)
+  // aggregation — you can see which stressors are driving the total.
+  tooltip.innerHTML = `
+    <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
+    Year: ${props.year || '—'}<br>
+    Cumulative stress: ${threatLevelLabel(props.stress_aggregate || 0)} (${pct(props.stress_aggregate)})<br>
+    <span style="opacity:0.75">· water ${pct(props.stress_water)} · roads ${pct(props.stress_roads)} · settlements ${pct(props.stress_settlements)}</span>
+  `;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
 function moveTooltip(e) {
   const x = e.originalEvent.clientX;
   const y = e.originalEvent.clientY;
@@ -239,6 +276,13 @@ function applyYearFilter(year) {
     map.getSource('settlement-threats').setData({
       type: 'FeatureCollection',
       features: filterByYear(allSettlementFeatures, year),
+    });
+  }
+
+  if (map.getSource('stress-aggregate')) {
+    map.getSource('stress-aggregate').setData({
+      type: 'FeatureCollection',
+      features: filterByYear(allAggregateFeatures, year),
     });
   }
 
@@ -362,6 +406,17 @@ async function loadSpecies(scientificName) {
     allSettlementFeatures = [];
   }
 
+  // Fetch cumulative-stress GeoJSON — occurrences with stress_aggregate + the
+  // per-stressor breakdown. Fail soft to empty if not yet exported.
+  try {
+    const ares = await fetch(getAggregateStressFile(scientificName));
+    const ageo = await ares.json();
+    allAggregateFeatures = ageo.features || [];
+  } catch (e) {
+    console.warn('Could not load cumulative stress for', scientificName, e);
+    allAggregateFeatures = [];
+  }
+
   // Fly to Africa on species switch
   map.flyTo({ center: [20, 0], zoom: 3, duration: 1200 });
 
@@ -452,9 +507,11 @@ function setVisibility(layerId, visible) {
 function updateLegend() {
   const isThreats = currentView === 'threats';
   const isSettlements = currentView === 'settlements';
-  document.getElementById('legend-stress').style.display = isThreats || isSettlements ? 'none' : 'flex';
+  const isStress = currentView === 'stress';
+  document.getElementById('legend-stress').style.display = isThreats || isSettlements || isStress ? 'none' : 'flex';
   document.getElementById('legend-threat').style.display = isThreats ? 'flex' : 'none';
   document.getElementById('legend-settlement').style.display = isSettlements ? 'flex' : 'none';
+  document.getElementById('legend-aggregate').style.display = isStress ? 'flex' : 'none';
 }
 
 // Hide every view-specific data layer. Each show*View() then re-enables only
@@ -466,6 +523,7 @@ function hideAllDataLayers() {
     'countries-fill', 'countries-stroke',
     'roads-backbone-line', 'threats-dot', 'threats-glow',
     'settlements-points-layer', 'settlement-threats-dot', 'settlement-threats-glow',
+    'stress-aggregate-dot', 'stress-aggregate-glow',
   ].forEach(id => setVisibility(id, false));
 }
 
@@ -510,6 +568,15 @@ function showSettlementsView() {
   stopPlay();
 }
 
+function showStressView() {
+  currentView = 'stress';
+  hideAllDataLayers();
+  setVisibility('stress-aggregate-dot',  true);
+  setVisibility('stress-aggregate-glow', true);
+  updateLegend();
+  stopPlay();
+}
+
 document.querySelectorAll('.view-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
@@ -517,6 +584,7 @@ document.querySelectorAll('.view-btn').forEach(btn => {
     if      (btn.dataset.view === 'points')      showPointsView();
     else if (btn.dataset.view === 'countries')   showCountriesView();
     else if (btn.dataset.view === 'settlements') showSettlementsView();
+    else if (btn.dataset.view === 'stress')      showStressView();
     else                                         showThreatsView();
   });
 });
@@ -1030,6 +1098,53 @@ map.on('load', async () => {
     moveTooltip(e);
   });
   map.on('mouseleave', 'settlement-threats-dot', () => {
+    map.getCanvas().style.cursor = '';
+    hideTooltip();
+  });
+
+  // ── Cumulative stress source + layers (STRESS view) ───────────
+  // Occurrences colored by stress_aggregate — the noisy-OR of ALL stressors.
+  map.addSource('stress-aggregate', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addLayer({
+    id: 'stress-aggregate-glow',
+    type: 'circle',
+    source: 'stress-aggregate',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':  8,
+      'circle-color':   STRESS_AGGREGATE_COLOR_EXPR,
+      'circle-opacity': 0.15,
+      'circle-blur':    1,
+    },
+  });
+
+  map.addLayer({
+    id: 'stress-aggregate-dot',
+    type: 'circle',
+    source: 'stress-aggregate',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius':         3.5,
+      'circle-color':          STRESS_AGGREGATE_COLOR_EXPR,
+      'circle-opacity':        0.85,
+      'circle-stroke-width':   0.5,
+      'circle-stroke-color':   '#FFFFFF',
+      'circle-stroke-opacity': 0.3,
+    },
+  });
+
+  map.on('mouseenter', 'stress-aggregate-dot', e => {
+    map.getCanvas().style.cursor = 'pointer';
+    showAggregateStressTooltip(e, e.features[0].properties);
+  });
+  map.on('mousemove', 'stress-aggregate-dot', e => {
+    moveTooltip(e);
+  });
+  map.on('mouseleave', 'stress-aggregate-dot', () => {
     map.getCanvas().style.cursor = '';
     hideTooltip();
   });
