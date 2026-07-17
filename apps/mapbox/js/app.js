@@ -66,9 +66,9 @@ const SETTLEMENT_POINT_COLOR = '#C08BE0';
 // Stress color ramp keyed on any 0–1 stress property. The STRESS view colors by
 // stress_aggregate (cumulative) by default; the per-stressor toggle recolors the
 // same points by a single stressor's contribution (stress_water/roads/settlements).
-function stressColorBy(prop) {
+function stressRamp(valueExpr) {
   return [
-    'interpolate', ['linear'], ['get', prop],
+    'interpolate', ['linear'], valueExpr,
     0,     ROAD_THREAT_NONE,
     0.001, STRESS_COLORS.low,
     0.33,  STRESS_COLORS.moderate,
@@ -76,7 +76,42 @@ function stressColorBy(prop) {
     1,     STRESS_COLORS.high,
   ];
 }
+function stressColorBy(prop) { return stressRamp(['get', prop]); }
 const STRESS_AGGREGATE_COLOR_EXPR = stressColorBy('stress_aggregate');
+
+// The per-occurrence stressor contributions that make up the cumulative
+// (noisy-OR) total. Scenario toggles include/exclude any of these.
+const STRESSOR_PROPS = ['stress_water', 'stress_roads', 'stress_settlements'];
+const SCENARIO_LABELS = { stress_water: 'Water', stress_roads: 'Roads', stress_settlements: 'Settlements' };
+// Which stressors are included in the live cumulative re-aggregation (a scenario).
+const scenarioEnabled = { stress_water: true, stress_roads: true, stress_settlements: true };
+
+// Cumulative stress as a LIVE Mapbox expression: noisy-OR (1 − ∏(1−sᵢ)) over the
+// ENABLED stressors, read straight from each feature's per-stressor properties.
+// A missing/null stressor coerces to 0 → factor (1−0)=1 → excluded (honest
+// coverage). This is what lets STRESS "Total" recolor instantly when a stressor
+// is toggled, with no data mutation. Matches the Python engine's noisy-OR.
+function scenarioAggExpr() {
+  const factors = STRESSOR_PROPS
+    .filter(p => scenarioEnabled[p])
+    .map(p => ['-', 1, ['to-number', ['get', p]]]);
+  if (factors.length === 0) return ['literal', 0];
+  const product = factors.length === 1 ? factors[0] : ['*', ...factors];
+  return ['-', 1, product];
+}
+
+// JS twin of scenarioAggExpr, for the tooltip (feature props are in hand there).
+function scenarioAggregate(props) {
+  const vals = STRESSOR_PROPS.filter(p => scenarioEnabled[p]).map(p => props[p]).filter(v => v != null);
+  if (!vals.length) return 0;
+  return 1 - vals.reduce((prod, v) => prod * (1 - v), 1);
+}
+
+// Legend/tooltip label for the cumulative total, noting any excluded stressors.
+function scenarioLabel() {
+  const excluded = STRESSOR_PROPS.filter(p => !scenarioEnabled[p]).map(p => SCENARIO_LABELS[p]);
+  return excluded.length ? `Cumulative stress (excl. ${excluded.join(', ')})` : 'Cumulative stress';
+}
 
 // Which stress property the STRESS view currently colors by.
 let currentStressBy = 'stress_aggregate';
@@ -234,12 +269,18 @@ function pct(v) {
 function showAggregateStressTooltip(e, props) {
   const cfg = speciesConfig[currentSpecies] || {};
   // The per-stressor breakdown is the whole point of cumulative (not worst-wins)
-  // aggregation — you can see which stressors are driving the total.
+  // aggregation — you can see which stressors drive the total. Excluded stressors
+  // (scenario off) are struck through and don't count toward the shown total.
+  const agg = scenarioAggregate(props);
+  const part = (p) => {
+    const s = `${SCENARIO_LABELS[p].toLowerCase()} ${pct(props[p])}`;
+    return scenarioEnabled[p] ? s : `<span style="opacity:0.4; text-decoration:line-through">${s}</span>`;
+  };
   tooltip.innerHTML = `
     <strong>${cfg.emoji || ''} ${props.species || cfg.common_name || currentSpecies}</strong><br>
     Year: ${props.year || '—'}<br>
-    Cumulative stress: ${threatLevelLabel(props.stress_aggregate || 0)} (${pct(props.stress_aggregate)})<br>
-    <span style="opacity:0.75">· water ${pct(props.stress_water)} · roads ${pct(props.stress_roads)} · settlements ${pct(props.stress_settlements)}</span>
+    ${scenarioLabel()}: ${threatLevelLabel(agg)} (${pct(agg)})<br>
+    <span style="opacity:0.75">· ${part('stress_water')} · ${part('stress_roads')} · ${part('stress_settlements')}</span>
   `;
   tooltip.style.display = 'block';
   moveTooltip(e);
@@ -526,6 +567,7 @@ function updateLegend() {
   document.getElementById('legend-settlement').style.display = isSettlements ? 'flex' : 'none';
   document.getElementById('legend-aggregate').style.display = isStress ? 'flex' : 'none';
   document.getElementById('stress-colorby').style.display = isStress ? 'flex' : 'none';
+  document.getElementById('stress-scenario').style.display = isStress ? 'flex' : 'none';
 }
 
 // Per-stressor toggle: recolor the STRESS dots by any single stressor's
@@ -533,18 +575,33 @@ function updateLegend() {
 // the pattern — the map-layer form of the tooltip breakdown.
 function setStressColorBy(prop) {
   currentStressBy = prop;
-  const expr = stressColorBy(prop);
+  // "Total" uses the live scenario expression (defaults to the full noisy-OR);
+  // a single stressor colors by its own property (scenario doesn't apply there).
+  const expr = prop === 'stress_aggregate' ? stressRamp(scenarioAggExpr()) : stressColorBy(prop);
   ['stress-aggregate-dot', 'stress-aggregate-glow'].forEach(id => {
     if (map.getLayer(id)) map.setPaintProperty(id, 'circle-color', expr);
   });
   document.querySelectorAll('.stressby-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.prop === prop));
   const label = document.getElementById('legend-aggregate-label');
-  if (label) label.textContent = STRESS_BY_LABELS[prop] || 'Stress';
+  if (label) label.textContent = prop === 'stress_aggregate' ? scenarioLabel() : (STRESS_BY_LABELS[prop] || 'Stress');
 }
 
 document.querySelectorAll('.stressby-btn').forEach(btn => {
   btn.addEventListener('click', () => setStressColorBy(btn.dataset.prop));
+});
+
+// Scenario toggles: include/exclude a stressor from the cumulative total and
+// re-aggregate live. Only affects the "Total" coloring (a single-stressor view
+// is unchanged); recomputes the noisy-OR expression on the fly.
+document.querySelectorAll('.scenario-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prop = btn.dataset.prop;
+    scenarioEnabled[prop] = !scenarioEnabled[prop];
+    btn.classList.toggle('active', scenarioEnabled[prop]);
+    btn.setAttribute('aria-pressed', String(scenarioEnabled[prop]));
+    if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
+  });
 });
 
 // Hide every view-specific data layer. Each show*View() then re-enables only
@@ -606,6 +663,9 @@ function showStressView() {
   hideAllDataLayers();
   setVisibility('stress-aggregate-dot',  true);
   setVisibility('stress-aggregate-glow', true);
+  // Apply the current colour-by (Total uses the live scenario noisy-OR expression)
+  // so the view is consistent from the moment it opens, before any toggle click.
+  setStressColorBy(currentStressBy);
   updateLegend();
   stopPlay();
 }
