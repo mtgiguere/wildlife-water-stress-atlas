@@ -26,7 +26,7 @@ filter_accessible_water() and into the distance calculation.
 
 import geopandas as gpd
 
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.config.species import get_stressor_params
 
 
 def filter_accessible_water(
@@ -53,9 +53,9 @@ def filter_accessible_water(
     Raises:
         KeyError: If species is not found in SPECIES_CONFIG.
     """
-    # This will raise KeyError if species is unknown — intentional,
-    # same behavior as before, consistent with how scoring.py handles it
-    allowed_types = SPECIES_CONFIG[species]["accessible_water_types"]
+    # Reads the water stressor's accessible_types from the species' stressors
+    # list. Raises KeyError if the species (or its water stressor) is unknown.
+    allowed_types = get_stressor_params(species, "water")["accessible_types"]
 
     return water[water["water_type"].isin(allowed_types)].copy()
 
@@ -78,4 +78,4 @@ def get_water_type_weights(species: str) -> dict[str, float]:
     Raises:
         KeyError: If species is not found in SPECIES_CONFIG.
     """
-    return SPECIES_CONFIG[species]["water_type_weights"]
+    return get_stressor_params(species, "water")["type_weights"]

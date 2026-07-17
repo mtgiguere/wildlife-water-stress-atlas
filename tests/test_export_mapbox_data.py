@@ -214,7 +214,9 @@ def test_export_species_config_has_required_fields(tmp_path):
     with open(output_path) as f:
         data = json.load(f)
 
-    required_fields = ["common_name", "emoji", "water_threshold_m", "water_dependency", "icon_static_path"]
+    # Frontend-facing metadata fields. Stressor params (e.g. the water threshold)
+    # now live nested under each entry's `stressors` list, not as flat keys.
+    required_fields = ["common_name", "emoji", "stressors", "water_dependency", "icon_static_path"]
 
     for scientific_name, cfg in data.items():
         for field in required_fields:

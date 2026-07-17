@@ -73,7 +73,7 @@ def test_apply_settlement_threat_score_raises_for_missing_distance(sample_gdf):
 
 
 def test_apply_settlement_threat_score_with_real_scoring(sample_gdf):
-    from wildlife_water_stress_atlas.analytics.threat_scoring import settlement_threat_score
+    from tests._scoring_oracle import settlement_threat_score
 
     result = apply_settlement_threat_score(sample_gdf, settlement_threat_score)
     assert result["settlement_threat_score"].between(0, 1).all()

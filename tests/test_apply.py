@@ -108,8 +108,8 @@ def test_apply_water_stress_score_with_real_scoring():
     import geopandas as gpd
     from shapely.geometry import Point
 
+    from tests._scoring_oracle import water_stress_score
     from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
-    from wildlife_water_stress_atlas.analytics.scoring import water_stress_score
 
     gdf = gpd.GeoDataFrame(
         {
