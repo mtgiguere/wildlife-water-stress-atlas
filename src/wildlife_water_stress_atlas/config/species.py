@@ -7,15 +7,9 @@ Single source of truth for all species configuration in the atlas.
 
 WHY THIS FILE EXISTS:
 ---------------------
-Previously, species-specific values were scattered across multiple modules:
-  - analytics/scoring.py       held water_threshold_m
-  - analytics/water_access.py  held accessible_water_types and water_type_weights
-
-That meant adding a new species required editing multiple files — a maintenance
-hazard and a violation of the core architectural principle:
-  "Adding a new species = adding one config entry. Nothing else should change."
-
-This registry fixes that. Every module that needs species data imports from here.
+Species-specific values used to be scattered across multiple modules, so adding a
+species meant editing several files — a maintenance hazard. This registry is the
+single source of truth: every module that needs species data imports from here.
 
 HOW TO ADD A NEW SPECIES:
 --------------------------
@@ -25,69 +19,34 @@ in species_loader.py discovers it automatically, builds SPECIES_CONFIG, and
 validates each plugin independently — a malformed one is skipped and logged, not
 fatal. No edits to this file or any other are needed.
 
-FIELD REFERENCE:
-----------------
-water_threshold_m       : int | float
-    Maximum distance in meters at which the species is considered water-stressed.
-    Used to normalize the stress score to a 0–1 range.
-    Example: 300_000 means "if an elephant is 300km from water, stress = 1.0"
+ENTRY SHAPE (post-cutover):
+---------------------------
+Each entry has species-level metadata plus a `stressors` list. Stressor params
+live ONLY in that list — there are no flat water_*/road_*/settlement_* keys.
+Consumers read params via get_stressor_params(species, stressor_id); the scoring
+engine reads the list directly.
 
-accessible_water_types  : set[str]
-    The water source types this species can actually use.
-    Must match the 'type' column values produced by the water ingestion layer.
-    Example: {"river", "lake", "pan", "wetland"}
+Top-level metadata:
+    scientific_name  : str — the registry key.
+    common_name      : str — UI label.
+    daily_range_m    : int | float > 0 — typical daily movement range (grid sizing).
+    water_dependency : "low" | "moderate" | "high" — qualitative dependence.
+    realm            : "terrestrial" | "freshwater" | "marine" — see Realm.
+    icon_url         : https:// URL (Mapbox/UI icon).
+    icon_static_path : "app/static/..." (Streamlit same-origin icon).
+    gbif_cache_file  : "*.gpkg" occurrence cache filename.
+    emoji            : str — UI/chart label.
+    rationale        : str — ecological justification (provenance).
 
-water_type_weights      : dict[str, float]
-    Relative reliability/preference weight for each accessible water type.
-    Keys MUST exactly match accessible_water_types.
-    Values are floats in the range (0.0, 1.0].
-    1.0 = fully reliable source, lower = seasonal or less preferred.
-    Example: {"river": 1.0, "pan": 0.8} means pans are slightly less reliable.
-
-daily_range_m           : int | float
-    Typical maximum daily movement range in meters.
-    Used for grid cell sizing and future movement modeling.
-    Example: 50_000 (50km is a reasonable upper bound for elephants)
-
-water_dependency        : str — one of "low", "moderate", "high"
-    Qualitative descriptor of how tightly this species depends on
-    surface water availability. Used for weighting in composite stress
-    scores when multiple pressure types are combined in future phases.
-road_sensitivity        : float in [0.0, 1.0]
-    Per-species multiplier for how strongly roads threaten this species.
-    0.0 means roads are irrelevant (e.g. flying species). Higher values
-    mean roads (mortality, fragmentation, poaching access) matter more.
-    A short-circuit: sensitivity 0.0 makes road_threat_score return 0.0
-    regardless of distance or road class.
-
-road_threshold_m        : int | float
-    Distance in meters beyond which a road has no measured effect on the
-    species. Inside this distance the threat decays linearly to 0.0 at
-    the threshold. Mirrors water_threshold_m but for the pressure layer.
-
-road_class_weights      : dict[str, float]
-    Per-class severity in [0.0, 1.0]. Keys must cover KNOWN_ROAD_CLASSES.
-    Larger/faster roads carry higher weight. A weight of 0.0 means that
-    road class poses no threat to this species (e.g. a footpath to a frog).
-    All road fields are heuristic placeholders pending ecological validation.
-
-settlement_sensitivity  : float in [0.0, 1.0]
-    Per-species multiplier for how strongly human settlements threaten this
-    species (habitat conversion, human-wildlife conflict, retaliatory
-    killing, disturbance). 0.0 short-circuits settlement_threat_score to 0.0
-    regardless of distance or class. Mirrors road_sensitivity for the second
-    human-pressure layer (Pressure Type 2, settlements).
-
-settlement_threshold_m  : int | float
-    Distance in meters beyond which a settlement has no measured effect on
-    the species. Inside this distance the threat decays linearly to 0.0 at
-    the threshold. Mirrors road_threshold_m.
-
-settlement_class_weights: dict[str, float]
-    Per-class severity in [0.0, 1.0]. Keys must cover KNOWN_SETTLEMENT_CLASSES.
-    Larger, more permanent settlements carry higher weight
-    (city > town > village > hamlet). All settlement fields are heuristic
-    placeholders pending ecological validation.
+stressors : list[dict] — one entry per stressor, each:
+    stressor_id : "water" | "roads" | "settlements" | ...  (see stressor_plugins)
+    sensitivity : float in [0.0, 1.0] — per-species multiplier (0.0 = immune).
+    params      : dict — kind-specific:
+        water (RESOURCE): threshold_m > 0; accessible_types (non-empty list);
+                          type_weights {type: (0.0, 1.0]} keyed by accessible_types.
+        roads / settlements (HAZARD): threshold_m > 0; class_weights {class: [0.0, 1.0]}
+                          covering KNOWN_ROAD_CLASSES / KNOWN_SETTLEMENT_CLASSES.
+All values are heuristic placeholders pending ecological validation.
 """
 
 from enum import Enum
@@ -146,6 +105,39 @@ VALID_REALMS: set[str] = {r.value for r in Realm}
 
 
 # ---------------------------------------------------------------------------
+# Stressors-list accessors
+# ---------------------------------------------------------------------------
+# Plugins declare a `stressors` list — the single source of truth for a species'
+# stressor parameters (post-cutover; the flat-key bridge is gone). Consumers and
+# validation read stressor params through these accessors.
+
+
+def _find_stressor(entry: dict, stressor_id: str) -> dict | None:
+    """Return the stressor dict with this id from an entry's `stressors` list, or None."""
+    for s in entry.get("stressors", []):
+        if isinstance(s, dict) and s.get("stressor_id") == stressor_id:
+            return s
+    return None
+
+
+def get_stressor_params(species: str, stressor_id: str) -> dict:
+    """
+    Return the params of a species' stressor, read from its `stressors` list.
+
+    Args:
+        species     : Scientific name (must be in SPECIES_CONFIG).
+        stressor_id : Stressor id, e.g. "water" / "roads" / "settlements".
+
+    Raises:
+        KeyError: If the species or the stressor is absent.
+    """
+    stressor = _find_stressor(SPECIES_CONFIG[species], stressor_id)
+    if stressor is None:
+        raise KeyError(f"{species} has no {stressor_id!r} stressor")
+    return stressor.get("params", {})
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 # These checks run once at import time — if someone adds a malformed species
@@ -153,37 +145,72 @@ VALID_REALMS: set[str] = {r.value for r in Realm}
 # deep inside the scoring pipeline at runtime.
 
 
-def _validate_proximity_stressor(species: str, cfg: dict, prefix: str, known_classes: set[str]) -> None:
+def _validate_water_stressor(species: str, entry: dict) -> None:
     """
-    Validate a feature-proximity stressor's fields (road, settlement).
+    Validate the required `water` stressor's params in a species' stressors list.
 
-    Both share the same shape: `{prefix}_sensitivity` in [0,1],
-    `{prefix}_threshold_m` positive, and `{prefix}_class_weights` covering
-    exactly `known_classes` with values in [0,1] (0.0 allowed — e.g. a footpath
-    poses no threat to a frog, unlike water weights which must be > 0).
-
-    This closes a long-standing gap: road/settlement fields were never validated
-    at import (see docs/TDD_CONTRACT.md — the "unvalidated fields" class of bug).
+    params.threshold_m positive; params.accessible_types a non-empty list;
+    params.type_weights a dict whose keys exactly match accessible_types with
+    values in (0.0, 1.0] (water weights must be > 0 — an accessible type that
+    provides no water is a contradiction, unlike a zero-threat road class).
     """
-    sens_key, thr_key, cw_key = f"{prefix}_sensitivity", f"{prefix}_threshold_m", f"{prefix}_class_weights"
+    stressor = _find_stressor(entry, "water")
+    if stressor is None:
+        raise ValueError(f"{species}: missing 'water' stressor")
 
-    for key in (sens_key, thr_key, cw_key):
-        if key not in cfg:
-            raise ValueError(f"{species}: missing {key}")
+    params = stressor.get("params", {})
 
-    if not isinstance(cfg[sens_key], (int, float)) or not (0.0 <= cfg[sens_key] <= 1.0):
-        raise ValueError(f"{species}: {sens_key} must be a number in [0.0, 1.0]")
+    threshold = params.get("threshold_m")
+    if not isinstance(threshold, (int, float)) or threshold <= 0:
+        raise ValueError(f"{species}: water threshold_m must be a positive number")
 
-    if not isinstance(cfg[thr_key], (int, float)) or cfg[thr_key] <= 0:
-        raise ValueError(f"{species}: {thr_key} must be a positive number")
+    types = params.get("accessible_types")
+    if not isinstance(types, (list, tuple, set)) or not types:
+        raise ValueError(f"{species}: water accessible_types must be a non-empty list")
 
-    weights = cfg[cw_key]
+    weights = params.get("type_weights")
+    if not isinstance(weights, dict) or set(weights.keys()) != set(types):
+        raise ValueError(f"{species}: water type_weights keys must exactly match accessible_types. Got {set(weights.keys()) if isinstance(weights, dict) else type(weights)} vs {set(types)}")
+
+    for water_type, weight in weights.items():
+        if not isinstance(weight, (int, float)) or not (0.0 < weight <= 1.0):
+            raise ValueError(f"{species}/{water_type}: type_weight must be a number between 0 (exclusive) and 1 (inclusive)")
+
+
+def _validate_proximity_stressor(species: str, entry: dict, stressor_id: str, known_classes: set[str]) -> None:
+    """
+    Validate a feature-proximity stressor (roads, settlements) in the stressors list.
+
+    Both share the same shape: `sensitivity` in [0,1], params.`threshold_m`
+    positive, and params.`class_weights` covering exactly `known_classes` with
+    values in [0,1] (0.0 allowed — e.g. a footpath poses no threat to a frog,
+    unlike water weights which must be > 0).
+
+    This preserves the import-time guard against the "unvalidated fields" class of
+    bug (docs/TDD_CONTRACT.md), now reading from the stressors list rather than
+    the retired flat keys.
+    """
+    stressor = _find_stressor(entry, stressor_id)
+    if stressor is None:
+        raise ValueError(f"{species}: missing '{stressor_id}' stressor")
+
+    sensitivity = stressor.get("sensitivity")
+    if not isinstance(sensitivity, (int, float)) or not (0.0 <= sensitivity <= 1.0):
+        raise ValueError(f"{species}: {stressor_id} sensitivity must be a number in [0.0, 1.0]")
+
+    params = stressor.get("params", {})
+
+    threshold = params.get("threshold_m")
+    if not isinstance(threshold, (int, float)) or threshold <= 0:
+        raise ValueError(f"{species}: {stressor_id} threshold_m must be a positive number")
+
+    weights = params.get("class_weights")
     if not isinstance(weights, dict) or set(weights.keys()) != set(known_classes):
-        raise ValueError(f"{species}: {cw_key} keys must exactly cover {known_classes}, got {set(weights.keys()) if isinstance(weights, dict) else type(weights)}")
+        raise ValueError(f"{species}: {stressor_id} class_weights keys must exactly cover {known_classes}, got {set(weights.keys()) if isinstance(weights, dict) else type(weights)}")
 
     for cls, weight in weights.items():
         if not isinstance(weight, (int, float)) or not (0.0 <= weight <= 1.0):
-            raise ValueError(f"{species}: {cw_key} value for '{cls}' must be a number in [0.0, 1.0]")
+            raise ValueError(f"{species}: {stressor_id} class_weights value for '{cls}' must be a number in [0.0, 1.0]")
 
 
 def _validate_species_config(config: dict[str, dict]) -> None:
@@ -195,9 +222,9 @@ def _validate_species_config(config: dict[str, dict]) -> None:
                     wrong types, or violates field constraints.
     """
     required_keys = {
-        "water_threshold_m",
-        "accessible_water_types",
-        "water_type_weights",
+        "scientific_name",
+        "common_name",
+        "stressors",
         "daily_range_m",
         "water_dependency",
         "icon_url",
@@ -210,22 +237,9 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         if missing:
             raise ValueError(f"{species} is missing required keys: {missing}")
 
-        # water_threshold_m must be a positive number
-        if not isinstance(cfg["water_threshold_m"], (int, float)) or cfg["water_threshold_m"] <= 0:
-            raise ValueError(f"{species}: water_threshold_m must be a positive number")
-
-        # accessible_water_types must be a non-empty set
-        if not isinstance(cfg["accessible_water_types"], set) or not cfg["accessible_water_types"]:
-            raise ValueError(f"{species}: accessible_water_types must be a non-empty set")
-
-        # water_type_weights keys must exactly match accessible_water_types
-        if cfg["water_type_weights"].keys() != cfg["accessible_water_types"]:
-            raise ValueError(f"{species}: water_type_weights keys must exactly match accessible_water_types. Got {set(cfg['water_type_weights'].keys())} vs {cfg['accessible_water_types']}")
-
-        # All weights must be floats in (0.0, 1.0]
-        for water_type, weight in cfg["water_type_weights"].items():
-            if not isinstance(weight, float) or not (0.0 < weight <= 1.0):
-                raise ValueError(f"{species}/{water_type}: weight must be a float between 0 (exclusive) and 1 (inclusive)")
+        # stressors must be a list (the single source of truth for stressor params)
+        if not isinstance(cfg["stressors"], list):
+            raise ValueError(f"{species}: stressors must be a list")
 
         # daily_range_m must be a positive number
         if not isinstance(cfg["daily_range_m"], (int, float)) or cfg["daily_range_m"] <= 0:
@@ -258,67 +272,22 @@ def _validate_species_config(config: dict[str, dict]) -> None:
         if cfg.get("realm") not in VALID_REALMS:
             raise ValueError(f"{species}: realm must be one of {VALID_REALMS}, got {cfg.get('realm')!r}")
 
-        # Human-pressure stressor fields (road, settlement) — previously
-        # unvalidated. Both share the sensitivity/threshold/class_weights shape.
-        _validate_proximity_stressor(species, cfg, "road", KNOWN_ROAD_CLASSES)
-        _validate_proximity_stressor(species, cfg, "settlement", KNOWN_SETTLEMENT_CLASSES)
-
-
-# ---------------------------------------------------------------------------
-# Stressors-list bridge (Phase C)
-# ---------------------------------------------------------------------------
-# Plugins now declare a `stressors` list (the source of truth). Legacy consumers
-# (scoring / water_access / threat_scoring / exports) still read the flat keys,
-# so we derive those keys from the list here. This bridge is temporary: it goes
-# away once every consumer reads via the generic engine. Defensive-by-design —
-# it never raises on a malformed stressor; the validator then catches the
-# resulting missing/invalid flat key and the loader skips that plugin.
-
-
-def _flatten_stressors(entry: dict) -> dict:
-    """Derive the legacy flat keys (water_*/road_*/settlement_*) from a species
-    entry's `stressors` list, preserving the list and all other fields."""
-    out = dict(entry)
-    by_id = {s.get("stressor_id"): s for s in entry.get("stressors", []) if isinstance(s, dict)}
-
-    water = by_id.get("water")
-    if water:
-        p = water.get("params", {})
-        if "threshold_m" in p:
-            out["water_threshold_m"] = p["threshold_m"]
-        if "accessible_types" in p:
-            out["accessible_water_types"] = p["accessible_types"]
-        if "type_weights" in p:
-            out["water_type_weights"] = p["type_weights"]
-
-    for stressor_id, prefix in (("roads", "road"), ("settlements", "settlement")):
-        s = by_id.get(stressor_id)
-        if s:
-            p = s.get("params", {})
-            if "sensitivity" in s:
-                out[f"{prefix}_sensitivity"] = s["sensitivity"]
-            if "threshold_m" in p:
-                out[f"{prefix}_threshold_m"] = p["threshold_m"]
-            if "class_weights" in p:
-                out[f"{prefix}_class_weights"] = p["class_weights"]
-
-    return out
-
-
-def _prepare_entry(entry: dict) -> dict:
-    """Loader transform: flatten the stressors list to legacy keys, then coerce
-    accessible_water_types (a JSON array) to the set the pipeline expects."""
-    out = _flatten_stressors(entry)
-    if "accessible_water_types" in out and not isinstance(out["accessible_water_types"], set):
-        out["accessible_water_types"] = set(out["accessible_water_types"])
-    return out
+        # Stressor params (the single source of truth). Water is required;
+        # roads/settlements share the sensitivity/threshold/class_weights shape.
+        _validate_water_stressor(species, cfg)
+        _validate_proximity_stressor(species, cfg, "roads", KNOWN_ROAD_CLASSES)
+        _validate_proximity_stressor(species, cfg, "settlements", KNOWN_SETTLEMENT_CLASSES)
 
 
 # Build the registry from per-species plugin files (JSON) under species_plugins/.
 # Each plugin is validated independently; a malformed one is skipped and logged
 # (see species_loader), not fatal. Adding a species = adding one JSON file.
+#
+# The `stressors` list is the single source of truth for stressor params — no
+# flattening to legacy keys (the bridge was retired at the scoring cutover).
+# Consumers read stressor params via get_stressor_params(); the engine reads the
+# list directly.
 SPECIES_CONFIG = load_species_plugins(
     PLUGINS_DIR,
     validate=lambda entry: _validate_species_config({entry["scientific_name"]: entry}),
-    transform=_prepare_entry,
 )

@@ -8,32 +8,36 @@
 
 ---
 
-## Current status — 2026-07 (Phase C in progress)
+## Current status — 2026-07 (Phase C essentially done; cutover complete)
 
 **All merged to `main`:** Phase-1 prototype (11 species; water/road/settlement;
-Mapbox + Streamlit), the settlements feature (#24), the 4 dependabot bumps
-(#21–23), **Phase A** (species = JSON plugins, #26) and **Phase B** (generic
-kind-aware scoring engine, #27). `main` is green (796 tests) with the full
-extensible engine that reproduces today's scores.
+Mapbox + Streamlit), the settlements feature (#24), the dependabot bumps, **Phase
+A** (species = JSON plugins, #26), **Phase B** (generic kind-aware scoring engine,
+#27), and Phase C C1–C5 (stressors-list config, generic export, STRESS view +
+per-stressor toggle with a permanent SwiftShader visual guard, stressor-TYPE
+plugins). `main` is green with the full extensible engine.
 
-- **Phase C — IN PROGRESS** on branch `feat/stressors-list-config` (off `main`):
-  - ✅ **C1** — plugins restructured to a `stressors` list (source of truth); a
-    `_flatten_stressors` bridge derives legacy flat keys so consumers stay green.
-  - ✅ **C2** — `compute_species_stress` (scripts/export_stress.py): the engine
-    is now a real consumer over geo data (per-stressor breakdown + noisy-OR
-    aggregate), golden-verified against the legacy pipelines.
-  - ⏭️ **C3** — generic file-writing export (one GeoJSON/species, all stressors +
-    aggregate); still pure-Python/TDD-safe.
-  - ⏭️ **C4** — stressor-driven frontend (views/legends from whatever stressors
-    exist; aggregate layer + per-stressor toggle; compare/scenario). **Re-enters
-    visual-guard territory** — a green Python suite is NOT enough; use the
-    SwiftShader screenshot discipline (see `[[reference-swiftshader-render]]`).
-  - 808 tests on the branch; lint clean.
+- **Phase C — scoring CUTOVER complete** on branch `feat/cutover-unify-scoring`
+  (off `main`; open for review): the generic engine is now the **sole scoring
+  path**. Deleted `analytics/threat_scoring.py` and `scoring.water_stress_score`
+  (kept `classify_stress_level`); the export scripts + `water_access` + streamlit
+  `stats` all score via `score_stressor` / read params via `get_stressor_params`.
+  Removed the `_flatten_stressors` bridge — the **`stressors` list is the single
+  config shape** (no flat water_*/road_*/settlement_* keys). The golden
+  "reproduces the original scores" guarantee is preserved by a frozen test-only
+  oracle (`tests/_scoring_oracle.py`). Config validation was re-pointed to the
+  stressors list, preserving all prior guards (incl. class-weight completeness).
+  746 tests, 99% coverage, lint clean.
+- **Remaining in Phase C (not started):** species compare mode; scenario toggles.
 - **Deferred: realm gating** — blocked on marine stressor *types* that don't
   exist yet, and redundant with current validation for the existing (all
   terrestrial/freshwater) species. Revisit when a marine species/stressor lands.
 - **Data caveat:** the committed settlement GeoJSON is a SUBSET (kenya/tanzania/
-  south-africa); run the full continental fetch + export before shipping.
+  south-africa); run the full continental fetch + export before shipping. The new
+  STRESS view also needs a continental `stress_gbif_*` export before it's populated
+  (its data is gitignored dev data today).
+- **Deploy:** a GitHub Pages workflow (`ci/pages-mapbox-deploy`) publishes the
+  static Mapbox app; requires Settings → Pages → Source = "GitHub Actions".
 
 **Design decided and locked (do not re-litigate):** stressor **kinds**
 (hazard/resource/ambient); **noisy-OR** aggregation `1−∏(1−sᵢ)` as the single
@@ -124,6 +128,13 @@ Branch `feat/stressors-list-config`.
       from `config/stressor_plugins/`. Adding a stressor type of an existing kind
       is now one JSON file, no code (demonstrated with a `fences` drop-in). Closes
       the retro gap; golden reproduction holds. (`test_stressor_type_loader.py`, 8)
+- [x] **CUTOVER** — the generic engine is the SOLE scoring path. Added
+      `score_stressor` (single scalar via the engine); routed the road/settlement/
+      water export scripts + `water_access` + streamlit `stats` through it; deleted
+      `threat_scoring.py`, `scoring.water_stress_score`, and the `_flatten_stressors`
+      bridge; the `stressors` list is now the single config shape (no flat keys) with
+      validation re-pointed to it. Golden reproduction preserved by a frozen test
+      oracle (`tests/_scoring_oracle.py`). (branch `feat/cutover-unify-scoring`)
 - [ ] Species compare mode (Savannah vs Forest elephant)
 - [ ] Scenario toggles: stressor on/off, reweight, live re-aggregate
 

@@ -20,8 +20,9 @@ OUTPUT:
 ARCHITECTURE NOTE:
 ------------------
 Roads are loaded once, then reused across all species — the road network
-is species-independent. Each species gets its own score via road_threat_score()
-which applies species-specific sensitivity and class weights from SPECIES_CONFIG.
+is species-independent. Each species gets its own score via the unified scoring
+engine (score_stressor(..., "roads", ...)), which applies that species'
+roads-stressor sensitivity and class weights from SPECIES_CONFIG.
 
 This script is part of the static pre-computation pipeline.
 When OSM data updates, re-run this script to refresh the GeoJSON.
@@ -33,7 +34,8 @@ import geopandas as gpd
 
 from wildlife_water_stress_atlas.analytics.apply import apply_road_threat_score
 from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_road
-from wildlife_water_stress_atlas.analytics.threat_scoring import road_threat_score
+from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
+from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
@@ -71,7 +73,13 @@ def compute_road_threats(
         road_threat_score columns added.
     """
     with_distances = add_distance_to_road(occurrences, roads)
-    return apply_road_threat_score(with_distances, road_threat_score)
+    return apply_road_threat_score(with_distances, _road_threat_score)
+
+
+def _road_threat_score(distance_m: float, road_class: str, species: str) -> float:
+    """Adapter to the unified engine (cutover): the roads-stressor value the
+    legacy threat_scoring.road_threat_score used to return."""
+    return score_stressor(species, "roads", FeatureProximity(distance_m, road_class))
 
 
 def build_backbone_roads(

@@ -22,7 +22,7 @@ from wildlife_water_stress_atlas.analytics.water_access import (
     filter_accessible_water,
     get_water_type_weights,
 )
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.config.species import get_stressor_params
 
 # ---------------------------------------------------------------------------
 # filter_accessible_water
@@ -78,24 +78,21 @@ def test_filter_accessible_water_raises_for_unknown_species():
 
 
 def test_filter_accessible_water_reads_from_species_config():
-    # This test proves the function is wired to the species config registry.
-    # We temporarily add a new water type to the elephant config and verify
-    # it is immediately reflected in filter_accessible_water() — no code
-    # changes required, just a config change.
-    #
-    # This is the exact mechanism that will fix the phantom thirst bug:
-    # add "pan" to SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"]
-    # and pans will immediately be included in the filter.
-    original_types = SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"].copy()
-    original_weights = SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"].copy()
+    # Proves the function is wired to the species config registry (the stressors
+    # list). We temporarily register a new water type on the elephant's water
+    # stressor and verify it is immediately reflected in filter_accessible_water()
+    # — no code changes, just a config change.
+    water_params = get_stressor_params("Loxodonta africana", "water")
+    original_types = list(water_params["accessible_types"])
+    original_weights = dict(water_params["type_weights"])
 
     try:
-        # Temporarily register "pan" as accessible for elephants
-        SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"].add("pan")
-        SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"]["pan"] = 0.8
+        # Temporarily register a novel type as accessible for elephants
+        water_params["accessible_types"].append("test_pool")
+        water_params["type_weights"]["test_pool"] = 0.8
 
         water = gpd.GeoDataFrame(
-            {"water_type": ["river", "pan"]},
+            {"water_type": ["river", "test_pool"]},
             geometry=[
                 LineString([(0, 0), (1, 1)]),
                 Polygon([(5, 5), (5, 6), (6, 6), (6, 5)]),
@@ -105,14 +102,15 @@ def test_filter_accessible_water_reads_from_species_config():
 
         result = filter_accessible_water(water, species="Loxodonta africana")
 
-        # Pan should now pass through the filter
-        assert "pan" in set(result["water_type"])
+        # The novel type should now pass through the filter
+        assert "test_pool" in set(result["water_type"])
         assert len(result) == 2
 
     finally:
         # Always restore original config so other tests are not affected
-        SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"] = original_types
-        SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"] = original_weights
+        water_params["accessible_types"][:] = original_types
+        water_params["type_weights"].clear()
+        water_params["type_weights"].update(original_weights)
 
 
 # ---------------------------------------------------------------------------
@@ -139,24 +137,26 @@ def test_get_water_type_weights_raises_for_unknown_species():
 
 
 def test_get_water_type_weights_reads_from_species_config():
-    # Same proof-of-wiring test as filter_accessible_water above —
-    # temporarily add a new type to the config and verify it shows up
-    # in get_water_type_weights() immediately
-    original_types = SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"].copy()
-    original_weights = SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"].copy()
+    # Same proof-of-wiring test as filter_accessible_water above — temporarily
+    # add a new type to the water stressor and verify it shows up in
+    # get_water_type_weights() immediately.
+    water_params = get_stressor_params("Loxodonta africana", "water")
+    original_types = list(water_params["accessible_types"])
+    original_weights = dict(water_params["type_weights"])
 
     try:
-        SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"].add("wetland")
-        SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"]["wetland"] = 0.9
+        water_params["accessible_types"].append("test_pool")
+        water_params["type_weights"]["test_pool"] = 0.9
 
         weights = get_water_type_weights("Loxodonta africana")
 
-        assert "wetland" in weights
-        assert weights["wetland"] == 0.9
+        assert "test_pool" in weights
+        assert weights["test_pool"] == 0.9
 
     finally:
-        SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"] = original_types
-        SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"] = original_weights
+        water_params["accessible_types"][:] = original_types
+        water_params["type_weights"].clear()
+        water_params["type_weights"].update(original_weights)
 
 
 def test_filter_accessible_water_result_is_a_copy():
