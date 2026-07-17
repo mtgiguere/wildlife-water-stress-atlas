@@ -5,6 +5,7 @@ from wildlife_water_stress_atlas.config.species import (
     KNOWN_SETTLEMENT_CLASSES,
     SPECIES_CONFIG,
     _validate_species_config,
+    get_stressor_params,
 )
 
 # ---------------------------------------------------------------------------
@@ -18,9 +19,9 @@ def test_species_config_contains_african_elephant():
 
 def test_all_species_have_required_keys():
     required_keys = {
-        "water_threshold_m",
-        "accessible_water_types",
-        "water_type_weights",
+        "scientific_name",
+        "common_name",
+        "stressors",
         "daily_range_m",
         "water_dependency",
     }
@@ -30,31 +31,33 @@ def test_all_species_have_required_keys():
 
 
 # ---------------------------------------------------------------------------
-# Field types and constraints
+# Water stressor params (the stressors list is the source of truth)
 # ---------------------------------------------------------------------------
 
 
 def test_water_threshold_m_is_positive_number():
-    for species, config in SPECIES_CONFIG.items():
-        assert isinstance(config["water_threshold_m"], (int, float)), f"{species}: water_threshold_m must be int or float"
-        assert config["water_threshold_m"] > 0, f"{species}: water_threshold_m must be positive"
+    for species in SPECIES_CONFIG:
+        threshold = get_stressor_params(species, "water")["threshold_m"]
+        assert isinstance(threshold, (int, float)), f"{species}: water threshold_m must be int or float"
+        assert threshold > 0, f"{species}: water threshold_m must be positive"
 
 
-def test_accessible_water_types_is_nonempty_set():
-    for species, config in SPECIES_CONFIG.items():
-        assert isinstance(config["accessible_water_types"], set), f"{species}: accessible_water_types must be a set"
-        assert len(config["accessible_water_types"]) > 0, f"{species}: accessible_water_types must not be empty"
+def test_accessible_types_is_nonempty():
+    for species in SPECIES_CONFIG:
+        types = get_stressor_params(species, "water")["accessible_types"]
+        assert len(types) > 0, f"{species}: water accessible_types must not be empty"
 
 
-def test_water_type_weights_keys_match_accessible_water_types():
-    for species, config in SPECIES_CONFIG.items():
-        assert config["water_type_weights"].keys() == config["accessible_water_types"], f"{species}: water_type_weights keys must match accessible_water_types"
+def test_type_weights_keys_match_accessible_types():
+    for species in SPECIES_CONFIG:
+        params = get_stressor_params(species, "water")
+        assert set(params["type_weights"].keys()) == set(params["accessible_types"]), f"{species}: type_weights keys must match accessible_types"
 
 
-def test_water_type_weights_are_floats_between_0_and_1():
-    for species, config in SPECIES_CONFIG.items():
-        for water_type, weight in config["water_type_weights"].items():
-            assert isinstance(weight, float), f"{species}/{water_type}: weight must be a float"
+def test_type_weights_are_numbers_between_0_and_1():
+    for species in SPECIES_CONFIG:
+        for water_type, weight in get_stressor_params(species, "water")["type_weights"].items():
+            assert isinstance(weight, (int, float)), f"{species}/{water_type}: weight must be a number"
             assert 0.0 < weight <= 1.0, f"{species}/{water_type}: weight must be between 0 (exclusive) and 1 (inclusive)"
 
 
@@ -75,16 +78,16 @@ def test_water_dependency_is_valid_string():
 # ---------------------------------------------------------------------------
 
 
-def test_elephant_water_threshold_matches_existing_scoring_module():
-    assert SPECIES_CONFIG["Loxodonta africana"]["water_threshold_m"] == 300_000
+def test_elephant_water_threshold_is_correct():
+    assert get_stressor_params("Loxodonta africana", "water")["threshold_m"] == 300_000
 
 
-def test_elephant_accessible_water_types_are_correct():
-    assert SPECIES_CONFIG["Loxodonta africana"]["accessible_water_types"] == {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "saline_lake", "permanent_water"}
+def test_elephant_accessible_types_are_correct():
+    assert set(get_stressor_params("Loxodonta africana", "water")["accessible_types"]) == {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "saline_lake", "permanent_water"}
 
 
-def test_elephant_water_type_weights_are_correct():
-    weights = SPECIES_CONFIG["Loxodonta africana"]["water_type_weights"]
+def test_elephant_type_weights_are_correct():
+    weights = get_stressor_params("Loxodonta africana", "water")["type_weights"]
     assert weights["river"] == 1.0
     assert weights["lake"] == 1.0
     assert weights["pan"] == 0.4
@@ -106,340 +109,195 @@ def test_unknown_species_raises_key_error():
 
 
 # ---------------------------------------------------------------------------
-# Validation — malformed entries should raise at import time
-# ---------------------------------------------------------------------------
-
-
-def test_missing_required_key_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            # water_threshold_m is missing
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="missing required keys"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_water_threshold_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": -1,  # negative — invalid
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="water_threshold_m"):
-        _validate_species_config(bad_config)
-
-
-def test_empty_accessible_water_types_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": set(),  # empty — invalid
-            "water_type_weights": {},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="accessible_water_types"):
-        _validate_species_config(bad_config)
-
-
-def test_mismatched_weight_keys_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river", "lake"},
-            "water_type_weights": {"river": 1.0},  # missing "lake" — invalid
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="water_type_weights keys"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_weight_value_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.5},  # > 1.0 — invalid
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="weight must be a float"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_daily_range_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 0,  # zero — invalid
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="daily_range_m"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_water_dependency_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "extreme",  # not in {"low", "moderate", "high"}
-            "icon_url": "https://example.com/icon.png",
-        }
-    }
-    with pytest.raises(ValueError, match="water_dependency"):
-        _validate_species_config(bad_config)
-
-
-def test_all_species_have_icon_url():
-    for species, config in SPECIES_CONFIG.items():
-        assert "icon_url" in config, f"{species} is missing icon_url"
-        assert isinstance(config["icon_url"], str), f"{species}: icon_url must be a string"
-        assert config["icon_url"].startswith("https://"), f"{species}: icon_url must be a valid URL"
-
-
-def test_elephant_icon_url_is_twemoji_elephant():
-    assert SPECIES_CONFIG["Loxodonta africana"]["icon_url"] == "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png"
-
-
-def test_invalid_icon_url_raises_value_error():
-
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "not-a-valid-url",  # missing https:// — invalid
-        }
-    }
-    with pytest.raises(ValueError, match="icon_url"):
-        _validate_species_config(bad_config)
-
-
-def test_species_config_contains_plains_zebra():
-    assert "Equus quagga" in SPECIES_CONFIG
-
-
-def test_all_species_have_icon_static_path():
-    for species, config in SPECIES_CONFIG.items():
-        assert "icon_static_path" in config, f"{species} is missing icon_static_path"
-        assert config["icon_static_path"].startswith("app/static/"), f"{species}: icon_static_path must start with 'app/static/'"
-
-
-def test_all_species_have_gbif_cache_file():
-    for species, config in SPECIES_CONFIG.items():
-        assert "gbif_cache_file" in config, f"{species} is missing gbif_cache_file"
-        assert config["gbif_cache_file"].endswith(".gpkg"), f"{species}: gbif_cache_file must end with .gpkg"
-
-
-def test_all_species_have_emoji():
-    for species, config in SPECIES_CONFIG.items():
-        assert "emoji" in config, f"{species} is missing emoji"
-        assert isinstance(config["emoji"], str), f"{species}: emoji must be a string"
-
-
-def test_invalid_icon_static_path_raises_value_error():
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-            "icon_static_path": "not/a/valid/path.png",  # missing app/static/ prefix
-            "gbif_cache_file": "gbif_fake.gpkg",
-            "emoji": "🦁",
-        }
-    }
-    with pytest.raises(ValueError, match="icon_static_path"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_gbif_cache_file_raises_value_error():
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-            "icon_static_path": "app/static/fake.png",
-            "gbif_cache_file": "not_a_gpkg_file.csv",  # wrong extension
-            "emoji": "🦁",
-        }
-    }
-    with pytest.raises(ValueError, match="gbif_cache_file"):
-        _validate_species_config(bad_config)
-
-
-def test_invalid_emoji_raises_value_error():
-    bad_config = {
-        "Fake species": {
-            "water_threshold_m": 100_000,
-            "accessible_water_types": {"river"},
-            "water_type_weights": {"river": 1.0},
-            "daily_range_m": 50_000,
-            "water_dependency": "high",
-            "icon_url": "https://example.com/icon.png",
-            "icon_static_path": "app/static/fake.png",
-            "gbif_cache_file": "gbif_fake.gpkg",
-            "emoji": 123,  # not a string
-        }
-    }
-    with pytest.raises(ValueError, match="emoji"):
-        _validate_species_config(bad_config)
-
-
-def test_species_config_contains_giraffe():
-    assert "Giraffa camelopardalis" in SPECIES_CONFIG
-
-
-def test_species_config_contains_lion():
-    assert "Panthera leo" in SPECIES_CONFIG
-
-
-def test_species_config_contains_cheetah():
-    assert "Acinonyx jubatus" in SPECIES_CONFIG
-
-
-def test_species_config_contains_nile_crocodile():
-    assert "Crocodylus niloticus" in SPECIES_CONFIG
-
-
-def test_species_config_contains_greater_flamingo():
-    assert "Phoenicopterus roseus" in SPECIES_CONFIG
-
-
-def test_species_config_contains_painted_reed_frog():
-    assert "Hyperolius marmoratus" in SPECIES_CONFIG
-
-
-def test_species_config_contains_african_clawed_frog():
-    assert "Xenopus laevis" in SPECIES_CONFIG
-
-
-def test_species_config_contains_hippopotamus():
-    assert "Hippopotamus amphibius" in SPECIES_CONFIG
-
-
-def test_species_config_contains_african_buffalo():
-    assert "Syncerus caffer" in SPECIES_CONFIG
-
-
-def test_hippo_water_threshold_is_tight():
-    # Hippos seldom move more than 3km from water — 15km is a generous
-    # upper bound that accounts for drought-driven dispersal movements.
-    assert SPECIES_CONFIG["Hippopotamus amphibius"]["water_threshold_m"] == 15_000
-
-
-def test_hippo_water_dependency_is_high():
-    assert SPECIES_CONFIG["Hippopotamus amphibius"]["water_dependency"] == "high"
-
-
-def test_hippo_accessible_water_types_are_correct():
-    assert SPECIES_CONFIG["Hippopotamus amphibius"]["accessible_water_types"] == {"river", "lake", "wetland", "floodplain", "permanent_water"}
-
-
-def test_hippo_water_type_weights_are_correct():
-    weights = SPECIES_CONFIG["Hippopotamus amphibius"]["water_type_weights"]
-    assert weights["river"] == 1.0
-    assert weights["lake"] == 1.0
-    assert weights["wetland"] == 0.8
-    assert weights["floodplain"] == 0.9
-    assert weights["permanent_water"] == 1.0
-
-
-def test_buffalo_water_threshold_is_correct():
-    # Buffalo drink daily and contract their range sharply around
-    # permanent water in dry season — 100km reflects dry-season max.
-    assert SPECIES_CONFIG["Syncerus caffer"]["water_threshold_m"] == 100_000
-
-
-def test_buffalo_water_dependency_is_high():
-    assert SPECIES_CONFIG["Syncerus caffer"]["water_dependency"] == "high"
-
-
-def test_buffalo_accessible_water_types_are_correct():
-    assert SPECIES_CONFIG["Syncerus caffer"]["accessible_water_types"] == {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"}
-
-
-def test_buffalo_water_type_weights_are_correct():
-    weights = SPECIES_CONFIG["Syncerus caffer"]["water_type_weights"]
-    assert weights["river"] == 1.0
-    assert weights["lake"] == 1.0
-    assert weights["pan"] == 0.5
-    assert weights["wetland"] == 0.7
-    assert weights["floodplain"] == 0.9
-    assert weights["surface_water"] == 0.6
-    assert weights["permanent_water"] == 0.9
-
-
-# ---------------------------------------------------------------------------
-# Road & settlement stressor validation — previously an UNVALIDATED gap
-# (see docs/TDD_CONTRACT.md; road/settlement fields were never checked at import)
+# Validation — a complete valid entry, then one bad field per negative test
 # ---------------------------------------------------------------------------
 
 
 def _valid_entry() -> dict:
-    """A complete, valid single-species entry — the base for negative tests so
-    each isolates exactly one bad field regardless of validation check order."""
+    """A complete, valid single-species entry (stressors-list shape) — the base
+    for negative tests so each isolates exactly one bad field regardless of the
+    validation check order."""
     return {
-        "water_threshold_m": 100_000,
-        "accessible_water_types": {"river"},
-        "water_type_weights": {"river": 1.0},
+        "scientific_name": "Fake species",
+        "common_name": "Faker",
         "daily_range_m": 50_000,
         "water_dependency": "high",
         "icon_url": "https://example.com/icon.png",
         "icon_static_path": "app/static/fake.png",
         "gbif_cache_file": "gbif_fake.gpkg",
         "emoji": "🦁",
-        "road_sensitivity": 0.5,
-        "road_threshold_m": 5_000,
-        "road_class_weights": {c: 0.5 for c in KNOWN_ROAD_CLASSES},
-        "settlement_sensitivity": 0.5,
-        "settlement_threshold_m": 5_000,
-        "settlement_class_weights": {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES},
         "realm": "terrestrial",
+        "stressors": [
+            {"stressor_id": "water", "sensitivity": 1.0, "params": {"threshold_m": 100_000, "accessible_types": ["river"], "type_weights": {"river": 1.0}}},
+            {"stressor_id": "roads", "sensitivity": 0.5, "params": {"threshold_m": 5_000, "class_weights": {c: 0.5 for c in KNOWN_ROAD_CLASSES}}},
+            {"stressor_id": "settlements", "sensitivity": 0.5, "params": {"threshold_m": 5_000, "class_weights": {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES}}},
+        ],
     }
+
+
+def _stressor(entry: dict, stressor_id: str) -> dict:
+    return next(s for s in entry["stressors"] if s["stressor_id"] == stressor_id)
 
 
 def test_valid_full_entry_passes_validation():
     _validate_species_config({"Fake species": _valid_entry()})  # must not raise
+
+
+def test_missing_required_key_raises_value_error():
+    entry = _valid_entry()
+    del entry["daily_range_m"]
+    with pytest.raises(ValueError, match="missing required keys"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_stressors_not_a_list_raises_value_error():
+    with pytest.raises(ValueError, match="stressors must be a list"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "stressors": {"not": "a list"}}})
+
+
+# --- water stressor ---
+
+
+def test_missing_water_stressor_raises_value_error():
+    entry = _valid_entry()
+    entry["stressors"] = [s for s in entry["stressors"] if s["stressor_id"] != "water"]
+    with pytest.raises(ValueError, match="water"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_invalid_water_threshold_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["threshold_m"] = -1
+    with pytest.raises(ValueError, match="threshold_m"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_empty_accessible_types_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["accessible_types"] = []
+    _stressor(entry, "water")["params"]["type_weights"] = {}
+    with pytest.raises(ValueError, match="accessible_types"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_mismatched_type_weight_keys_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["accessible_types"] = ["river", "lake"]
+    _stressor(entry, "water")["params"]["type_weights"] = {"river": 1.0}  # missing "lake"
+    with pytest.raises(ValueError, match="type_weights keys"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_invalid_type_weight_value_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["type_weights"] = {"river": 1.5}  # > 1.0
+    with pytest.raises(ValueError, match="type_weight"):
+        _validate_species_config({"Fake species": entry})
+
+
+# --- other top-level fields ---
+
+
+def test_invalid_daily_range_raises_value_error():
+    with pytest.raises(ValueError, match="daily_range_m"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "daily_range_m": 0}})
+
+
+def test_invalid_water_dependency_raises_value_error():
+    with pytest.raises(ValueError, match="water_dependency"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "water_dependency": "extreme"}})
+
+
+def test_invalid_icon_url_raises_value_error():
+    with pytest.raises(ValueError, match="icon_url"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "icon_url": "not-a-valid-url"}})
+
+
+def test_invalid_icon_static_path_raises_value_error():
+    with pytest.raises(ValueError, match="icon_static_path"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "icon_static_path": "not/a/valid/path.png"}})
+
+
+def test_invalid_gbif_cache_file_raises_value_error():
+    with pytest.raises(ValueError, match="gbif_cache_file"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "gbif_cache_file": "not_a_gpkg_file.csv"}})
+
+
+def test_invalid_emoji_raises_value_error():
+    with pytest.raises(ValueError, match="emoji"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "emoji": 123}})
+
+
+# ---------------------------------------------------------------------------
+# Registry membership & per-species metadata
+# ---------------------------------------------------------------------------
+
+
+def test_all_species_have_icon_url():
+    for species, config in SPECIES_CONFIG.items():
+        assert isinstance(config["icon_url"], str) and config["icon_url"].startswith("https://"), f"{species}: icon_url must be a valid URL"
+
+
+def test_elephant_icon_url_is_twemoji_elephant():
+    assert SPECIES_CONFIG["Loxodonta africana"]["icon_url"] == "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f418.png"
+
+
+def test_all_species_have_icon_static_path():
+    for species, config in SPECIES_CONFIG.items():
+        assert config["icon_static_path"].startswith("app/static/"), f"{species}: icon_static_path must start with 'app/static/'"
+
+
+def test_all_species_have_gbif_cache_file():
+    for species, config in SPECIES_CONFIG.items():
+        assert config["gbif_cache_file"].endswith(".gpkg"), f"{species}: gbif_cache_file must end with .gpkg"
+
+
+def test_all_species_have_emoji():
+    for species, config in SPECIES_CONFIG.items():
+        assert isinstance(config["emoji"], str), f"{species}: emoji must be a string"
+
+
+@pytest.mark.parametrize(
+    "scientific_name",
+    [
+        "Equus quagga",
+        "Giraffa camelopardalis",
+        "Panthera leo",
+        "Acinonyx jubatus",
+        "Crocodylus niloticus",
+        "Phoenicopterus roseus",
+        "Hyperolius marmoratus",
+        "Xenopus laevis",
+        "Hippopotamus amphibius",
+        "Syncerus caffer",
+    ],
+)
+def test_species_config_contains_species(scientific_name):
+    assert scientific_name in SPECIES_CONFIG
+
+
+def test_hippo_water_threshold_is_tight():
+    # Hippos seldom move more than 3km from water — 15km is a generous
+    # upper bound that accounts for drought-driven dispersal movements.
+    assert get_stressor_params("Hippopotamus amphibius", "water")["threshold_m"] == 15_000
+
+
+def test_hippo_water_dependency_is_high():
+    assert SPECIES_CONFIG["Hippopotamus amphibius"]["water_dependency"] == "high"
+
+
+def test_hippo_accessible_types_are_correct():
+    assert set(get_stressor_params("Hippopotamus amphibius", "water")["accessible_types"]) == {"river", "lake", "wetland", "floodplain", "permanent_water"}
+
+
+def test_buffalo_water_threshold_is_correct():
+    # Buffalo drink daily and contract their range sharply around
+    # permanent water in dry season — 100km reflects dry-season max.
+    assert get_stressor_params("Syncerus caffer", "water")["threshold_m"] == 100_000
+
+
+def test_buffalo_accessible_types_are_correct():
+    assert set(get_stressor_params("Syncerus caffer", "water")["accessible_types"]) == {"river", "lake", "pan", "wetland", "floodplain", "surface_water", "permanent_water"}
 
 
 # ---------------------------------------------------------------------------
@@ -465,65 +323,72 @@ def test_invalid_realm_raises_value_error():
         _validate_species_config({"Fake species": {**_valid_entry(), "realm": "atmospheric"}})
 
 
-def test_all_species_have_road_and_settlement_fields():
+# ---------------------------------------------------------------------------
+# Road & settlement stressor validation (from the stressors list)
+# ---------------------------------------------------------------------------
+
+
+def test_all_species_have_road_and_settlement_stressors():
     for species, cfg in SPECIES_CONFIG.items():
-        for key in ("road_sensitivity", "road_threshold_m", "road_class_weights", "settlement_sensitivity", "settlement_threshold_m", "settlement_class_weights"):
-            assert key in cfg, f"{species} is missing {key}"
+        ids = {s["stressor_id"] for s in cfg["stressors"]}
+        assert {"roads", "settlements"} <= ids, f"{species} missing road/settlement stressors: {ids}"
 
 
-def test_missing_road_sensitivity_raises_value_error():
+def test_missing_roads_stressor_raises_value_error():
     entry = _valid_entry()
-    del entry["road_sensitivity"]
-    with pytest.raises(ValueError, match="road_sensitivity"):
+    entry["stressors"] = [s for s in entry["stressors"] if s["stressor_id"] != "roads"]
+    with pytest.raises(ValueError, match="roads"):
         _validate_species_config({"Fake species": entry})
 
 
 def test_road_sensitivity_out_of_range_raises_value_error():
-    with pytest.raises(ValueError, match="road_sensitivity"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "road_sensitivity": 1.5}})
+    entry = _valid_entry()
+    _stressor(entry, "roads")["sensitivity"] = 1.5
+    with pytest.raises(ValueError, match="sensitivity"):
+        _validate_species_config({"Fake species": entry})
 
 
 def test_road_threshold_not_positive_raises_value_error():
-    with pytest.raises(ValueError, match="road_threshold_m"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "road_threshold_m": 0}})
+    entry = _valid_entry()
+    _stressor(entry, "roads")["params"]["threshold_m"] = 0
+    with pytest.raises(ValueError, match="threshold_m"):
+        _validate_species_config({"Fake species": entry})
 
 
 def test_road_class_weights_missing_class_raises_value_error():
-    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
+    entry = _valid_entry()
+    weights = _stressor(entry, "roads")["params"]["class_weights"]
     weights.pop(next(iter(weights)))  # drop one required class
-    with pytest.raises(ValueError, match="road_class_weights"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})
+    with pytest.raises(ValueError, match="class_weights"):
+        _validate_species_config({"Fake species": entry})
 
 
 def test_road_class_weight_out_of_range_raises_value_error():
-    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
+    entry = _valid_entry()
+    weights = _stressor(entry, "roads")["params"]["class_weights"]
     weights[next(iter(weights))] = 2.0
-    with pytest.raises(ValueError, match="road_class_weights"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})
+    with pytest.raises(ValueError, match="class_weights"):
+        _validate_species_config({"Fake species": entry})
 
 
 def test_road_class_weight_zero_is_allowed():
     """A 0.0 class weight is valid (e.g. a footpath poses no threat to a frog) —
     unlike water weights, which must be > 0."""
-    weights = {c: 0.5 for c in KNOWN_ROAD_CLASSES}
-    weights["path"] = 0.0
-    _validate_species_config({"Fake species": {**_valid_entry(), "road_class_weights": weights}})  # must not raise
-
-
-def test_missing_settlement_sensitivity_raises_value_error():
     entry = _valid_entry()
-    del entry["settlement_sensitivity"]
-    with pytest.raises(ValueError, match="settlement_sensitivity"):
-        _validate_species_config({"Fake species": entry})
+    _stressor(entry, "roads")["params"]["class_weights"]["path"] = 0.0
+    _validate_species_config({"Fake species": entry})  # must not raise
 
 
 def test_settlement_sensitivity_out_of_range_raises_value_error():
-    with pytest.raises(ValueError, match="settlement_sensitivity"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "settlement_sensitivity": -0.1}})
+    entry = _valid_entry()
+    _stressor(entry, "settlements")["sensitivity"] = -0.1
+    with pytest.raises(ValueError, match="sensitivity"):
+        _validate_species_config({"Fake species": entry})
 
 
 def test_settlement_class_weights_missing_class_raises_value_error():
-    weights = {c: 0.5 for c in KNOWN_SETTLEMENT_CLASSES}
+    entry = _valid_entry()
+    weights = _stressor(entry, "settlements")["params"]["class_weights"]
     weights.pop(next(iter(weights)))
-    with pytest.raises(ValueError, match="settlement_class_weights"):
-        _validate_species_config({"Fake species": {**_valid_entry(), "settlement_class_weights": weights}})
+    with pytest.raises(ValueError, match="class_weights"):
+        _validate_species_config({"Fake species": entry})

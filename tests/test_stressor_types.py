@@ -17,6 +17,7 @@ stressor with no distance/decay assumption.
 import pytest
 
 from tests._scoring_oracle import road_threat_score, water_stress_score
+from wildlife_water_stress_atlas.analytics.stress_engine import species_stressors
 from wildlife_water_stress_atlas.analytics.stressors import (
     AmbientStressor,
     FeatureProximity,
@@ -27,25 +28,25 @@ from wildlife_water_stress_atlas.analytics.stressors import (
     StressorConfig,
     StressorKind,
 )
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 
 _FROG = "Hyperolius marmoratus"
 _ELEPHANT = "Loxodonta africana"
 
 
+def _stressor_cfg(species: str, stressor_id: str) -> StressorConfig:
+    """The species' StressorConfig for one stressor, built from its stressors
+    list by the engine's own builder (the post-cutout single source of truth)."""
+    return next(c for c in species_stressors(species) if c.stressor_id == stressor_id)
+
+
 def _road_cfg(species: str) -> StressorConfig:
-    cfg = SPECIES_CONFIG[species]
-    return StressorConfig(
-        stressor_id="roads",
-        sensitivity=cfg["road_sensitivity"],
-        params={"threshold_m": cfg["road_threshold_m"], "class_weights": cfg["road_class_weights"]},
-    )
+    return _stressor_cfg(species, "roads")
 
 
 def _water_cfg(species: str) -> StressorConfig:
-    # Water was formula min(d/thr, 1.0) with no sensitivity — reproduced by a
-    # RESOURCE with sensitivity 1.0.
-    return StressorConfig(stressor_id="water", sensitivity=1.0, params={"threshold_m": SPECIES_CONFIG[species]["water_threshold_m"]})
+    # Water is a RESOURCE with sensitivity 1.0 — reproduces the original
+    # min(d/threshold, 1.0) formula.
+    return _stressor_cfg(species, "water")
 
 
 # ---------------------------------------------------------------------------
