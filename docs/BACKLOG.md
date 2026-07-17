@@ -136,7 +136,12 @@ Branch `feat/stressors-list-config`.
       validation re-pointed to it. Golden reproduction preserved by a frozen test
       oracle (`tests/_scoring_oracle.py`). (branch `feat/cutover-unify-scoring`)
 - [ ] Species compare mode (Savannah vs Forest elephant)
-- [ ] Scenario toggles: stressor on/off, reweight, live re-aggregate
+- [x] **Scenario toggles** — STRESS view "Include" control excludes a stressor and
+      re-aggregates the cumulative noisy-OR LIVE (client-side Mapbox expression over
+      the enabled per-stressor props; legend + tooltip annotate exclusions). DOM
+      e2e + a SwiftShader visual guard (RED-verified). Raised the stress visual
+      threshold above the render-noise floor. (branch `feat/scenario-toggles`)
+      **Follow-on:** per-stressor reweight (slider) + live re-aggregate.
 
 ## Phase D — Range + grid scoring
 
