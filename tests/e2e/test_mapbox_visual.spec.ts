@@ -28,9 +28,11 @@ const MIN_SETTLEMENT_POINTS_FOOTPRINT = 6000;
 
 // Cumulative-stress dots (STRESS view). Fed by an INLINE fixture injected into
 // the map source (below), so this guard needs no generated data file — it runs
-// anywhere the app + SwiftShader do. ~a few hundred px when painting, ~0 if the
-// layer/view is broken.
-const MIN_STRESS_FOOTPRINT = 200;
+// anywhere the app + SwiftShader do. Measured on this renderer: painting the dots
+// ~1.1k changed px; a red→green recolor ~10k–15k; broken cases fall to
+// SwiftShader's frame-to-frame noise floor (~320px). 600 sits above the noise and
+// below the smallest real signal.
+const MIN_STRESS_FOOTPRINT = 600;
 
 // A small inline stress FeatureCollection near the pinned camera. High aggregate
 // (red) but low roads (green) so the per-stressor toggle produces a visible
@@ -41,6 +43,18 @@ const STRESS_FIXTURE = {
   features: Array.from({ length: 24 }, (_, i) => ({
     type: 'Feature',
     properties: { species: 'Test', year: 2020, stress_aggregate: 0.85, stress_water: 0.7, stress_roads: 0.08, stress_settlements: 0.2 },
+    geometry: { type: 'Point', coordinates: [33.2 + (i % 6) * 0.6, -3.2 + Math.floor(i / 6) * 0.9] },
+  })),
+};
+
+// Scenario fixture: roads DOMINATES (0.9), water/settlements negligible. So the
+// full cumulative total is high (red), but excluding roads collapses it to near
+// zero (green) — a large, unambiguous recolor for the scenario-toggle guard.
+const SCENARIO_FIXTURE = {
+  type: 'FeatureCollection',
+  features: Array.from({ length: 24 }, (_, i) => ({
+    type: 'Feature',
+    properties: { species: 'Test', year: 2020, stress_aggregate: 0.91, stress_water: 0.05, stress_roads: 0.9, stress_settlements: 0.05 },
     geometry: { type: 'Point', coordinates: [33.2 + (i % 6) * 0.6, -3.2 + Math.floor(i / 6) * 0.9] },
   })),
 };
@@ -194,5 +208,23 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
 
     const recolor = changedPixels(totalShot, roadsShot);
     expect(recolor, `toggle recolor changed only ${recolor}px — the colour-by toggle isn't recoloring`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
+  });
+
+  test('excluding a dominant stressor re-aggregates the cumulative total (scenario toggle)', async ({ page }) => {
+    // Roads-dominant fixture: the full total is red; excluding roads must collapse
+    // it toward green via the live noisy-OR recompute — a visible recolor.
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await page.waitForTimeout(1500);
+    await page.evaluate((fc) => map.getSource('stress-aggregate').setData(fc), SCENARIO_FIXTURE);
+    await page.evaluate((p) => map.jumpTo(p), { center: [34.5, -2], zoom: 6 });
+    await page.waitForTimeout(2500);
+
+    const withRoads = await page.locator('#map canvas').screenshot();
+    await page.locator('.scenario-btn', { hasText: 'Roads' }).click();
+    await page.waitForTimeout(1500);
+    const withoutRoads = await page.locator('#map canvas').screenshot();
+
+    const recolor = changedPixels(withRoads, withoutRoads);
+    expect(recolor, `excluding roads changed only ${recolor}px — the scenario re-aggregation isn't recoloring`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
   });
 });
