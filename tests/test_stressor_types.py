@@ -160,3 +160,20 @@ def test_ambient_respects_sensitivity():
 def test_ambient_no_measurement_is_uncovered():
     cfg = StressorConfig("air_pollution", sensitivity=1.0, params={"low": 0.0, "high": 100.0})
     assert AmbientStressor().score(None, cfg) == Score(None, False)
+
+
+def test_ambient_ramp_uses_a_nonzero_low_bound():
+    # A non-zero `low` pins the (value - low)/(high - low) formula: with low=0
+    # every earlier test can't tell `-` from `+` (0-0 == 0+0). (Mutation-audit gap.)
+    cfg = StressorConfig("air_pollution", sensitivity=1.0, params={"low": 10.0, "high": 50.0})
+    assert AmbientStressor().score(FieldSample(30.0), cfg).value == pytest.approx(0.5)  # (30-10)/(50-10)
+    assert AmbientStressor().score(FieldSample(20.0), cfg).value == pytest.approx(0.25)  # (20-10)/40
+    # clamps outside [low, high]
+    assert AmbientStressor().score(FieldSample(5.0), cfg).value == pytest.approx(0.0)
+    assert AmbientStressor().score(FieldSample(60.0), cfg).value == pytest.approx(1.0)
+
+
+def test_ambient_with_measurement_is_covered():
+    # Pins the covered flag on the scored path (mutation-audit gap: True→None survived).
+    cfg = StressorConfig("air_pollution", sensitivity=1.0, params={"low": 10.0, "high": 50.0})
+    assert AmbientStressor().score(FieldSample(30.0), cfg).covered is True

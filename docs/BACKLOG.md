@@ -141,7 +141,12 @@ Branch `feat/stressors-list-config`.
       the enabled per-stressor props; legend + tooltip annotate exclusions). DOM
       e2e + a SwiftShader visual guard (RED-verified). Raised the stress visual
       threshold above the render-noise floor. (branch `feat/scenario-toggles`)
-      **Follow-on:** per-stressor reweight (slider) + live re-aggregate.
+- [x] **Scenario reweight** — per-stressor weight slider (0–100%, default 100)
+      beside each include/exclude button; the cumulative total is noisy-OR over
+      weightᵢ·stressᵢ, recomputed live (0% == excluded). Models partial mitigation.
+      DOM e2e + visual guard; hardened the stress visual guards against SwiftShader
+      basemap-dither noise (dense fixtures, glow-hidden dot layer, higher per-pixel
+      + footprint thresholds; RED-verified). (branch `feat/scenario-reweight`)
 
 ## Phase D — Range + grid scoring
 
