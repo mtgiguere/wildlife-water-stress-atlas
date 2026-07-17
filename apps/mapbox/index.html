@@ -19,6 +19,17 @@
     }
     .stressby-btn:hover { background: rgba(255,255,255,0.12); }
     .stressby-btn.active { border-color: var(--accent, #00C4FF); color: var(--accent, #00C4FF); }
+
+    /* Scenario include/exclude toggles (STRESS view) */
+    #stress-scenario { display: flex; }
+    .scenario-btn {
+      background: rgba(255,255,255,0.06); color: var(--text, #cdd6e0);
+      border: 1px solid transparent; border-radius: 4px;
+      padding: 2px 8px; font-size: 11px; cursor: pointer;
+      opacity: 0.45; text-decoration: line-through;
+    }
+    .scenario-btn:hover { background: rgba(255,255,255,0.12); }
+    .scenario-btn.active { opacity: 1; text-decoration: none; border-color: rgba(255,255,255,0.25); }
   </style>
 </head>
 <body>
@@ -161,6 +172,15 @@
       <button class="stressby-btn" data-prop="stress_water">Water</button>
       <button class="stressby-btn" data-prop="stress_roads">Roads</button>
       <button class="stressby-btn" data-prop="stress_settlements">Settlements</button>
+    </div>
+
+    <!-- Scenario toggles — include/exclude a stressor and re-aggregate the
+         cumulative stress live. Shown only in the STRESS view. -->
+    <div id="stress-scenario" style="display:none; gap:4px; align-items:center; flex-wrap:wrap; margin-top:6px">
+      <span style="font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.5px">Include</span>
+      <button class="scenario-btn active" data-prop="stress_water" aria-pressed="true">Water</button>
+      <button class="scenario-btn active" data-prop="stress_roads" aria-pressed="true">Roads</button>
+      <button class="scenario-btn active" data-prop="stress_settlements" aria-pressed="true">Settlements</button>
     </div>
 
     <!-- Species -->

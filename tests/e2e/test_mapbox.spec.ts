@@ -214,6 +214,43 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Scenario toggles (within STRESS view) — include/exclude a stressor and
+  // re-aggregate the cumulative stress live.
+  // ---------------------------------------------------------------------------
+
+  test('scenario control is hidden outside STRESS view', async ({ page }) => {
+    await expect(page.locator('#stress-scenario')).toBeHidden();
+  });
+
+  test('scenario control appears in STRESS view with all stressors enabled', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('#stress-scenario')).toBeVisible();
+    const buttons = page.locator('.scenario-btn');
+    await expect(buttons).toHaveCount(3);
+    // all three included by default
+    await expect(page.locator('.scenario-btn.active')).toHaveCount(3);
+  });
+
+  test('clicking a scenario stressor toggles it off then on', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    const roads = page.locator('.scenario-btn', { hasText: 'Roads' });
+    await roads.click();
+    await expect(roads).not.toHaveClass(/active/);
+    await roads.click();
+    await expect(roads).toHaveClass(/active/);
+  });
+
+  test('excluding a stressor annotates the cumulative-stress legend label', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    // Coloring by Total, excluding Roads should note the exclusion.
+    await page.locator('.scenario-btn', { hasText: 'Roads' }).click();
+    await expect(page.locator('#legend-aggregate-label')).toContainText('Roads');
+    // re-including restores the plain cumulative label
+    await page.locator('.scenario-btn', { hasText: 'Roads' }).click();
+    await expect(page.locator('#legend-aggregate-label')).toHaveText('Cumulative stress');
+  });
+
+  // ---------------------------------------------------------------------------
   // Year slider
   // ---------------------------------------------------------------------------
 
