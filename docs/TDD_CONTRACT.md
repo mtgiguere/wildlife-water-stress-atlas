@@ -440,3 +440,58 @@ rendering**. TDD remains excellent on its home turf (pure/algorithmic Python).
 Its coverage stops at the Python boundary; that boundary is exactly where these
 two bugs lived. The follow-ups (integration test for the roads download; a
 SwiftShader visual smoke test) are tracked in the project bible.
+
+## Addendum — "Green ≠ Verified" (2026-07)
+
+Two incidents this cycle sharpened a single theme already present in *Bug #5:
+Eight Hollow Tests That Cannot Fail* — **a passing test proves nothing until you
+have seen it fail for the right reason.**
+
+### Blind spot C: a pixel-diff guard below the noise floor
+
+The STRESS-view SwiftShader guards (Blind spot B's own remedy) asserted that a
+recolor changed `> 200` pixels. But SwiftShader's frame-to-frame basemap dither
+is ~300–750px on a full-canvas diff — *above* that threshold. So the guard was
+**hollow**: it passed whether or not the app actually recolored. It was caught
+only because a RED demo (disabling the recompute) *still passed* — the failing
+step refused to fail.
+
+> **Rule:** a pixel-diff / threshold guard is not trustworthy until you have
+> *measured* both the real signal and the noise floor and shown the threshold
+> sits provably between them. The fix here: make the signal dominate (dense
+> fixture, isolate the crisp layer, raise the per-pixel delta) so signal ≫ noise,
+> then set the threshold in the gap. "It passed" is not a measurement.
+
+### The systematic detector: mutation testing
+
+Blind spot C is the manual version of a general question — *which of my green
+tests would still pass if the code were wrong?* Mutation testing answers it
+mechanically: it perturbs the source and checks whether the suite fails. A
+**surviving mutant is a RED that never got written.**
+
+A scoped audit of the scoring + validation core (2026-07) bore this out:
+- `analytics/stressors.py` — 136/152 killed; the one real gap was `AmbientStressor`
+  tested only with `low=0.0` (so `−` vs `+` couldn't be told apart). Fixed.
+- `config/species.py` — surfaced **6 real validation-boundary gaps** (`<= 0` vs
+  `== 0`; water weights' strict `> 0`; exact key-set match vs subset; negative vs
+  zero). All were "tested one bad value but not the boundary/other direction."
+  Fixed. This is the field-drift bug class this whole document exists for.
+- `analytics/stress_engine.py` — effectively clean (one trivial `frozen=` mutant).
+
+> **Rule:** run a scoped mutation audit on correctness-critical Python (scoring,
+> validation) when it changes — not as a CI gate (it's slow and equivalent
+> mutants can never die), but as a periodic hunt for hollow tests. Read every
+> survivor: kill the real ones with a test, and satisfy yourself the rest are
+> genuinely equivalent.
+>
+> **Tooling caveat (Windows):** `mutmut` 3.x is WSL-only. `mutatest` 3.1.0 works
+> but (a) needs a one-line Py3.12 fix (`random.sample` on a `set`) and (b) pins
+> `coverage < 6`, which breaks `pytest-cov`. Run it in an isolated env, or drop to
+> `coverage 5.x` for the audit window and restore `coverage 7` (+ confirm the
+> suite) afterward. Do **not** add it to the project's dependencies.
+
+### The meta-lesson, restated
+
+The refrain is now: green is a *claim*, not *evidence*. The evidence is the
+observed RED — whether from the classic RED-first step, a deliberate break of a
+visual guard, or a mutant that your suite failed to kill.
