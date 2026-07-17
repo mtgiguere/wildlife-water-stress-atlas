@@ -392,3 +392,60 @@ def test_settlement_class_weights_missing_class_raises_value_error():
     weights.pop(next(iter(weights)))
     with pytest.raises(ValueError, match="class_weights"):
         _validate_species_config({"Fake species": entry})
+
+
+# ---------------------------------------------------------------------------
+# Boundary / edge cases surfaced by a mutation audit — each pins a bound that a
+# passing suite previously left un-nailed (e.g. `<= 0` vs `== 0`, strict `> 0`
+# for water, exact key-set match vs subset).
+# ---------------------------------------------------------------------------
+
+
+def test_water_threshold_of_exactly_zero_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["threshold_m"] = 0
+    with pytest.raises(ValueError, match="threshold_m"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_water_type_weight_of_exactly_zero_raises_value_error():
+    # Water weights must be strictly > 0 (an accessible type that provides no
+    # water is a contradiction) — unlike road/settlement class weights, where 0 is
+    # allowed. This pins that distinction.
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["type_weights"] = {"river": 0.0}
+    with pytest.raises(ValueError, match="type_weight"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_water_type_weights_extra_key_raises_value_error():
+    # An extra key (superset of accessible_types) must be rejected, not just a
+    # missing one.
+    entry = _valid_entry()
+    _stressor(entry, "water")["params"]["type_weights"]["lake"] = 0.5
+    with pytest.raises(ValueError, match="type_weights keys"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_negative_proximity_threshold_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "roads")["params"]["threshold_m"] = -1
+    with pytest.raises(ValueError, match="threshold_m"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_proximity_class_weights_extra_key_raises_value_error():
+    entry = _valid_entry()
+    _stressor(entry, "roads")["params"]["class_weights"]["not_a_real_class"] = 0.5
+    with pytest.raises(ValueError, match="class_weights"):
+        _validate_species_config({"Fake species": entry})
+
+
+def test_negative_daily_range_raises_value_error():
+    with pytest.raises(ValueError, match="daily_range_m"):
+        _validate_species_config({"Fake species": {**_valid_entry(), "daily_range_m": -1}})
+
+
+def test_get_stressor_params_unknown_stressor_raises_key_error():
+    with pytest.raises(KeyError):
+        get_stressor_params("Loxodonta africana", "not_a_stressor")

@@ -93,8 +93,14 @@ ruff format .
 # E2E tests (Streamlit)
 npx playwright test --config=playwright.config.ts
 
-# E2E tests (Mapbox)
+# E2E tests (Mapbox — DOM). NOTE: this config has NO webServer block; it expects
+# a static server already running on :3000. Start one first:
+#   (cd apps/mapbox && python -m http.server 3000)
 npx playwright test --config=playwright.mapbox.config.ts
+
+# Visual guards (Mapbox — SwiftShader/WebGL). This config DOES start its own
+# server, so no manual step is needed.
+npx playwright test --config=playwright.visual.config.ts
 ```
 
 ---
