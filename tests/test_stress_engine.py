@@ -15,7 +15,7 @@ the whole extensible refactor provably preserves behavior.
 
 import pytest
 
-from wildlife_water_stress_atlas.analytics.scoring import water_stress_score
+from tests._scoring_oracle import road_threat_score, settlement_threat_score, water_stress_score
 from wildlife_water_stress_atlas.analytics.stress_engine import (
     STRESSOR_TYPES,
     StressResult,
@@ -23,7 +23,6 @@ from wildlife_water_stress_atlas.analytics.stress_engine import (
     species_stressors,
 )
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity, Score
-from wildlife_water_stress_atlas.analytics.threat_scoring import road_threat_score, settlement_threat_score
 from wildlife_water_stress_atlas.config.species import (
     KNOWN_ROAD_CLASSES,
     KNOWN_SETTLEMENT_CLASSES,

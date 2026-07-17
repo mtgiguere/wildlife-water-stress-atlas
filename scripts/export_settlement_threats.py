@@ -25,8 +25,9 @@ ARCHITECTURE NOTE:
 ------------------
 Mirrors export_road_threats.py. Settlements are loaded once, then reused across
 all species — the settlement network is species-independent. Each species gets
-its own score via settlement_threat_score() using species-specific sensitivity
-and class weights from SPECIES_CONFIG.
+its own score via the unified scoring engine (score_stressor(..., "settlements",
+...)), using that species' settlements-stressor sensitivity and class weights
+from SPECIES_CONFIG.
 
 Part of the static pre-computation pipeline — re-run when OSM data updates.
 """
@@ -37,7 +38,8 @@ import geopandas as gpd
 
 from wildlife_water_stress_atlas.analytics.apply import apply_settlement_threat_score
 from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_settlement
-from wildlife_water_stress_atlas.analytics.threat_scoring import settlement_threat_score
+from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
+from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
@@ -74,7 +76,13 @@ def compute_settlement_threats(
         settlement_threat_score columns added.
     """
     with_distances = add_distance_to_settlement(occurrences, settlements)
-    return apply_settlement_threat_score(with_distances, settlement_threat_score)
+    return apply_settlement_threat_score(with_distances, _settlement_threat_score)
+
+
+def _settlement_threat_score(distance_m: float, settlement_class: str, species: str) -> float:
+    """Adapter to the unified engine (cutover): the settlements-stressor value the
+    legacy threat_scoring.settlement_threat_score used to return."""
+    return score_stressor(species, "settlements", FeatureProximity(distance_m, settlement_class))
 
 
 def build_settlement_points(

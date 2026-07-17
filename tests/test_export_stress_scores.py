@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 import geopandas as gpd
 from shapely.geometry import Point
 
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG, get_stressor_params
 
 # ---------------------------------------------------------------------------
 # compute_stress_scores()
@@ -120,7 +120,7 @@ def test_compute_stress_scores_high_distance_gives_high_stress():
     from scripts.export_stress_scores import compute_stress_scores
 
     mock_engine = MagicMock()
-    threshold = SPECIES_CONFIG["Loxodonta africana"]["water_threshold_m"]
+    threshold = get_stressor_params("Loxodonta africana", "water")["threshold_m"]
     mock_gdf = gpd.GeoDataFrame(
         {"species": ["Loxodonta africana"], "year": [2020], "distance_m": [float(threshold)]},
         geometry=[Point(20, -10)],

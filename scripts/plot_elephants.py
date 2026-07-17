@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 
 from wildlife_water_stress_atlas.analytics.apply import apply_water_stress_score
 from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
-from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level, water_stress_score
+from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
 from wildlife_water_stress_atlas.analytics.spatial import aggregate_stress_to_grid
+from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
+from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.analytics.water_access import filter_accessible_water
 from wildlife_water_stress_atlas.ingest.gbif import fetch_occurrences, occurrences_to_gdf
 from wildlife_water_stress_atlas.ingest.water import load_all_water
@@ -97,7 +99,12 @@ def main():
     # 4. Score water stress per occurrence
     # ------------------------------------------------------------------
     occurrences = add_distance_to_water(occurrences, accessible_water)
-    occurrences = apply_water_stress_score(occurrences, water_stress_score)
+    # Score water via the unified engine (cutover) — same value the legacy
+    # scoring.water_stress_score returned.
+    occurrences = apply_water_stress_score(
+        occurrences,
+        lambda distance, species: score_stressor(species, "water", FeatureProximity(distance, None)),
+    )
     occurrences["stress_level"] = occurrences["water_stress_score"].apply(classify_stress_level)
 
     # ------------------------------------------------------------------

@@ -34,10 +34,9 @@ from pathlib import Path
 import geopandas as gpd
 from sqlalchemy import create_engine
 
-from wildlife_water_stress_atlas.analytics.scoring import (
-    classify_stress_level,
-    water_stress_score,
-)
+from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
+from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
+from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.utils.generic_threader import GenericThreader
 
@@ -84,7 +83,7 @@ def compute_stress_scores(engine, scientific_name: str) -> gpd.GeoDataFrame:
 
     gdf = gpd.read_postgis(query, engine, geom_col="geometry")
 
-    gdf["stress_score"] = gdf["distance_m"].apply(lambda d: water_stress_score(d, scientific_name))
+    gdf["stress_score"] = gdf["distance_m"].apply(lambda d: score_stressor(scientific_name, "water", FeatureProximity(d, None)))
     gdf["stress_level"] = gdf["stress_score"].apply(classify_stress_level)
 
     return gdf

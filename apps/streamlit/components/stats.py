@@ -12,7 +12,7 @@ those live in the render functions at the bottom of this file
 and are covered by Playwright E2E tests.
 """
 
-from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG, get_stressor_params
 
 
 def get_water_threshold_display(species: str) -> str:
@@ -28,7 +28,7 @@ def get_water_threshold_display(species: str) -> str:
     Returns:
         Formatted string e.g. "300 km", "2 km", "10 km"
     """
-    threshold_m = SPECIES_CONFIG[species]["water_threshold_m"]
+    threshold_m = get_stressor_params(species, "water")["threshold_m"]
     # Convert meters to km — all thresholds are whole km values
     threshold_km = int(threshold_m / 1000)
     return f"{threshold_km} km"
