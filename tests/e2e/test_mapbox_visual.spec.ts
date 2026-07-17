@@ -26,38 +26,40 @@ const MIN_BACKBONE_FOOTPRINT = 35000;
 // ~0 if the layer silently fails to load. Threshold sits well between.
 const MIN_SETTLEMENT_POINTS_FOOTPRINT = 6000;
 
-// Cumulative-stress dots (STRESS view). Fed by an INLINE fixture injected into
-// the map source (below), so this guard needs no generated data file — it runs
-// anywhere the app + SwiftShader do. Measured on this renderer: painting the dots
-// ~1.1k changed px; a red→green recolor ~10k–15k; broken cases fall to
-// SwiftShader's frame-to-frame noise floor (~320px). 600 sits above the noise and
-// below the smallest real signal.
-const MIN_STRESS_FOOTPRINT = 600;
+// Cumulative-stress dots (STRESS view). Fed by a DENSE inline fixture (156 pts)
+// injected into the map source, so this guard needs no generated data file — it
+// runs anywhere the app + SwiftShader do. The dense grid + glow-hidden dot layer
+// makes the real signal (paint / red→green recolor) measure ~5k–15k changed px,
+// while SwiftShader's irreducible full-canvas basemap dither is ~750px. 2500 sits
+// well above the noise and well below the smallest real signal.
+const MIN_STRESS_FOOTPRINT = 2500;
 
-// A small inline stress FeatureCollection near the pinned camera. High aggregate
-// (red) but low roads (green) so the per-stressor toggle produces a visible
-// recolor. Injected via map.getSource('stress-aggregate').setData(...) — the
-// robust way to guard the frontend without depending on gitignored dev data.
-const STRESS_FIXTURE = {
-  type: 'FeatureCollection',
-  features: Array.from({ length: 24 }, (_, i) => ({
-    type: 'Feature',
-    properties: { species: 'Test', year: 2020, stress_aggregate: 0.85, stress_water: 0.7, stress_roads: 0.08, stress_settlements: 0.2 },
-    geometry: { type: 'Point', coordinates: [33.2 + (i % 6) * 0.6, -3.2 + Math.floor(i / 6) * 0.9] },
-  })),
-};
+// Per-pixel diff threshold for the STRESS tests. A stress recolor is a large
+// per-pixel change (red→green ≈ 400+ summed RGB); this drops sub-threshold jitter.
+const STRESS_PIXEL_THRESH = 90;
 
-// Scenario fixture: roads DOMINATES (0.9), water/settlements negligible. So the
-// full cumulative total is high (red), but excluding roads collapses it to near
-// zero (green) — a large, unambiguous recolor for the scenario-toggle guard.
-const SCENARIO_FIXTURE = {
-  type: 'FeatureCollection',
-  features: Array.from({ length: 24 }, (_, i) => ({
-    type: 'Feature',
-    properties: { species: 'Test', year: 2020, stress_aggregate: 0.91, stress_water: 0.05, stress_roads: 0.9, stress_settlements: 0.05 },
-    geometry: { type: 'Point', coordinates: [33.2 + (i % 6) * 0.6, -3.2 + Math.floor(i / 6) * 0.9] },
-  })),
-};
+// A dense inline stress FeatureCollection covering the pinned camera (a 12×13
+// grid = 156 points). Dense on purpose: the dot-recolor signal must dwarf
+// SwiftShader's full-canvas basemap dither (~750px). Injected via
+// map.getSource('stress-aggregate').setData(...) — the robust way to guard the
+// frontend without depending on gitignored dev data.
+function stressGrid(props) {
+  return {
+    type: 'FeatureCollection',
+    features: Array.from({ length: 156 }, (_, i) => ({
+      type: 'Feature',
+      properties: { species: 'Test', year: 2020, ...props },
+      geometry: { type: 'Point', coordinates: [31 + (i % 12) * 0.5, -5 + Math.floor(i / 12) * 0.45] },
+    })),
+  };
+}
+
+// High aggregate (red) but low roads (green) so the per-stressor toggle recolors.
+const STRESS_FIXTURE = stressGrid({ stress_aggregate: 0.85, stress_water: 0.7, stress_roads: 0.08, stress_settlements: 0.2 });
+
+// Roads DOMINATES (0.9), water/settlements negligible: the full total is red, but
+// excluding/zeroing roads collapses it to green — a large, unambiguous recolor.
+const SCENARIO_FIXTURE = stressGrid({ stress_aggregate: 0.91, stress_water: 0.05, stress_roads: 0.9, stress_settlements: 0.05 });
 
 // Camera pinned over road/settlement-dense East/Central Africa so the
 // measurement does not depend on where the fly-to animation happens to land.
@@ -171,11 +173,16 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
 
   // --- STRESS view: fed by an inline fixture (no generated-data dependency) ---
 
-  async function openStressViewWithFixture(page) {
+  // Opens the STRESS view, injects a dense fixture, pins the camera, and hides the
+  // glow layer — the blurred, semi-transparent glow re-composites
+  // nondeterministically on SwiftShader and inflates the pixel-diff noise. We
+  // measure the crisp dot layer instead.
+  async function openStressViewWithFixture(page, fixture = STRESS_FIXTURE) {
     await page.locator('.view-btn', { hasText: 'STRESS' }).click();
     await page.waitForTimeout(1500);
-    await page.evaluate((fc) => map.getSource('stress-aggregate').setData(fc), STRESS_FIXTURE);
+    await page.evaluate((fc) => map.getSource('stress-aggregate').setData(fc), fixture);
     await page.evaluate((p) => map.jumpTo(p), { center: [34.5, -2], zoom: 6 });
+    await setLayerVisible(page, 'stress-aggregate-glow', false);
     await page.waitForTimeout(2500);
   }
 
@@ -184,13 +191,11 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
 
     const withDots = await page.locator('#map canvas').screenshot();
     await setLayerVisible(page, 'stress-aggregate-dot', false);
-    await setLayerVisible(page, 'stress-aggregate-glow', false);
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1000);
     const withoutDots = await page.locator('#map canvas').screenshot();
     await setLayerVisible(page, 'stress-aggregate-dot', true);
-    await setLayerVisible(page, 'stress-aggregate-glow', true);
 
-    const footprint = changedPixels(withDots, withoutDots);
+    const footprint = changedPixels(withDots, withoutDots, STRESS_PIXEL_THRESH);
     expect(
       footprint,
       `stress dots footprint ${footprint}px is below ${MIN_STRESS_FOOTPRINT}px — STRESS view not painting`,
@@ -203,28 +208,41 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
     const totalShot = await page.locator('#map canvas').screenshot();
     // Fixture is high aggregate (red) but low roads (green): switching must recolor.
     await page.locator('.stressby-btn', { hasText: 'Roads' }).click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
     const roadsShot = await page.locator('#map canvas').screenshot();
 
-    const recolor = changedPixels(totalShot, roadsShot);
+    const recolor = changedPixels(totalShot, roadsShot, STRESS_PIXEL_THRESH);
     expect(recolor, `toggle recolor changed only ${recolor}px — the colour-by toggle isn't recoloring`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
   });
 
   test('excluding a dominant stressor re-aggregates the cumulative total (scenario toggle)', async ({ page }) => {
     // Roads-dominant fixture: the full total is red; excluding roads must collapse
     // it toward green via the live noisy-OR recompute — a visible recolor.
-    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
-    await page.waitForTimeout(1500);
-    await page.evaluate((fc) => map.getSource('stress-aggregate').setData(fc), SCENARIO_FIXTURE);
-    await page.evaluate((p) => map.jumpTo(p), { center: [34.5, -2], zoom: 6 });
-    await page.waitForTimeout(2500);
+    await openStressViewWithFixture(page, SCENARIO_FIXTURE);
 
     const withRoads = await page.locator('#map canvas').screenshot();
     await page.locator('.scenario-btn', { hasText: 'Roads' }).click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
     const withoutRoads = await page.locator('#map canvas').screenshot();
 
-    const recolor = changedPixels(withRoads, withoutRoads);
+    const recolor = changedPixels(withRoads, withoutRoads, STRESS_PIXEL_THRESH);
     expect(recolor, `excluding roads changed only ${recolor}px — the scenario re-aggregation isn't recoloring`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
+  });
+
+  test('lowering a dominant stressor weight re-aggregates the total (reweight slider)', async ({ page }) => {
+    // Roads-dominant fixture: dragging the roads weight to 0% must collapse the
+    // red total toward green via the live noisy-OR recompute — a visible recolor.
+    await openStressViewWithFixture(page, SCENARIO_FIXTURE);
+
+    const fullWeight = await page.locator('#map canvas').screenshot();
+    await page.locator('.scenario-weight[data-prop="stress_roads"]').evaluate((el: HTMLInputElement) => {
+      el.value = '0';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForTimeout(1000);
+    const zeroWeight = await page.locator('#map canvas').screenshot();
+
+    const recolor = changedPixels(fullWeight, zeroWeight, STRESS_PIXEL_THRESH);
+    expect(recolor, `roads weight→0 changed only ${recolor}px — the reweight isn't re-aggregating`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
   });
 });

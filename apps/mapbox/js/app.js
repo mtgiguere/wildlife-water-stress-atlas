@@ -83,18 +83,21 @@ const STRESS_AGGREGATE_COLOR_EXPR = stressColorBy('stress_aggregate');
 // (noisy-OR) total. Scenario toggles include/exclude any of these.
 const STRESSOR_PROPS = ['stress_water', 'stress_roads', 'stress_settlements'];
 const SCENARIO_LABELS = { stress_water: 'Water', stress_roads: 'Roads', stress_settlements: 'Settlements' };
-// Which stressors are included in the live cumulative re-aggregation (a scenario).
+// Which stressors are included in the live cumulative re-aggregation (a scenario),
+// and each stressor's weight in [0,1] (a mitigation knob; 0 == excluded).
 const scenarioEnabled = { stress_water: true, stress_roads: true, stress_settlements: true };
+const scenarioWeight = { stress_water: 1, stress_roads: 1, stress_settlements: 1 };
 
-// Cumulative stress as a LIVE Mapbox expression: noisy-OR (1 − ∏(1−sᵢ)) over the
-// ENABLED stressors, read straight from each feature's per-stressor properties.
-// A missing/null stressor coerces to 0 → factor (1−0)=1 → excluded (honest
-// coverage). This is what lets STRESS "Total" recolor instantly when a stressor
-// is toggled, with no data mutation. Matches the Python engine's noisy-OR.
+// Cumulative stress as a LIVE Mapbox expression: noisy-OR (1 − ∏(1−wᵢ·sᵢ)) over
+// the ENABLED stressors, read straight from each feature's per-stressor
+// properties and scaled by the scenario weight wᵢ. A missing/null stressor
+// coerces to 0 → factor (1−0)=1 → excluded (honest coverage); weight 0 does the
+// same. This lets STRESS "Total" recolor instantly on any toggle/slider change,
+// with no data mutation. Matches the Python engine's noisy-OR.
 function scenarioAggExpr() {
   const factors = STRESSOR_PROPS
     .filter(p => scenarioEnabled[p])
-    .map(p => ['-', 1, ['to-number', ['get', p]]]);
+    .map(p => ['-', 1, ['*', scenarioWeight[p], ['to-number', ['get', p]]]]);
   if (factors.length === 0) return ['literal', 0];
   const product = factors.length === 1 ? factors[0] : ['*', ...factors];
   return ['-', 1, product];
@@ -102,7 +105,10 @@ function scenarioAggExpr() {
 
 // JS twin of scenarioAggExpr, for the tooltip (feature props are in hand there).
 function scenarioAggregate(props) {
-  const vals = STRESSOR_PROPS.filter(p => scenarioEnabled[p]).map(p => props[p]).filter(v => v != null);
+  const vals = STRESSOR_PROPS
+    .filter(p => scenarioEnabled[p])
+    .map(p => (props[p] == null ? null : scenarioWeight[p] * props[p]))
+    .filter(v => v != null);
   if (!vals.length) return 0;
   return 1 - vals.reduce((prod, v) => prod * (1 - v), 1);
 }
@@ -600,6 +606,18 @@ document.querySelectorAll('.scenario-btn').forEach(btn => {
     scenarioEnabled[prop] = !scenarioEnabled[prop];
     btn.classList.toggle('active', scenarioEnabled[prop]);
     btn.setAttribute('aria-pressed', String(scenarioEnabled[prop]));
+    if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
+  });
+});
+
+// Weight sliders: scale a stressor's contribution to the cumulative total and
+// re-aggregate live (0% == excluded). Only affects the "Total" coloring.
+document.querySelectorAll('.scenario-weight').forEach(slider => {
+  slider.addEventListener('input', () => {
+    const prop = slider.dataset.prop;
+    scenarioWeight[prop] = Number(slider.value) / 100;
+    const valSpan = document.querySelector(`.scenario-weight-val[data-prop="${prop}"]`);
+    if (valSpan) valSpan.textContent = `${slider.value}%`;
     if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
   });
 });
