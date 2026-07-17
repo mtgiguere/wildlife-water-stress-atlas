@@ -30,6 +30,10 @@
     }
     .scenario-btn:hover { background: rgba(255,255,255,0.12); }
     .scenario-btn.active { opacity: 1; text-decoration: none; border-color: rgba(255,255,255,0.25); }
+    .scenario-row { display: flex; align-items: center; gap: 6px; }
+    .scenario-row .scenario-btn { min-width: 82px; text-align: left; }
+    .scenario-weight { flex: 1; height: 3px; cursor: pointer; }
+    .scenario-weight-val { font-size: 10px; opacity: 0.7; min-width: 34px; text-align: right; }
   </style>
 </head>
 <body>
@@ -174,13 +178,26 @@
       <button class="stressby-btn" data-prop="stress_settlements">Settlements</button>
     </div>
 
-    <!-- Scenario toggles — include/exclude a stressor and re-aggregate the
-         cumulative stress live. Shown only in the STRESS view. -->
-    <div id="stress-scenario" style="display:none; gap:4px; align-items:center; flex-wrap:wrap; margin-top:6px">
-      <span style="font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.5px">Include</span>
-      <button class="scenario-btn active" data-prop="stress_water" aria-pressed="true">Water</button>
-      <button class="scenario-btn active" data-prop="stress_roads" aria-pressed="true">Roads</button>
-      <button class="scenario-btn active" data-prop="stress_settlements" aria-pressed="true">Settlements</button>
+    <!-- Scenario controls — include/exclude a stressor (button) and set its
+         weight (slider), re-aggregating the cumulative stress live. STRESS view
+         only. A weight of 0% is equivalent to excluding the stressor. -->
+    <div id="stress-scenario" style="display:none; flex-direction:column; gap:4px; margin-top:6px">
+      <span style="font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.5px">Scenario — weight each stressor</span>
+      <div class="scenario-row">
+        <button class="scenario-btn active" data-prop="stress_water" aria-pressed="true">Water</button>
+        <input class="scenario-weight" type="range" min="0" max="100" step="5" value="100" data-prop="stress_water" aria-label="Water weight" />
+        <span class="scenario-weight-val" data-prop="stress_water">100%</span>
+      </div>
+      <div class="scenario-row">
+        <button class="scenario-btn active" data-prop="stress_roads" aria-pressed="true">Roads</button>
+        <input class="scenario-weight" type="range" min="0" max="100" step="5" value="100" data-prop="stress_roads" aria-label="Roads weight" />
+        <span class="scenario-weight-val" data-prop="stress_roads">100%</span>
+      </div>
+      <div class="scenario-row">
+        <button class="scenario-btn active" data-prop="stress_settlements" aria-pressed="true">Settlements</button>
+        <input class="scenario-weight" type="range" min="0" max="100" step="5" value="100" data-prop="stress_settlements" aria-label="Settlements weight" />
+        <span class="scenario-weight-val" data-prop="stress_settlements">100%</span>
+      </div>
     </div>
 
     <!-- Species -->

@@ -250,6 +250,24 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await expect(page.locator('#legend-aggregate-label')).toHaveText('Cumulative stress');
   });
 
+  test('scenario weight sliders appear in STRESS view at 100%', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    await expect(page.locator('.scenario-weight')).toHaveCount(3);
+    for (const p of ['stress_water', 'stress_roads', 'stress_settlements']) {
+      await expect(page.locator(`.scenario-weight[data-prop="${p}"]`)).toHaveValue('100');
+    }
+  });
+
+  test('changing a scenario weight updates its displayed percentage', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    const roads = page.locator('.scenario-weight[data-prop="stress_roads"]');
+    await roads.evaluate((el: HTMLInputElement, v) => {
+      el.value = v as string;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, '40');
+    await expect(page.locator('.scenario-weight-val[data-prop="stress_roads"]')).toHaveText('40%');
+  });
+
   // ---------------------------------------------------------------------------
   // Year slider
   // ---------------------------------------------------------------------------
