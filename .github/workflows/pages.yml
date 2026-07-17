@@ -1,0 +1,56 @@
+name: Deploy Mapbox atlas to GitHub Pages
+
+# Publishes the static Mapbox app (apps/mapbox/) to GitHub Pages.
+#
+# The app is vanilla JS + static GeoJSON with NO server — all asset paths are
+# relative (data/…, js/…, css/…), so it works unchanged from the project-Pages
+# subpath (https://<user>.github.io/wildlife-water-stress-atlas/).
+#
+# This uses the "GitHub Actions" Pages source (artifact upload), NOT the legacy
+# "deploy from a branch" Jekyll build — so nothing in the repo root (README,
+# CLAUDE.md) is rendered or published; only apps/mapbox/ ships.
+#
+# ONE-TIME SETUP: Settings → Pages → Build and deployment → Source = "GitHub
+# Actions". A workflow cannot set that itself.
+
+on:
+  push:
+    branches: ["main"]
+    # Only redeploy when the app or its data actually change.
+    paths:
+      - "apps/mapbox/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: {}
+
+# Least-privilege token scoped to what deploy-pages needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize deploys; never cancel an in-flight one mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload apps/mapbox as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/mapbox
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
