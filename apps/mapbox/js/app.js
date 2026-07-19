@@ -403,26 +403,71 @@ document.getElementById('play-btn').addEventListener('click', () => {
 // ─────────────────────────────────────────────────────────────────
 // SPECIES
 // ─────────────────────────────────────────────────────────────────
+// Group species by realm (data-driven → scales as species plugins are added;
+// a flat list doesn't). Preferred order first, then any unknown realms.
+const REALM_ORDER = ['terrestrial', 'freshwater', 'marine'];
+const REALM_LABELS = { terrestrial: 'Terrestrial', freshwater: 'Freshwater', marine: 'Marine' };
+
 function buildSpeciesGrid(config) {
   const grid = document.getElementById('species-grid');
   grid.innerHTML = '';
 
+  const byRealm = {};
   Object.entries(config).forEach(([sci, cfg]) => {
-    const btn = document.createElement('button');
-    btn.className = 'species-btn';
-    btn.dataset.species = sci;
-    btn.innerHTML = `
-      <span class="species-emoji">${cfg.emoji || '🐾'}</span>
-      <span class="species-info">
-        <span class="species-common">${cfg.common_name}</span>
-        <span class="species-scientific">${sci}</span>
-      </span>
-      <span class="species-tier">${TIER_LABELS[sci] || ''}</span>
-    `;
-    btn.addEventListener('click', () => loadSpecies(sci));
-    grid.appendChild(btn);
+    const realm = cfg.realm || 'other';
+    (byRealm[realm] ||= []).push([sci, cfg]);
+  });
+  const realms = [
+    ...REALM_ORDER.filter(r => byRealm[r]),
+    ...Object.keys(byRealm).filter(r => !REALM_ORDER.includes(r)),
+  ];
+
+  realms.forEach(realm => {
+    const header = document.createElement('div');
+    header.className = 'species-group-label';
+    header.dataset.realm = realm;
+    header.textContent = REALM_LABELS[realm] || realm;
+    grid.appendChild(header);
+
+    byRealm[realm].forEach(([sci, cfg]) => {
+      const btn = document.createElement('button');
+      btn.className = 'species-btn';
+      btn.dataset.species = sci;
+      btn.dataset.search = `${cfg.common_name} ${sci}`.toLowerCase();  // for filtering
+      btn.innerHTML = `
+        <span class="species-emoji">${cfg.emoji || '🐾'}</span>
+        <span class="species-info">
+          <span class="species-common">${cfg.common_name}</span>
+          <span class="species-scientific">${sci}</span>
+        </span>
+        <span class="species-tier">${TIER_LABELS[sci] || ''}</span>
+      `;
+      btn.addEventListener('click', () => loadSpecies(sci));
+      grid.appendChild(btn);
+    });
   });
 }
+
+// Type-to-filter the species list; scales to many plugins. Hides non-matching
+// buttons and any realm header left with no visible members.
+function filterSpecies(query) {
+  const q = query.trim().toLowerCase();
+  const grid = document.getElementById('species-grid');
+  grid.querySelectorAll('.species-btn').forEach(btn => {
+    btn.style.display = !q || btn.dataset.search.includes(q) ? '' : 'none';
+  });
+  grid.querySelectorAll('.species-group-label').forEach(header => {
+    let sib = header.nextElementSibling;
+    let anyVisible = false;
+    while (sib && sib.classList.contains('species-btn')) {
+      if (sib.style.display !== 'none') { anyVisible = true; break; }
+      sib = sib.nextElementSibling;
+    }
+    header.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+document.getElementById('species-search').addEventListener('input', e => filterSpecies(e.target.value));
 
 async function loadSpecies(scientificName) {
   currentSpecies = scientificName;

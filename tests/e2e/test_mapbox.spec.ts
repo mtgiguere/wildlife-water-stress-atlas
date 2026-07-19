@@ -48,6 +48,23 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await expect(buttons).toHaveCount(11);
   });
 
+  test('species list is grouped by realm (scales beyond a flat list)', async ({ page }) => {
+    const groups = page.locator('.species-group-label');
+    expect(await groups.count()).toBeGreaterThanOrEqual(2); // terrestrial + freshwater
+  });
+
+  test('species search filters the list', async ({ page }) => {
+    const search = page.locator('#species-search');
+    await expect(search).toBeVisible();
+    await search.fill('lion');
+    const visible = page.locator('.species-btn:visible');
+    await expect(visible).toHaveCount(1);
+    await expect(visible.first()).toContainText('Lion');
+    // clearing restores the full list
+    await search.fill('');
+    await expect(page.locator('.species-btn:visible')).toHaveCount(11);
+  });
+
   test('African Elephant is selected by default', async ({ page }) => {
     const activeBtn = page.locator('.species-btn.active');
     await expect(activeBtn).toContainText('African Elephant');
