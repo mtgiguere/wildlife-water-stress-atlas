@@ -28,7 +28,13 @@ plugins). `main` is green with the full extensible engine.
   oracle (`tests/_scoring_oracle.py`). Config validation was re-pointed to the
   stressors list, preserving all prior guards (incl. class-weight completeness).
   746 tests, 99% coverage, lint clean.
-- **Remaining in Phase C (not started):** species compare mode; scenario toggles.
+- **Scenario toggles + reweight SHIPPED** (branches merged). Scoring cutover +
+  Pages deploy + a mutation audit (with validation-boundary hardening) also merged.
+- **Near-term: Phase C-UI — Mapbox UX overhaul** (branch `feat/ui-overhaul`) —
+  view-toggle wrap, 0=green dots, time-scrubber overlay (default = last full year),
+  searchable/grouped species selector, data-driven stressor controls, settlement
+  backbone+names. See the "Phase C-UI" section below. **Remaining Phase C feature:**
+  species compare mode (gated on a 2nd species' data).
 - **Deferred: realm gating** — blocked on marine stressor *types* that don't
   exist yet, and redundant with current validation for the existing (all
   terrestrial/freshwater) species. Revisit when a marine species/stressor lands.
@@ -147,6 +153,54 @@ Branch `feat/stressors-list-config`.
       DOM e2e + visual guard; hardened the stress visual guards against SwiftShader
       basemap-dither noise (dense fixtures, glow-hidden dot layer, higher per-pixel
       + footprint thresholds; RED-verified). (branch `feat/scenario-reweight`)
+
+## Phase C-UI — Mapbox UX overhaul  🟡 PLANNED (branch `feat/ui-overhaul`)
+
+Grounded in a review of the live UI (see the discussion 2026-07). Ordering is
+flexible; do the quick wins first. **All items are Mapbox-frontend → SwiftShader
+visual-guard + DOM-test territory (RED first; measure signal vs noise for pixel
+guards — see docs/TDD_CONTRACT.md "Green ≠ Verified").**
+
+- [ ] **UI-1 (quick win) — view toggle overflows.** The 5th button (STRESS) is
+      clipped off the panel: `#view-toggle` is `display:flex` with **no
+      `flex-wrap`**. Add `flex-wrap: wrap`. A primary feature is nearly unreachable
+      → highest priority. (DOM test: STRESS button visible/clickable.)
+- [ ] **UI-2 (quick win) — occurrence dots invisible at 0 stress.** The ramp starts
+      at dim slate (`#2A4050`) so a 0-stress animal ≈ invisible on the dark basemap.
+      Fix: **0 = green** (green→yellow→red, animal always visible). Keep the honesty
+      we built: grey should mean **no-data / uncovered**, NOT zero-stress. Add a
+      minimum dot opacity/size floor. **Do NOT steepen the gradient** (that distorts
+      the scale) — visibility ≠ steepness; consider a perceptually-uniform ramp.
+- [ ] **UI-3 — time control is below the fold.** A temporal map hides its time
+      slider → the whole temporal story (COVID dip, "data gaps are insights") is
+      invisible until you scroll. Lift it out to a **map-overlay scrubber**
+      (play + year + slider), top-center (legend owns bottom-left). Frees panel
+      height (helps UI-5). **Default year = last FULL year of data =
+      `min(latest year present in data, currentYear − 1)`** (data-driven, not the
+      current hardcoded 2020 — which is the anomalous COVID-dip year, the worst
+      default). Browser `new Date()` is fine here (only workflow scripts are barred).
+- [ ] **UI-4 — species selector doesn't scale.** Species are plugin-configurable →
+      could be hundreds; the grid is already data-driven (`buildSpeciesGrid`) but a
+      flat list (left OR right panel) hits a hard ceiling. Build a **search/filter
+      box + grouping** (collapse by `realm` or tier — data already present). Cheap at
+      11, scales to ~100; virtualization / "browse" modal only at true scale (search
+      + group is their foundation, not throwaway). This **replaces** the earlier
+      "compact rows / move to right panel" idea (both were flat lists → same wall).
+- [ ] **UI-5 — stressor controls are hardcoded.** Scenario / colour-by / legend are
+      literal `Water/Roads/Settlements` buttons + a fixed `STRESSOR_PROPS` array in
+      `index.html`/`app.js`; a 4th stressor plugin silently won't appear. **Generate
+      them from the selected species' stressor list** — finishes the Phase-C
+      "stressor-driven frontend" goal. Per-species stressor count is BOUNDED (~5–15,
+      not hundreds) → dynamic rendering, no search needed. (The global stressor
+      catalog, potentially hundreds, is an *authoring* surface — Phase G plugin
+      flow — NOT a map-panel concern. Per-stressor *views* like ROADS/SETTLEMENTS
+      also needn't multiply: the STRESS view + colour-by already subsumes them.)
+- [ ] **UI-6 — settlements are an unlabeled purple blob.** Current data
+      (`settlements_points.geojson`, 1351 pts) carries **only `settlement_class` —
+      no names** → a name tooltip is impossible without a data re-fetch. Two parts:
+      (a) treat like the roads *backbone* — show only cities/towns, size/opacity by
+      class so majors anchor and small recede; (b) **re-fetch settlements WITH names**
+      (bundle with the continental deploy-data fetch) then hover-label / label majors.
 
 ## Phase D — Range + grid scoring
 
