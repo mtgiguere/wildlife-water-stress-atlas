@@ -140,7 +140,10 @@ let allThreatFeatures = [];  // all road-threat features for current species
 let allSettlementFeatures = [];  // all settlement-threat features for current species
 let allAggregateFeatures = [];   // all cumulative-stress features for current species
 let currentSpecies   = 'Loxodonta africana';
-let currentYear      = 2020;
+// Default to the last FULL calendar year; loadSpeciesData() then clamps this to
+// the data's actual range, so the effective default = min(latest year in data,
+// currentYear − 1). (Was hardcoded 2020 — the anomalous COVID-dip year.)
+let currentYear      = new Date().getFullYear() - 1;
 let currentView      = 'points';
 let countryData      = [];   // [{NAME, ISO_A3, year, count}, ...]
 let countriesGeoJSON = null;

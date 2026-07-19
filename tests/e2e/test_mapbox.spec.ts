@@ -297,6 +297,19 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await expect(page.locator('#year-slider')).toBeVisible();
   });
 
+  test('time scrubber is a map overlay, not inside the left panel', async ({ page }) => {
+    await expect(page.locator('#time-scrubber #year-slider')).toHaveCount(1);
+    await expect(page.locator('#panel #year-slider')).toHaveCount(0);
+  });
+
+  test('default year is the last full year of data, not a hardcode', async ({ page }) => {
+    const slider = page.locator('#year-slider');
+    const max = Number(await slider.evaluate((el: HTMLInputElement) => el.max));
+    const val = Number(await slider.evaluate((el: HTMLInputElement) => el.value));
+    const cap = new Date().getFullYear() - 1; // last FULL calendar year
+    expect(val).toBe(Math.min(max, cap));
+  });
+
   test('year display updates when slider moves', async ({ page }) => {
     const slider = page.locator('#year-slider');
     await slider.evaluate((el: HTMLInputElement) => {

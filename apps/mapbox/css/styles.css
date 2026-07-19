@@ -445,6 +445,37 @@ html, body {
   margin-bottom: 16px;
 }
 
+/* Time scrubber — a map overlay (top-center, over the map area right of the
+   panel) so the temporal dimension reads at a glance. */
+#time-scrubber {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: rgba(10, 15, 20, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  max-width: min(760px, 68vw);
+  font-size: 12px;
+}
+#time-scrubber #year-slider { flex: 1 1 auto; min-width: 160px; margin: 0; }
+#time-scrubber .speed-group { display: flex; gap: 3px; }
+#time-scrubber .scrubber-year { white-space: nowrap; opacity: 0.85; letter-spacing: 0.5px; }
+#time-scrubber #year-display { color: var(--accent, #00C4FF); font-weight: 600; }
+#time-scrubber #year-range-labels {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
 .view-btn {
   flex: 1;
   font-family: var(--font-display);

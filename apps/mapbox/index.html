@@ -142,6 +142,21 @@
   </div>
 </div>
 
+<!-- Time scrubber — overlaid on the map so the temporal dimension is obvious at a
+     glance (this is a time series, not a static snapshot). Moved out of the left
+     panel (was below the fold). IDs preserved so the app + tests still wire up. -->
+<div id="time-scrubber">
+  <button id="play-btn">▶ PLAY</button>
+  <div class="speed-group">
+    <button class="speed-btn" data-ms="800">SLOW</button>
+    <button class="speed-btn active" data-ms="400">MED</button>
+    <button class="speed-btn" data-ms="150">FAST</button>
+  </div>
+  <div class="scrubber-year">YEAR <span id="year-display">2020</span></div>
+  <input type="range" id="year-slider" min="1800" max="2024" value="2020" step="1" />
+  <div id="year-range-labels"><span>1800</span><span>2024</span></div>
+</div>
+
 <!-- Left panel -->
 <div id="panel">
   <div id="panel-header">
@@ -197,23 +212,6 @@
       <div class="section-label">Species</div>
       <div id="species-grid">
         <!-- Populated by JS -->
-      </div>
-    </div>
-
-    <!-- Year -->
-    <div id="year-section">
-      <div class="section-label">Year</div>
-      <div id="year-display">2020</div>
-      <input type="range" id="year-slider" min="1800" max="2024" value="2020" step="1" />
-      <div id="year-range-labels">
-        <span>1800</span>
-        <span>2024</span>
-      </div>
-      <div id="autoplay-controls">
-        <button id="play-btn">▶ PLAY</button>
-        <button class="speed-btn" data-ms="800">SLOW</button>
-        <button class="speed-btn active" data-ms="400">MED</button>
-        <button class="speed-btn" data-ms="150">FAST</button>
       </div>
     </div>
 
