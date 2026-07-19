@@ -263,3 +263,48 @@ def test_build_stress_from_scores_rejects_misaligned_inputs():
     )
     with pytest.raises(ValueError):
         build_stress_from_scores(one, two, two)
+
+
+# ---------------------------------------------------------------------------
+# rescore_water_with_added_source — fold an ADDITIONAL accessible water source
+# (e.g. HydroRIVERS) into an existing per-occurrence water-stress table.
+# ---------------------------------------------------------------------------
+
+
+def test_rescore_water_with_added_source_takes_nearer_distance_and_rescores():
+    from scripts.export_stress import rescore_water_with_added_source
+    from tests._scoring_oracle import water_stress_score
+    from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
+
+    sci = "Hippopotamus amphibius"
+    pts = [Point(0, 0), Point(1, 1), Point(2, 2)]
+    stress = gpd.GeoDataFrame(
+        {"species": [sci] * 3, "year": [2019, 2020, 2021], "distance_m": [500.0, 20_000.0, 8_000.0], "stress_score": [0.0, 0.0, 0.0], "stress_level": ["x"] * 3},
+        geometry=pts,
+        crs="EPSG:4326",
+    )
+    added = [100_000.0, 3_000.0, 50_000.0]  # a nearer river only at index 1
+
+    out = rescore_water_with_added_source(stress, added, sci)
+
+    # nearer of the two distances, elementwise
+    assert list(out["distance_m"]) == [500.0, 3_000.0, 8_000.0]
+    # stress + level recomputed from the new distance, matching the engine/oracle
+    for i, d in enumerate([500.0, 3_000.0, 8_000.0]):
+        assert out["stress_score"].iloc[i] == pytest.approx(water_stress_score(d, sci))
+        assert out["stress_level"].iloc[i] == classify_stress_level(water_stress_score(d, sci))
+    # row-aligned + schema preserved
+    assert len(out) == 3
+    assert list(out.columns) == ["species", "year", "distance_m", "stress_score", "stress_level", "geometry"]
+
+
+def test_rescore_water_with_added_source_rejects_length_mismatch():
+    from scripts.export_stress import rescore_water_with_added_source
+
+    stress = gpd.GeoDataFrame(
+        {"species": ["X"], "year": [2020], "distance_m": [1.0], "stress_score": [0.0], "stress_level": ["low"]},
+        geometry=[Point(0, 0)],
+        crs="EPSG:4326",
+    )
+    with pytest.raises(ValueError):
+        rescore_water_with_added_source(stress, [1.0, 2.0], "X")
