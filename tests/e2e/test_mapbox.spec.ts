@@ -48,6 +48,23 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await expect(buttons).toHaveCount(11);
   });
 
+  test('species list is grouped by realm (scales beyond a flat list)', async ({ page }) => {
+    const groups = page.locator('.species-group-label');
+    expect(await groups.count()).toBeGreaterThanOrEqual(2); // terrestrial + freshwater
+  });
+
+  test('species search filters the list', async ({ page }) => {
+    const search = page.locator('#species-search');
+    await expect(search).toBeVisible();
+    await search.fill('lion');
+    const visible = page.locator('.species-btn:visible');
+    await expect(visible).toHaveCount(1);
+    await expect(visible.first()).toContainText('Lion');
+    // clearing restores the full list
+    await search.fill('');
+    await expect(page.locator('.species-btn:visible')).toHaveCount(11);
+  });
+
   test('African Elephant is selected by default', async ({ page }) => {
     const activeBtn = page.locator('.species-btn.active');
     await expect(activeBtn).toContainText('African Elephant');
@@ -77,6 +94,23 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
 
   test('POINTS view button is active by default', async ({ page }) => {
     await expect(page.locator('.view-btn.active')).toContainText('POINTS');
+  });
+
+  test('all five view buttons fit within the panel (STRESS not clipped)', async ({ page }) => {
+    const panel = await page.locator('#panel').boundingBox();
+    const buttons = page.locator('.view-btn');
+    await expect(buttons).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
+      const label = (await buttons.nth(i).innerText()).trim();
+      const box = await buttons.nth(i).boundingBox();
+      expect(box, `view button "${label}" has no box`).not.toBeNull();
+      // Every button's right edge must sit within the panel — else it's clipped
+      // off-panel (the STRESS-button overflow: #view-toggle had no flex-wrap).
+      expect(
+        box!.x + box!.width,
+        `view button "${label}" overflows the panel (right edge ${Math.round(box!.x + box!.width)} > panel ${Math.round(panel!.x + panel!.width)})`,
+      ).toBeLessThanOrEqual(panel!.x + panel!.width + 1);
+    }
   });
 
   test('clicking COUNTRIES makes it active', async ({ page }) => {
@@ -207,10 +241,28 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await page.locator('.view-btn', { hasText: 'STRESS' }).click();
     await page.locator('.stressby-btn', { hasText: 'Roads' }).click();
     await expect(page.locator('.stressby-btn.active')).toContainText('Roads');
-    await expect(page.locator('#legend-aggregate-label')).toHaveText('Road stress');
+    // Label is derived from the stressor id (title-cased) — "Roads stress".
+    await expect(page.locator('#legend-aggregate-label')).toHaveText('Roads stress');
     // and back to Total
     await page.locator('.stressby-btn', { hasText: 'Total' }).click();
     await expect(page.locator('#legend-aggregate-label')).toHaveText('Cumulative stress');
+  });
+
+  test('stressor controls are generated from the species stressors (extensible)', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    // Default species has water/roads/settlements → Total + 3 colour-by buttons, 3 scenario rows.
+    await expect(page.locator('#stress-colorby .stressby-btn')).toHaveCount(4);
+    await expect(page.locator('#stress-scenario .scenario-btn')).toHaveCount(3);
+    // Inject a novel 4th stressor and rebuild — the controls must adapt (proves
+    // they're generated from data, not hardcoded to Water/Roads/Settlements).
+    await page.evaluate(() => {
+      // eslint-disable-next-line no-undef
+      speciesConfig['Loxodonta africana'].stressors.push({ stressor_id: 'climate', sensitivity: 1.0, params: {} });
+      // eslint-disable-next-line no-undef
+      buildStressorControls('Loxodonta africana');
+    });
+    await expect(page.locator('.stressby-btn[data-prop="stress_climate"]')).toHaveCount(1);
+    await expect(page.locator('.scenario-btn[data-prop="stress_climate"]')).toHaveCount(1);
   });
 
   // ---------------------------------------------------------------------------
@@ -278,6 +330,19 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
 
   test('year slider is present', async ({ page }) => {
     await expect(page.locator('#year-slider')).toBeVisible();
+  });
+
+  test('time scrubber is a map overlay, not inside the left panel', async ({ page }) => {
+    await expect(page.locator('#time-scrubber #year-slider')).toHaveCount(1);
+    await expect(page.locator('#panel #year-slider')).toHaveCount(0);
+  });
+
+  test('default year is the last full year of data, not a hardcode', async ({ page }) => {
+    const slider = page.locator('#year-slider');
+    const max = Number(await slider.evaluate((el: HTMLInputElement) => el.max));
+    const val = Number(await slider.evaluate((el: HTMLInputElement) => el.value));
+    const cap = new Date().getFullYear() - 1; // last FULL calendar year
+    expect(val).toBe(Math.min(max, cap));
   });
 
   test('year display updates when slider moves', async ({ page }) => {
