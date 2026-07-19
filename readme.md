@@ -3,6 +3,11 @@
 A geospatial decision-support platform that models wildlife survival risk
 as a function of freshwater access and environmental pressure across Africa.
 
+> 🐸 **Are you an ecologist who wants to add a species or a stressor?**
+> Start with **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — a plain-language guide
+> to how it works, how to add your animal/pressure as a simple file (no coding),
+> and exactly what the algorithm does with your numbers.
+
 ---
 
 ## What It Does
