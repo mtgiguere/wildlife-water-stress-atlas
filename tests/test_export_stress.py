@@ -258,7 +258,8 @@ def test_build_stress_from_scores_rejects_misaligned_inputs():
     one = gpd.GeoDataFrame({"species": ["X"], "year": [2020], "stress_score": [0.1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     two = gpd.GeoDataFrame(
         {"species": ["X", "X"], "year": [2020, 2021], "road_threat_score": [0.1, 0.2], "settlement_threat_score": [0.1, 0.2]},
-        geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:4326",
+        geometry=[Point(0, 0), Point(1, 1)],
+        crs="EPSG:4326",
     )
     with pytest.raises(ValueError):
         build_stress_from_scores(one, two, two)

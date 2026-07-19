@@ -70,10 +70,7 @@ def build_stress_from_scores(
 
     # All three are covered (a real 0 means "no stress", not "no data"), so the
     # noisy-OR runs over all three. aggregate_stress is the engine's one formula.
-    aggregate = [
-        aggregate_stress([Score(float(w), True), Score(float(r), True), Score(float(s), True)]).value
-        for w, r, s in zip(water, roads, setts, strict=True)
-    ]
+    aggregate = [aggregate_stress([Score(float(w), True), Score(float(r), True), Score(float(s), True)]).value for w, r, s in zip(water, roads, setts, strict=True)]
 
     out = roads_gdf[["species", "year"]].copy()
     out["stress_water"] = water
@@ -82,6 +79,7 @@ def build_stress_from_scores(
     out["stress_aggregate"] = aggregate
     out["geometry"] = roads_gdf.geometry.to_numpy()
     return gpd.GeoDataFrame(out, geometry="geometry", crs=roads_gdf.crs)
+
 
 # Default input/output locations (match the other export scripts).
 DEFAULT_DATA_DIR = Path("data/processed")
