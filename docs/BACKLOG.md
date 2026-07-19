@@ -46,9 +46,16 @@ plugins). `main` is green with the full extensible engine.
   committed per-stressor exports — fast, no distance recompute). **Continental on
   water + roads, REGIONAL on settlements** (settlement data still a subset of
   eastern/southern Africa).
+- **Water accuracy — HydroRIVERS integrated** (branch `feat/hydrorivers-regen`):
+  `add_distance_to_water` indexed (`sjoin_nearest`), `HydroRivers` source (1.5M
+  Africa segments), and all water stress regenerated via
+  `rescore_water_with_added_source` (new dist = min(old, HydroRIVERS)). Fixed the
+  obligate-aquatic false-red: hippo water-HIGH 53%→3.5%, croc 54.5%→0.2%; water-
+  independent species unchanged (their stress is real). Residual frog stress is a
+  real small-wetland data gap, not an artifact.
 - **Data caveat:** the committed settlement GeoJSON is a SUBSET; run the full
   continental fetch + export, then **regenerate `stress_gbif_*`** so its settlement
-  dimension is complete (ties to UI-6).
+  dimension is complete (ties to UI-6). (Water is now continental via HydroRIVERS.)
 - **Deploy:** a GitHub Pages workflow (`ci/pages-mapbox-deploy`) publishes the
   static Mapbox app; requires Settings → Pages → Source = "GitHub Actions".
 
