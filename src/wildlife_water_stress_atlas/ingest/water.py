@@ -302,6 +302,42 @@ class ShapefileLakes(WaterSource):
         )
 
 
+class HydroRivers(WaterSource):
+    """
+    Loads the dense HydroRIVERS river network (HydroSHEDS) from a File
+    Geodatabase (.gdb).
+
+    HydroRIVERS is ~1.5M segments for Africa vs the ~thousands in the Natural
+    Earth centerlines — the density that makes distance-to-water accurate for
+    animals that live in small/seasonal rivers (e.g. hippos, which otherwise read
+    as ~14 km from "mapped" water when they're sitting in it). Only geometry is
+    needed for the distance calc, so we read geometry-only to stay memory-lean
+    over 1.5M lines. Stream-order metadata (ORD_STRA) could later set per-segment
+    reliability; treated as permanent surface water for now.
+    """
+
+    def load(self) -> gpd.GeoDataFrame:
+        """Load the HydroRIVERS geodatabase and return a normalized GeoDataFrame."""
+        # columns=[] → geometry only (the attribute table is large and unused here).
+        gdf = gpd.read_file(self.filepath, columns=[])
+
+        if gdf.crs is None:
+            gdf = gdf.set_crs("EPSG:4326")
+        else:
+            gdf = gdf.to_crs("EPSG:4326")
+
+        gdf = self._clip_to_bbox(gdf)
+
+        return self._normalize(
+            gdf,
+            water_type="river",
+            mechanism=WaterMechanism.PERMANENT_SURFACE,
+            permanence="permanent",
+            reliability=1.0,
+            months_water=12,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Raster Source Classes
 # ---------------------------------------------------------------------------
@@ -664,6 +700,7 @@ class JRCGlobalSurfaceWater(WaterSource):
 # Add new source classes here when they're implemented.
 SOURCE_REGISTRY: dict[str, type[WaterSource]] = {
     "rivers": ShapefileRivers,
+    "hydrorivers": HydroRivers,
     "lakes": ShapefileLakes,
     "glwd": GLWDWetlands,
     "jrc_gsw": JRCGlobalSurfaceWater,
