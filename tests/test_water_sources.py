@@ -19,6 +19,8 @@ import pytest
 from shapely.geometry import LineString, Polygon
 
 from wildlife_water_stress_atlas.ingest.water import (
+    SOURCE_REGISTRY,
+    HydroRivers,
     ShapefileLakes,
     ShapefileRivers,
     WaterMechanism,
@@ -400,3 +402,23 @@ def test_combine_water_layers_still_works(mock_rivers_gdf, mock_lakes_gdf):
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == 2
     assert result.crs.to_string() == "EPSG:4326"
+
+
+# ---------------------------------------------------------------------------
+# HydroRivers — dense HydroSHEDS river network (File Geodatabase)
+# ---------------------------------------------------------------------------
+
+
+def test_hydrorivers_produces_normalized_river_schema(monkeypatch, mock_rivers_gdf):
+    monkeypatch.setattr(WATER_READ_FILE, lambda *a, **k: mock_rivers_gdf)
+
+    source = HydroRivers("dummy/HydroRIVERS_v10_af.gdb")
+    result = source.load()
+
+    for col in ("water_type", "source_id", "mechanism", "permanence", "reliability", "months_water"):
+        assert col in result.columns
+    assert (result["water_type"] == "river").all()
+
+
+def test_hydrorivers_registered_in_source_registry():
+    assert SOURCE_REGISTRY["hydrorivers"] is HydroRivers
