@@ -30,11 +30,14 @@ plugins). `main` is green with the full extensible engine.
   746 tests, 99% coverage, lint clean.
 - **Scenario toggles + reweight SHIPPED** (branches merged). Scoring cutover +
   Pages deploy + a mutation audit (with validation-boundary hardening) also merged.
-- **Near-term: Phase C-UI — Mapbox UX overhaul** (branch `feat/ui-overhaul`) —
-  view-toggle wrap, 0=green dots, time-scrubber overlay (default = last full year),
-  searchable/grouped species selector, data-driven stressor controls, settlement
-  backbone+names. See the "Phase C-UI" section below. **Remaining Phase C feature:**
-  species compare mode (gated on a 2nd species' data).
+- **Phase C-UI — Mapbox UX overhaul: UI-1…UI-5 DONE** on branch `feat/ui-overhaul`
+  (open for review): view-toggle wrap; 0=green dots (grey reserved for no-data);
+  time-scrubber overlay defaulting to the last full year of data; searchable,
+  realm-grouped species selector; data-driven stressor controls (generated from the
+  species' stressor list). `species_config.json` refreshed to the post-cutover shape.
+  **UI-6 (settlement backbone-tiering + names) remains — gated on the settlement
+  data re-fetch (current data has no names).** See "Phase C-UI" below.
+  **Remaining Phase C feature:** species compare mode (gated on a 2nd species' data).
 - **Deferred: realm gating** — blocked on marine stressor *types* that don't
   exist yet, and redundant with current validation for the existing (all
   terrestrial/freshwater) species. Revisit when a marine species/stressor lands.
@@ -161,17 +164,17 @@ flexible; do the quick wins first. **All items are Mapbox-frontend → SwiftShad
 visual-guard + DOM-test territory (RED first; measure signal vs noise for pixel
 guards — see docs/TDD_CONTRACT.md "Green ≠ Verified").**
 
-- [ ] **UI-1 (quick win) — view toggle overflows.** The 5th button (STRESS) is
+- [x] **UI-1 (quick win) — view toggle overflows.** The 5th button (STRESS) is
       clipped off the panel: `#view-toggle` is `display:flex` with **no
       `flex-wrap`**. Add `flex-wrap: wrap`. A primary feature is nearly unreachable
       → highest priority. (DOM test: STRESS button visible/clickable.)
-- [ ] **UI-2 (quick win) — occurrence dots invisible at 0 stress.** The ramp starts
+- [x] **UI-2 (quick win) — occurrence dots invisible at 0 stress.** The ramp starts
       at dim slate (`#2A4050`) so a 0-stress animal ≈ invisible on the dark basemap.
       Fix: **0 = green** (green→yellow→red, animal always visible). Keep the honesty
       we built: grey should mean **no-data / uncovered**, NOT zero-stress. Add a
       minimum dot opacity/size floor. **Do NOT steepen the gradient** (that distorts
       the scale) — visibility ≠ steepness; consider a perceptually-uniform ramp.
-- [ ] **UI-3 — time control is below the fold.** A temporal map hides its time
+- [x] **UI-3 — time control is below the fold.** A temporal map hides its time
       slider → the whole temporal story (COVID dip, "data gaps are insights") is
       invisible until you scroll. Lift it out to a **map-overlay scrubber**
       (play + year + slider), top-center (legend owns bottom-left). Frees panel
@@ -179,14 +182,14 @@ guards — see docs/TDD_CONTRACT.md "Green ≠ Verified").**
       `min(latest year present in data, currentYear − 1)`** (data-driven, not the
       current hardcoded 2020 — which is the anomalous COVID-dip year, the worst
       default). Browser `new Date()` is fine here (only workflow scripts are barred).
-- [ ] **UI-4 — species selector doesn't scale.** Species are plugin-configurable →
+- [x] **UI-4 — species selector doesn't scale.** Species are plugin-configurable →
       could be hundreds; the grid is already data-driven (`buildSpeciesGrid`) but a
       flat list (left OR right panel) hits a hard ceiling. Build a **search/filter
       box + grouping** (collapse by `realm` or tier — data already present). Cheap at
       11, scales to ~100; virtualization / "browse" modal only at true scale (search
       + group is their foundation, not throwaway). This **replaces** the earlier
       "compact rows / move to right panel" idea (both were flat lists → same wall).
-- [ ] **UI-5 — stressor controls are hardcoded.** Scenario / colour-by / legend are
+- [x] **UI-5 — stressor controls are hardcoded.** Scenario / colour-by / legend are
       literal `Water/Roads/Settlements` buttons + a fixed `STRESSOR_PROPS` array in
       `index.html`/`app.js`; a 4th stressor plugin silently won't appear. **Generate
       them from the selected species' stressor list** — finishes the Phase-C
