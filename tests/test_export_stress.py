@@ -223,3 +223,42 @@ def test_main_calls_export_all_stress():
         main()
         mock_all.assert_called_once()
         assert mock_all.call_args.kwargs["output_dir"] == Path("apps/mapbox/data")
+
+
+# ---------------------------------------------------------------------------
+# Fast aggregate builder — combine the already-computed per-stressor exports
+# into the cumulative stress layer (noisy-OR), without recomputing distances.
+# ---------------------------------------------------------------------------
+
+
+def test_build_stress_from_scores_matches_engine_noisy_or():
+    from scripts.export_stress import build_stress_from_scores
+    from wildlife_water_stress_atlas.analytics.stressors import Score, aggregate_stress
+
+    pts = [Point(0, 0), Point(1, 1), Point(2, 2)]
+    triples = [(0.0, 0.2, 0.1), (0.5, 0.0, 0.4), (1.0, 0.3, 0.0)]
+    water = gpd.GeoDataFrame({"species": ["X"] * 3, "year": [2019, 2020, 2021], "stress_score": [t[0] for t in triples]}, geometry=pts, crs="EPSG:4326")
+    roads = gpd.GeoDataFrame({"species": ["X"] * 3, "year": [2019, 2020, 2021], "road_threat_score": [t[1] for t in triples]}, geometry=pts, crs="EPSG:4326")
+    setts = gpd.GeoDataFrame({"species": ["X"] * 3, "year": [2019, 2020, 2021], "settlement_threat_score": [t[2] for t in triples]}, geometry=pts, crs="EPSG:4326")
+
+    out = build_stress_from_scores(water, roads, setts)
+
+    assert list(out.columns) == ["species", "year", "stress_water", "stress_roads", "stress_settlements", "stress_aggregate", "geometry"]
+    for i, (w, r, s) in enumerate(triples):
+        expected = aggregate_stress([Score(w, True), Score(r, True), Score(s, True)]).value
+        assert out["stress_aggregate"].iloc[i] == pytest.approx(expected)
+        assert out["stress_water"].iloc[i] == pytest.approx(w)
+        assert out["stress_roads"].iloc[i] == pytest.approx(r)
+        assert out["stress_settlements"].iloc[i] == pytest.approx(s)
+
+
+def test_build_stress_from_scores_rejects_misaligned_inputs():
+    from scripts.export_stress import build_stress_from_scores
+
+    one = gpd.GeoDataFrame({"species": ["X"], "year": [2020], "stress_score": [0.1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+    two = gpd.GeoDataFrame(
+        {"species": ["X", "X"], "year": [2020, 2021], "road_threat_score": [0.1, 0.2], "settlement_threat_score": [0.1, 0.2]},
+        geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:4326",
+    )
+    with pytest.raises(ValueError):
+        build_stress_from_scores(one, two, two)
