@@ -241,10 +241,28 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await page.locator('.view-btn', { hasText: 'STRESS' }).click();
     await page.locator('.stressby-btn', { hasText: 'Roads' }).click();
     await expect(page.locator('.stressby-btn.active')).toContainText('Roads');
-    await expect(page.locator('#legend-aggregate-label')).toHaveText('Road stress');
+    // Label is derived from the stressor id (title-cased) — "Roads stress".
+    await expect(page.locator('#legend-aggregate-label')).toHaveText('Roads stress');
     // and back to Total
     await page.locator('.stressby-btn', { hasText: 'Total' }).click();
     await expect(page.locator('#legend-aggregate-label')).toHaveText('Cumulative stress');
+  });
+
+  test('stressor controls are generated from the species stressors (extensible)', async ({ page }) => {
+    await page.locator('.view-btn', { hasText: 'STRESS' }).click();
+    // Default species has water/roads/settlements → Total + 3 colour-by buttons, 3 scenario rows.
+    await expect(page.locator('#stress-colorby .stressby-btn')).toHaveCount(4);
+    await expect(page.locator('#stress-scenario .scenario-btn')).toHaveCount(3);
+    // Inject a novel 4th stressor and rebuild — the controls must adapt (proves
+    // they're generated from data, not hardcoded to Water/Roads/Settlements).
+    await page.evaluate(() => {
+      // eslint-disable-next-line no-undef
+      speciesConfig['Loxodonta africana'].stressors.push({ stressor_id: 'climate', sensitivity: 1.0, params: {} });
+      // eslint-disable-next-line no-undef
+      buildStressorControls('Loxodonta africana');
+    });
+    await expect(page.locator('.stressby-btn[data-prop="stress_climate"]')).toHaveCount(1);
+    await expect(page.locator('.scenario-btn[data-prop="stress_climate"]')).toHaveCount(1);
   });
 
   // ---------------------------------------------------------------------------
