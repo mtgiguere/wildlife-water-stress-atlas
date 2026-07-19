@@ -61,6 +61,10 @@ const STRESS_FIXTURE = stressGrid({ stress_aggregate: 0.85, stress_water: 0.7, s
 // excluding/zeroing roads collapses it to green — a large, unambiguous recolor.
 const SCENARIO_FIXTURE = stressGrid({ stress_aggregate: 0.91, stress_water: 0.05, stress_roads: 0.9, stress_settlements: 0.05 });
 
+// Everything at ZERO stress. The animal must still be VISIBLE (green), not the
+// near-invisible dark slate the ramp used to paint at 0 (UI-2).
+const ZERO_STRESS_FIXTURE = stressGrid({ stress_aggregate: 0.0, stress_water: 0.0, stress_roads: 0.0, stress_settlements: 0.0 });
+
 // Camera pinned over road/settlement-dense East/Central Africa so the
 // measurement does not depend on where the fly-to animation happens to land.
 const PINNED = { center: [34, -2] as [number, number], zoom: 6 };
@@ -200,6 +204,23 @@ test.describe('Mapbox app — WebGL visual smoke test', () => {
       footprint,
       `stress dots footprint ${footprint}px is below ${MIN_STRESS_FOOTPRINT}px — STRESS view not painting`,
     ).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
+  });
+
+  test('zero-stress occurrences are still visibly painted (green, not slate)', async ({ page }) => {
+    // UI-2: at 0 stress the ramp used to paint dark slate ≈ invisible on the dark
+    // basemap. With 0 = green the animal is always visible — its painted footprint
+    // (at the strong per-pixel threshold, which drops near-basemap slate) must clear
+    // the bar.
+    await openStressViewWithFixture(page, ZERO_STRESS_FIXTURE);
+
+    const withDots = await page.locator('#map canvas').screenshot();
+    await setLayerVisible(page, 'stress-aggregate-dot', false);
+    await page.waitForTimeout(1000);
+    const withoutDots = await page.locator('#map canvas').screenshot();
+    await setLayerVisible(page, 'stress-aggregate-dot', true);
+
+    const footprint = changedPixels(withDots, withoutDots, STRESS_PIXEL_THRESH);
+    expect(footprint, `zero-stress dots footprint ${footprint}px — a 0-stress animal is ~invisible`).toBeGreaterThan(MIN_STRESS_FOOTPRINT);
   });
 
   test('per-stressor toggle recolors the STRESS dots', async ({ page }) => {

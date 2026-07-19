@@ -35,28 +35,29 @@ const STRESS_COLOR_EXPR = [
   STRESS_COLORS.fallback,
 ];
 
-// Road threat color ramp — continuous 0–1 road_threat_score.
-// 0 (no threat / immune species / beyond threshold) reads as dim slate;
-// any positive threat ramps green → yellow → red, reusing the stress palette.
+// Dim slate — reserved for genuine no-data / no-coverage (Phase D confidence
+// layer). NOT used for a real zero-stress value: a 0 reads green so the animal
+// stays visible (see stressRamp / the threat ramps below).
 const ROAD_THREAT_NONE = '#2A4050';
+
+// Road threat color ramp — continuous 0–1 road_threat_score. 0 = green (low /
+// no threat) so every occurrence is visible; threat reads as the shift to red.
 const ROAD_THREAT_COLOR_EXPR = [
   'interpolate', ['linear'], ['get', 'road_threat_score'],
-  0,     ROAD_THREAT_NONE,
-  0.001, STRESS_COLORS.low,
-  0.33,  STRESS_COLORS.moderate,
-  0.66,  STRESS_COLORS.high,
-  1,     STRESS_COLORS.high,
+  0,    STRESS_COLORS.low,
+  0.33, STRESS_COLORS.moderate,
+  0.66, STRESS_COLORS.high,
+  1,    STRESS_COLORS.high,
 ];
 
 // Settlement threat color ramp — same green→red threat semantics as roads,
 // keyed on settlement_threat_score. Shown in the SETTLEMENTS view.
 const SETTLEMENT_THREAT_COLOR_EXPR = [
   'interpolate', ['linear'], ['get', 'settlement_threat_score'],
-  0,     ROAD_THREAT_NONE,
-  0.001, STRESS_COLORS.low,
-  0.33,  STRESS_COLORS.moderate,
-  0.66,  STRESS_COLORS.high,
-  1,     STRESS_COLORS.high,
+  0,    STRESS_COLORS.low,
+  0.33, STRESS_COLORS.moderate,
+  0.66, STRESS_COLORS.high,
+  1,    STRESS_COLORS.high,
 ];
 
 // Settlement context points (cities & towns) — a warm violet, distinct from
@@ -69,11 +70,13 @@ const SETTLEMENT_POINT_COLOR = '#C08BE0';
 function stressRamp(valueExpr) {
   return [
     'interpolate', ['linear'], valueExpr,
-    0,     ROAD_THREAT_NONE,
-    0.001, STRESS_COLORS.low,
-    0.33,  STRESS_COLORS.moderate,
-    0.66,  STRESS_COLORS.high,
-    1,     STRESS_COLORS.high,
+    // 0 = green (not dark slate): the animal is ALWAYS visible; stress reads as the
+    // shift toward red. Grey is reserved for genuine no-data/coverage (Phase D),
+    // never for a real zero-stress value.
+    0,    STRESS_COLORS.low,
+    0.33, STRESS_COLORS.moderate,
+    0.66, STRESS_COLORS.high,
+    1,    STRESS_COLORS.high,
   ];
 }
 function stressColorBy(prop) { return stressRamp(['get', prop]); }
