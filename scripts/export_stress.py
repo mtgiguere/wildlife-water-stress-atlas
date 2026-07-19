@@ -26,7 +26,7 @@ from wildlife_water_stress_atlas.analytics.overlap import (
     add_distance_to_water,
 )
 from wildlife_water_stress_atlas.analytics.stress_engine import score_species_stress
-from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
+from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity, Score, aggregate_stress
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
@@ -37,6 +37,49 @@ AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 # stress_aggregate for the headline layer and the per-stressor columns for the
 # breakdown/toggle.
 _OUTPUT_COLS = ["species", "year", "stress_water", "stress_roads", "stress_settlements", "stress_aggregate"]
+
+
+def build_stress_from_scores(
+    water_gdf: gpd.GeoDataFrame,
+    roads_gdf: gpd.GeoDataFrame,
+    settlements_gdf: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """
+    Build the cumulative-stress GeoDataFrame from the already-computed per-stressor
+    exports — the FAST path that avoids recomputing distances over continental
+    roads/water.
+
+    The per-stressor scores in those exports ARE the engine's scores (post-cutover
+    every export routes through score_stressor), so the noisy-OR here is identical
+    to compute_species_stress's aggregate — it just reuses prior work.
+
+    Inputs must be ROW-ALIGNED (same occurrences in the same order) — they are, as
+    all three derive from the same GBIF cache. Columns read: water.stress_score,
+    roads.road_threat_score, settlements.settlement_threat_score.
+
+    Raises:
+        ValueError: if the three inputs are not the same length (misaligned).
+    """
+    n = len(roads_gdf)
+    if not (len(water_gdf) == len(settlements_gdf) == n):
+        raise ValueError(f"per-stressor exports are misaligned: water={len(water_gdf)}, roads={n}, settlements={len(settlements_gdf)}")
+
+    water = water_gdf["stress_score"].to_numpy()
+    roads = roads_gdf["road_threat_score"].to_numpy()
+    setts = settlements_gdf["settlement_threat_score"].to_numpy()
+
+    # All three are covered (a real 0 means "no stress", not "no data"), so the
+    # noisy-OR runs over all three. aggregate_stress is the engine's one formula.
+    aggregate = [aggregate_stress([Score(float(w), True), Score(float(r), True), Score(float(s), True)]).value for w, r, s in zip(water, roads, setts, strict=True)]
+
+    out = roads_gdf[["species", "year"]].copy()
+    out["stress_water"] = water
+    out["stress_roads"] = roads
+    out["stress_settlements"] = setts
+    out["stress_aggregate"] = aggregate
+    out["geometry"] = roads_gdf.geometry.to_numpy()
+    return gpd.GeoDataFrame(out, geometry="geometry", crs=roads_gdf.crs)
+
 
 # Default input/output locations (match the other export scripts).
 DEFAULT_DATA_DIR = Path("data/processed")

@@ -72,6 +72,29 @@ def test_add_distance_to_water_works_with_combined_water_sources():
     assert result.loc[0, "distance_to_water"] >= 0
 
 
+def test_add_distance_to_water_picks_the_nearest_of_several():
+    # With several water features, the distance must be to the NEAREST one — the
+    # whole point of the indexed nearest-join (and unchanged from brute-force).
+    occurrences = gpd.GeoDataFrame(
+        {"species": ["X"]},
+        geometry=[Point(0, 0)],
+        crs="EPSG:4326",
+    )
+    water = gpd.GeoDataFrame(
+        {"type": ["far_lake", "near_river"]},
+        geometry=[
+            Polygon([(5, 5), (5, 6), (6, 6), (6, 5)]),  # far (~5 deg away)
+            LineString([(0.1, -1), (0.1, 1)]),  # near (~0.1 deg = ~11 km east)
+        ],
+        crs="EPSG:4326",
+    )
+
+    result = add_distance_to_water(occurrences, water)
+    d = result.loc[0, "distance_to_water"]
+    assert 8_000 < d < 15_000, f"expected the ~11km river, got {d}m (picked the far lake?)"
+    assert len(result) == 1  # nearest-join must not duplicate the occurrence
+
+
 def test_add_distance_to_water_empty_occurrences_returns_empty():
     """Empty occurrences GeoDataFrame produces an empty result — no crash."""
     occurrences = gpd.GeoDataFrame(

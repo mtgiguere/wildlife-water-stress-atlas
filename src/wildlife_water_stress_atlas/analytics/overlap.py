@@ -28,14 +28,30 @@ def add_distance_to_water(
         Distance is computed in EPSG:3857 (Web Mercator) for metric accuracy,
         then the result is re-projected back to EPSG:4326 for consistency
         with the rest of the pipeline.
+
+        Uses gpd.sjoin_nearest (STRtree spatial index) — ~O(points · log water)
+        rather than the O(points · water) of a per-point brute-force scan. Same
+        result as before, but it scales to dense hydrography (e.g. a full
+        HydroRIVERS network) without exploding, mirroring add_distance_to_road.
     """
     occurrences_projected = occurrences.to_crs(epsg=3857)
     water_projected = water.to_crs(epsg=3857)
 
-    result = occurrences_projected.copy()
-    result["distance_to_water"] = result.geometry.apply(lambda point: water_projected.distance(point).min())
+    joined = gpd.sjoin_nearest(
+        occurrences_projected,
+        water_projected[["geometry"]],
+        how="left",
+        distance_col="distance_to_water",
+    )
 
-    return result.to_crs(epsg=4326)
+    # Equidistant water features produce duplicate rows for one occurrence — keep
+    # the first match per original occurrence so the row count is preserved.
+    joined = joined[~joined.index.duplicated(keep="first")]
+    joined = joined.drop(columns="index_right", errors="ignore")
+    if "distance_to_water" not in joined.columns:  # empty occurrences → no join rows
+        joined["distance_to_water"] = []
+
+    return joined.to_crs(epsg=4326)
 
 
 def add_distance_to_road(
