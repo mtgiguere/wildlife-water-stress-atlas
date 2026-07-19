@@ -41,10 +41,14 @@ plugins). `main` is green with the full extensible engine.
 - **Deferred: realm gating** — blocked on marine stressor *types* that don't
   exist yet, and redundant with current validation for the existing (all
   terrestrial/freshwater) species. Revisit when a marine species/stressor lands.
-- **Data caveat:** the committed settlement GeoJSON is a SUBSET (kenya/tanzania/
-  south-africa); run the full continental fetch + export before shipping. The new
-  STRESS view also needs a continental `stress_gbif_*` export before it's populated
-  (its data is gitignored dev data today).
+- **STRESS view LIT UP** (branch `feat/stress-data`): committed `stress_gbif_*`
+  for all 11 species, built by `build_stress_from_scores` (noisy-OR of the
+  committed per-stressor exports — fast, no distance recompute). **Continental on
+  water + roads, REGIONAL on settlements** (settlement data still a subset of
+  eastern/southern Africa).
+- **Data caveat:** the committed settlement GeoJSON is a SUBSET; run the full
+  continental fetch + export, then **regenerate `stress_gbif_*`** so its settlement
+  dimension is complete (ties to UI-6).
 - **Deploy:** a GitHub Pages workflow (`ci/pages-mapbox-deploy`) publishes the
   static Mapbox app; requires Settings → Pages → Source = "GitHub Actions".
 
