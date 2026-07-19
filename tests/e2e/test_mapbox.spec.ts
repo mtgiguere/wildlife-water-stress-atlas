@@ -79,6 +79,23 @@ test.describe('Wildlife Water Stress Atlas — Mapbox App', () => {
     await expect(page.locator('.view-btn.active')).toContainText('POINTS');
   });
 
+  test('all five view buttons fit within the panel (STRESS not clipped)', async ({ page }) => {
+    const panel = await page.locator('#panel').boundingBox();
+    const buttons = page.locator('.view-btn');
+    await expect(buttons).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
+      const label = (await buttons.nth(i).innerText()).trim();
+      const box = await buttons.nth(i).boundingBox();
+      expect(box, `view button "${label}" has no box`).not.toBeNull();
+      // Every button's right edge must sit within the panel — else it's clipped
+      // off-panel (the STRESS-button overflow: #view-toggle had no flex-wrap).
+      expect(
+        box!.x + box!.width,
+        `view button "${label}" overflows the panel (right edge ${Math.round(box!.x + box!.width)} > panel ${Math.round(panel!.x + panel!.width)})`,
+      ).toBeLessThanOrEqual(panel!.x + panel!.width + 1);
+    }
+  });
+
   test('clicking COUNTRIES makes it active', async ({ page }) => {
     await page.locator('.view-btn', { hasText: 'COUNTRIES' }).click();
     await expect(page.locator('.view-btn.active')).toContainText('COUNTRIES');
