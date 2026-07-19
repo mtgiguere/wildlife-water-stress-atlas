@@ -35,28 +35,29 @@ const STRESS_COLOR_EXPR = [
   STRESS_COLORS.fallback,
 ];
 
-// Road threat color ramp — continuous 0–1 road_threat_score.
-// 0 (no threat / immune species / beyond threshold) reads as dim slate;
-// any positive threat ramps green → yellow → red, reusing the stress palette.
+// Dim slate — reserved for genuine no-data / no-coverage (Phase D confidence
+// layer). NOT used for a real zero-stress value: a 0 reads green so the animal
+// stays visible (see stressRamp / the threat ramps below).
 const ROAD_THREAT_NONE = '#2A4050';
+
+// Road threat color ramp — continuous 0–1 road_threat_score. 0 = green (low /
+// no threat) so every occurrence is visible; threat reads as the shift to red.
 const ROAD_THREAT_COLOR_EXPR = [
   'interpolate', ['linear'], ['get', 'road_threat_score'],
-  0,     ROAD_THREAT_NONE,
-  0.001, STRESS_COLORS.low,
-  0.33,  STRESS_COLORS.moderate,
-  0.66,  STRESS_COLORS.high,
-  1,     STRESS_COLORS.high,
+  0,    STRESS_COLORS.low,
+  0.33, STRESS_COLORS.moderate,
+  0.66, STRESS_COLORS.high,
+  1,    STRESS_COLORS.high,
 ];
 
 // Settlement threat color ramp — same green→red threat semantics as roads,
 // keyed on settlement_threat_score. Shown in the SETTLEMENTS view.
 const SETTLEMENT_THREAT_COLOR_EXPR = [
   'interpolate', ['linear'], ['get', 'settlement_threat_score'],
-  0,     ROAD_THREAT_NONE,
-  0.001, STRESS_COLORS.low,
-  0.33,  STRESS_COLORS.moderate,
-  0.66,  STRESS_COLORS.high,
-  1,     STRESS_COLORS.high,
+  0,    STRESS_COLORS.low,
+  0.33, STRESS_COLORS.moderate,
+  0.66, STRESS_COLORS.high,
+  1,    STRESS_COLORS.high,
 ];
 
 // Settlement context points (cities & towns) — a warm violet, distinct from
@@ -69,24 +70,28 @@ const SETTLEMENT_POINT_COLOR = '#C08BE0';
 function stressRamp(valueExpr) {
   return [
     'interpolate', ['linear'], valueExpr,
-    0,     ROAD_THREAT_NONE,
-    0.001, STRESS_COLORS.low,
-    0.33,  STRESS_COLORS.moderate,
-    0.66,  STRESS_COLORS.high,
-    1,     STRESS_COLORS.high,
+    // 0 = green (not dark slate): the animal is ALWAYS visible; stress reads as the
+    // shift toward red. Grey is reserved for genuine no-data/coverage (Phase D),
+    // never for a real zero-stress value.
+    0,    STRESS_COLORS.low,
+    0.33, STRESS_COLORS.moderate,
+    0.66, STRESS_COLORS.high,
+    1,    STRESS_COLORS.high,
   ];
 }
 function stressColorBy(prop) { return stressRamp(['get', prop]); }
 const STRESS_AGGREGATE_COLOR_EXPR = stressColorBy('stress_aggregate');
 
 // The per-occurrence stressor contributions that make up the cumulative
-// (noisy-OR) total. Scenario toggles include/exclude any of these.
-const STRESSOR_PROPS = ['stress_water', 'stress_roads', 'stress_settlements'];
-const SCENARIO_LABELS = { stress_water: 'Water', stress_roads: 'Roads', stress_settlements: 'Settlements' };
+// (noisy-OR) total. These are REBUILT per selected species from its stressor
+// list (buildStressorControls) — not hardcoded — so the controls reflect whatever
+// stressors a plugin declares. `let` because they're reassigned on species change.
+let STRESSOR_PROPS = ['stress_water', 'stress_roads', 'stress_settlements'];
+let SCENARIO_LABELS = { stress_water: 'Water', stress_roads: 'Roads', stress_settlements: 'Settlements' };
 // Which stressors are included in the live cumulative re-aggregation (a scenario),
 // and each stressor's weight in [0,1] (a mitigation knob; 0 == excluded).
-const scenarioEnabled = { stress_water: true, stress_roads: true, stress_settlements: true };
-const scenarioWeight = { stress_water: 1, stress_roads: 1, stress_settlements: 1 };
+let scenarioEnabled = { stress_water: true, stress_roads: true, stress_settlements: true };
+let scenarioWeight = { stress_water: 1, stress_roads: 1, stress_settlements: 1 };
 
 // Cumulative stress as a LIVE Mapbox expression: noisy-OR (1 − ∏(1−wᵢ·sᵢ)) over
 // the ENABLED stressors, read straight from each feature's per-stressor
@@ -121,12 +126,61 @@ function scenarioLabel() {
 
 // Which stress property the STRESS view currently colors by.
 let currentStressBy = 'stress_aggregate';
-const STRESS_BY_LABELS = {
-  stress_aggregate:   'Cumulative stress',
-  stress_water:       'Water stress',
-  stress_roads:       'Road stress',
-  stress_settlements: 'Settlement stress',
-};
+
+// A stressor id → display label (title-cased; underscores → spaces). A proper
+// display name lives in the stressor-type plugins; title-casing the id is the JIT
+// choice until that's surfaced to the frontend.
+function titleCase(id) {
+  return id.replace(/_/g, ' ').replace(/\b\w/, c => c.toUpperCase());
+}
+
+// Build the STRESS-view controls (colour-by + scenario) from the SELECTED
+// species' stressor list — so the UI reflects whatever stressors a plugin
+// declares (finishes the "stressor-driven frontend" goal), instead of a
+// hardcoded Water/Roads/Settlements set. Called on species change. Event
+// handling is delegated to the containers, so rebuilding the DOM is safe.
+function buildStressorControls(species) {
+  const cfg = speciesConfig[species] || {};
+  const ids = Array.isArray(cfg.stressors) ? cfg.stressors.map(s => s.stressor_id) : [];
+
+  STRESSOR_PROPS   = ids.map(id => `stress_${id}`);
+  SCENARIO_LABELS  = Object.fromEntries(ids.map(id => [`stress_${id}`, titleCase(id)]));
+  scenarioEnabled  = Object.fromEntries(STRESSOR_PROPS.map(p => [p, true]));
+  scenarioWeight   = Object.fromEntries(STRESSOR_PROPS.map(p => [p, 1]));
+  currentStressBy  = 'stress_aggregate';
+
+  // Colour-by: Total (cumulative) + one button per stressor.
+  const colorby = document.getElementById('stress-colorby');
+  colorby.querySelectorAll('.stressby-btn').forEach(b => b.remove());
+  const total = document.createElement('button');
+  total.className = 'stressby-btn active';
+  total.dataset.prop = 'stress_aggregate';
+  total.textContent = 'Total';
+  colorby.appendChild(total);
+  ids.forEach(id => {
+    const b = document.createElement('button');
+    b.className = 'stressby-btn';
+    b.dataset.prop = `stress_${id}`;
+    b.textContent = titleCase(id);
+    colorby.appendChild(b);
+  });
+
+  // Scenario: one include/exclude button + weight slider per stressor.
+  const scenario = document.getElementById('stress-scenario');
+  scenario.querySelectorAll('.scenario-row').forEach(r => r.remove());
+  ids.forEach(id => {
+    const prop = `stress_${id}`;
+    const label = titleCase(id);
+    const row = document.createElement('div');
+    row.className = 'scenario-row';
+    row.innerHTML = `
+      <button class="scenario-btn active" data-prop="${prop}" aria-pressed="true">${label}</button>
+      <input class="scenario-weight" type="range" min="0" max="100" step="5" value="100" data-prop="${prop}" aria-label="${label} weight" />
+      <span class="scenario-weight-val" data-prop="${prop}">100%</span>
+    `;
+    scenario.appendChild(row);
+  });
+}
 
 // ─────────────────────────────────────────────────────────────────
 // STATE
@@ -137,7 +191,10 @@ let allThreatFeatures = [];  // all road-threat features for current species
 let allSettlementFeatures = [];  // all settlement-threat features for current species
 let allAggregateFeatures = [];   // all cumulative-stress features for current species
 let currentSpecies   = 'Loxodonta africana';
-let currentYear      = 2020;
+// Default to the last FULL calendar year; loadSpeciesData() then clamps this to
+// the data's actual range, so the effective default = min(latest year in data,
+// currentYear − 1). (Was hardcoded 2020 — the anomalous COVID-dip year.)
+let currentYear      = new Date().getFullYear() - 1;
 let currentView      = 'points';
 let countryData      = [];   // [{NAME, ISO_A3, year, count}, ...]
 let countriesGeoJSON = null;
@@ -397,29 +454,79 @@ document.getElementById('play-btn').addEventListener('click', () => {
 // ─────────────────────────────────────────────────────────────────
 // SPECIES
 // ─────────────────────────────────────────────────────────────────
+// Group species by realm (data-driven → scales as species plugins are added;
+// a flat list doesn't). Preferred order first, then any unknown realms.
+const REALM_ORDER = ['terrestrial', 'freshwater', 'marine'];
+const REALM_LABELS = { terrestrial: 'Terrestrial', freshwater: 'Freshwater', marine: 'Marine' };
+
 function buildSpeciesGrid(config) {
   const grid = document.getElementById('species-grid');
   grid.innerHTML = '';
 
+  const byRealm = {};
   Object.entries(config).forEach(([sci, cfg]) => {
-    const btn = document.createElement('button');
-    btn.className = 'species-btn';
-    btn.dataset.species = sci;
-    btn.innerHTML = `
-      <span class="species-emoji">${cfg.emoji || '🐾'}</span>
-      <span class="species-info">
-        <span class="species-common">${cfg.common_name}</span>
-        <span class="species-scientific">${sci}</span>
-      </span>
-      <span class="species-tier">${TIER_LABELS[sci] || ''}</span>
-    `;
-    btn.addEventListener('click', () => loadSpecies(sci));
-    grid.appendChild(btn);
+    const realm = cfg.realm || 'other';
+    (byRealm[realm] ||= []).push([sci, cfg]);
+  });
+  const realms = [
+    ...REALM_ORDER.filter(r => byRealm[r]),
+    ...Object.keys(byRealm).filter(r => !REALM_ORDER.includes(r)),
+  ];
+
+  realms.forEach(realm => {
+    const header = document.createElement('div');
+    header.className = 'species-group-label';
+    header.dataset.realm = realm;
+    header.textContent = REALM_LABELS[realm] || realm;
+    grid.appendChild(header);
+
+    byRealm[realm].forEach(([sci, cfg]) => {
+      const btn = document.createElement('button');
+      btn.className = 'species-btn';
+      btn.dataset.species = sci;
+      btn.dataset.search = `${cfg.common_name} ${sci}`.toLowerCase();  // for filtering
+      btn.innerHTML = `
+        <span class="species-emoji">${cfg.emoji || '🐾'}</span>
+        <span class="species-info">
+          <span class="species-common">${cfg.common_name}</span>
+          <span class="species-scientific">${sci}</span>
+        </span>
+        <span class="species-tier">${TIER_LABELS[sci] || ''}</span>
+      `;
+      btn.addEventListener('click', () => loadSpecies(sci));
+      grid.appendChild(btn);
+    });
   });
 }
 
+// Type-to-filter the species list; scales to many plugins. Hides non-matching
+// buttons and any realm header left with no visible members.
+function filterSpecies(query) {
+  const q = query.trim().toLowerCase();
+  const grid = document.getElementById('species-grid');
+  grid.querySelectorAll('.species-btn').forEach(btn => {
+    btn.style.display = !q || btn.dataset.search.includes(q) ? '' : 'none';
+  });
+  grid.querySelectorAll('.species-group-label').forEach(header => {
+    let sib = header.nextElementSibling;
+    let anyVisible = false;
+    while (sib && sib.classList.contains('species-btn')) {
+      if (sib.style.display !== 'none') { anyVisible = true; break; }
+      sib = sib.nextElementSibling;
+    }
+    header.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+document.getElementById('species-search').addEventListener('input', e => filterSpecies(e.target.value));
+
 async function loadSpecies(scientificName) {
   currentSpecies = scientificName;
+
+  // Rebuild the STRESS-view controls from this species' stressor list, and
+  // re-apply the Total coloring if the STRESS view is open.
+  buildStressorControls(scientificName);
+  if (currentView === 'stress') setStressColorBy('stress_aggregate');
 
   // Update active button
   document.querySelectorAll('.species-btn').forEach(btn => {
@@ -590,36 +697,38 @@ function setStressColorBy(prop) {
   document.querySelectorAll('.stressby-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.prop === prop));
   const label = document.getElementById('legend-aggregate-label');
-  if (label) label.textContent = prop === 'stress_aggregate' ? scenarioLabel() : (STRESS_BY_LABELS[prop] || 'Stress');
+  // Label derives from the stressor id (title-cased): "Water stress", etc.
+  if (label) label.textContent = prop === 'stress_aggregate' ? scenarioLabel() : `${SCENARIO_LABELS[prop] || 'Stress'} stress`;
 }
 
-document.querySelectorAll('.stressby-btn').forEach(btn => {
-  btn.addEventListener('click', () => setStressColorBy(btn.dataset.prop));
+// Controls are rebuilt per species (buildStressorControls), so listeners are
+// DELEGATED to the containers rather than bound to individual (transient) buttons.
+document.getElementById('stress-colorby').addEventListener('click', e => {
+  const btn = e.target.closest('.stressby-btn');
+  if (btn) setStressColorBy(btn.dataset.prop);
 });
 
-// Scenario toggles: include/exclude a stressor from the cumulative total and
-// re-aggregate live. Only affects the "Total" coloring (a single-stressor view
-// is unchanged); recomputes the noisy-OR expression on the fly.
-document.querySelectorAll('.scenario-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const prop = btn.dataset.prop;
-    scenarioEnabled[prop] = !scenarioEnabled[prop];
-    btn.classList.toggle('active', scenarioEnabled[prop]);
-    btn.setAttribute('aria-pressed', String(scenarioEnabled[prop]));
-    if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
-  });
+// Scenario include/exclude — toggle a stressor in/out of the cumulative total and
+// re-aggregate live (only affects the "Total" coloring).
+document.getElementById('stress-scenario').addEventListener('click', e => {
+  const btn = e.target.closest('.scenario-btn');
+  if (!btn) return;
+  const prop = btn.dataset.prop;
+  scenarioEnabled[prop] = !scenarioEnabled[prop];
+  btn.classList.toggle('active', scenarioEnabled[prop]);
+  btn.setAttribute('aria-pressed', String(scenarioEnabled[prop]));
+  if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
 });
 
-// Weight sliders: scale a stressor's contribution to the cumulative total and
-// re-aggregate live (0% == excluded). Only affects the "Total" coloring.
-document.querySelectorAll('.scenario-weight').forEach(slider => {
-  slider.addEventListener('input', () => {
-    const prop = slider.dataset.prop;
-    scenarioWeight[prop] = Number(slider.value) / 100;
-    const valSpan = document.querySelector(`.scenario-weight-val[data-prop="${prop}"]`);
-    if (valSpan) valSpan.textContent = `${slider.value}%`;
-    if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
-  });
+// Weight sliders — scale a stressor's contribution (0% == excluded), live.
+document.getElementById('stress-scenario').addEventListener('input', e => {
+  const slider = e.target.closest('.scenario-weight');
+  if (!slider) return;
+  const prop = slider.dataset.prop;
+  scenarioWeight[prop] = Number(slider.value) / 100;
+  const valSpan = document.querySelector(`.scenario-weight-val[data-prop="${prop}"]`);
+  if (valSpan) valSpan.textContent = `${slider.value}%`;
+  if (currentStressBy === 'stress_aggregate') setStressColorBy('stress_aggregate');
 });
 
 // Hide every view-specific data layer. Each show*View() then re-enables only
