@@ -53,11 +53,13 @@ A high-performance interactive web app built with Mapbox GL JS. All rendering
 happens client-side via WebGL — no server, no payload limits, instant response.
 
 Features:
-- Select any of 11 species from the sidebar
-- ⬤ **Points view** — occurrence dots colored by water stress (low/moderate/high), animated year slider and autoplay (Slow/Med/Fast)
+- **Searchable, realm-grouped species selector** in the sidebar (scales as species are added)
+- A **time scrubber** across the top (play + Slow/Med/Fast) that defaults to the **last full year of data**
+- ⬤ **Points view** — occurrence dots coloured by water stress (green→yellow→red; a 0-stress animal stays green so the animal is always visible), with clustering at low zoom
 - ▦ **Countries view** — choropleth shaded by record count per country per year
-- ⚠ **Roads view** — occurrences colored by road threat (proximity to the nearest major road, weighted by species road-sensitivity), over an amber backbone road network. Reed frogs light up beside motorways; flamingos stay dark (they fly — immune)
-- 🏘 **Settlements view** — occurrences colored by settlement threat (proximity to the nearest city/town, weighted by species settlement-sensitivity), over violet city & town points. Lions blaze near settlements (retaliatory killing); flamingos stay dark. A separate view from Roads for now — future work lets users combine pressure layers
+- ⚠ **Roads view** — occurrences coloured by road threat (proximity to the nearest major road, weighted by species road-sensitivity), over an amber backbone road network. Reed frogs light up beside motorways; flamingos stay dark (they fly — immune)
+- 🏘 **Settlements view** — occurrences coloured by settlement threat (proximity to the nearest city/town, weighted by species settlement-sensitivity), over violet city & town points. Lions blaze near settlements (retaliatory killing); flamingos stay dark
+- ⚑ **STRESS view** — occurrences coloured by **cumulative** stress (noisy-OR of every stressor), with a **Colour by** toggle (Total or any single stressor) and live **Scenario** controls: include/exclude a stressor or slide its weight (0–100%) and watch the map re-aggregate instantly — the "what if we mitigate roads?" lens. Controls are generated from each species' stressor list, not hardcoded
 - Click any country → **trend chart** slides up with linear regression, slope, r², and INCREASING/STABLE/DECLINING classification
 - Dark Mapbox basemap with blue water network (rivers, wetlands, pans, floodplains)
 - COVID-19 dip annotation — 2020 record drop reflects field access disruption
@@ -89,7 +91,7 @@ python -m http.server 3000
 Live: **https://wildlife-water-stress-atlas-ngvdrwg2yhzekplfeq6nvd.streamlit.app**
 
 An interactive web app built with Streamlit and PyDeck allows users to:
-- Select any of 9 species from the sidebar dropdown
+- Select any of 11 species from the sidebar dropdown
 - Watch occurrence records shift across Africa using a year slider
 - See the **COVID-19 dip in 2020** — field researchers couldn't access sites, reflected in the data
 - Explore water sources including rivers, wetlands, pans, and floodplains
@@ -110,22 +112,42 @@ The core library computes water stress scores for any species:
 - Scores each occurrence by distance to nearest accessible water
 - Aggregates to a 50km grid for visualization
 
+**One generic, kind-aware scoring engine.** Every stressor — water, roads,
+settlements, and any future one — is scored by a single engine, not per-stressor
+functions. A stressor has a **kind** that owns its math: *hazard* (closer = worse,
+e.g. roads/settlements), *resource* (farther = worse, e.g. water), or *ambient*
+(a measured value, no distance). Per-stressor scores are combined into one
+comparable 0–1 cumulative score via **noisy-OR** (`1 − ∏(1 − sᵢ)`), and scores
+carry **coverage** so "no data" is never a fake zero. See
+[`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for the ecologist-facing explanation
+and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design.
+
 **Analytics modules:**
-- `analytics/overlap.py` — distance from each occurrence to nearest water source
-- `analytics/scoring.py` — water stress score (0–1) per occurrence
-- `analytics/water_access.py` — species-specific water type filtering
-- `analytics/spatial.py` — aggregates point scores to 50km grid
-- `analytics/trends.py` — `compute_linear_regression()`, `classify_trend()`, `get_country_time_series()`, `add_trends_to_country_counts()`. Trend regression is computed in the Python pipeline and baked into exported GeoJSON — slope, r², and trend classification are pre-computed, not computed at runtime in the browser.
+- `analytics/stressors.py` — `StressorKind` + the reference scorers
+  (`HazardStressor`/`ResourceStressor`/`AmbientStressor`) and `aggregate_stress`
+  (noisy-OR over covered scores)
+- `analytics/stress_engine.py` — the query-shaped engine: `score_stressor(...)` /
+  `score_species_stress(species, measurements)` → per-stressor breakdown + cumulative
+- `analytics/overlap.py` — distance from each occurrence to nearest water / road /
+  settlement, all via the indexed `sjoin_nearest`
+- `analytics/water_access.py` — species-specific water-type filtering
+- `analytics/scoring.py` — `classify_stress_level()` (score → low/moderate/high label)
+- `analytics/spatial.py` — aggregates point scores to a 50km grid
+- `analytics/trends.py` — linear-regression trend analytics, baked into exported GeoJSON
 
-**Human pressure modules (roads + settlements — Pressure Type 2):**
-- `ingest/threats.py` — `OSMRoads` and `OSMSettlements` source classes + `load_all_threats()`, mirroring the water ingest pattern; map OSM highway/place tags to canonical road/settlement classes
-- `analytics/threat_scoring.py` — `road_threat_score(distance_m, road_class, species)` and `settlement_threat_score(distance_m, settlement_class, species)`: distance × species sensitivity × class weight, 0–1. Flamingos (fly) score 0 on both; amphibians are most road-sensitive; lions are most settlement-sensitive (retaliatory killing), while *Xenopus* scores low (a human-tolerant generalist)
-- `analytics/overlap.add_distance_to_{road,settlement}()` + `analytics/apply.apply_{road,settlement}_threat_score()` — nearest-feature distance (via `sjoin_nearest`) and scoring across a GeoDataFrame
-- One Geofabrik download per country yields **both** layers: `fetch_road_data.py` extracts roads and settlements from the same GPKG in a single pass
+Stressor **types** and **species** are plugins (`config/stressor_plugins/*.json`,
+`config/species_plugins/*.json`) — adding either is one JSON file, no code. The
+export scripts (`export_stress.py`, `export_road_threats.py`, …) all score through
+the same engine.
 
-The phantom thirst bug is fixed — elephants near Etosha Pan (Namibia) and
-Makgadikgadi/Sua Pan (Botswana) previously appeared falsely stressed because
-those water sources weren't in the data. GLWD v2 now correctly captures them.
+**Phantom thirst — the honest water story.** Distance-to-water is only as good as
+the water map. Elephants near Etosha/Makgadikgadi pans were once falsely stressed
+until GLWD v2 added those pans; more recently, *obligate-aquatic* species (hippos,
+crocodiles) read as ~14 km from "mapped" water because the river network was too
+coarse. Adding **HydroRIVERS** (~1.5M African segments) collapsed hippo water-stress
+from ~53% high to ~3.5% — while leaving genuinely water-independent species (lion,
+cheetah, elephant) untouched. Residual amphibian stress reflects small wetlands no
+dataset fully captures — a real gap, surfaced honestly, not hidden.
 
 ---
 
@@ -133,7 +155,8 @@ those water sources weren't in the data. GLWD v2 now correctly captures them.
 
 | Source | Type | What It Adds |
 |---|---|---|
-| Natural Earth rivers | Shapefile (lines) | River network — lines for distance calc accuracy |
+| HydroRIVERS v10 (HydroSHEDS) | File Geodatabase (lines) | Dense river network (~1.5M African segments) — the accuracy that stops obligate-aquatic species reading as far from water |
+| Natural Earth rivers | Shapefile (lines) | Coarse river centerlines (legacy; superseded by HydroRIVERS for scoring) |
 | Natural Earth countries | Shapefile (polygons) | Country boundaries for choropleth aggregation |
 | GLWD v2 | GeoTIFF (raster) | Wetlands, pans, floodplains, saline lakes |
 | JRC Global Surface Water | GeoTIFF tiles | Seasonal and ephemeral surface water |
@@ -159,9 +182,12 @@ is surfaced explicitly via the r² value.
 
 ## Architecture
 
-**Species config is a single source of truth.**
-`config/species.py` holds all species-specific parameters. Adding a new
-species means adding one dict entry — no other code changes.
+**Species and stressors are file plugins.**
+Each species is a JSON file in `config/species_plugins/`; each stressor *type* is
+a JSON file in `config/stressor_plugins/`. `config/species.py` discovers and
+validates them at import, exposing the registry. Adding a species or a stressor of
+an existing kind is **one JSON file, no code** — see
+[`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
 **Water sources share a normalized schema.**
 Every source class produces the same columns: `geometry`, `source_id`,
@@ -231,7 +257,8 @@ python scripts/plot_elephants.py
 
 Data files are not committed to git (too large). Required files:
 - `data/raw/water/glwd/GLWD_v2_0_main_class.tif` — HydroSHEDS GLWD v2
-- `data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp` — Natural Earth rivers
+- `data/raw/water/rivers/HydroRIVERS_v10_af.gdb/` — HydroRIVERS Africa (dense river network; from hydrosheds.org)
+- `data/raw/water/rivers/ne_10m_rivers_lake_centerlines_scale_rank.shp` — Natural Earth rivers (legacy)
 - `data/raw/countries/ne_110m_admin_0_countries.shp` — Natural Earth countries (choropleth)
 - `data/raw/water/jrc_gsw/` — JRC Global Surface Water tiles (Africa)
 - `data/processed/gbif_*.gpkg` — cached GBIF records per species (built by prefetch_gbif.py)
@@ -261,14 +288,17 @@ ruff format .
 # Run in standalone PowerShell with Node.js v22
 npx playwright test
 
-# WebGL visual smoke test (renders the Mapbox app via software WebGL /
-# SwiftShader and asserts the road network actually paints — guards the
-# invisible-render class of bug). Auto-starts the static server.
+# WebGL visual guards (renders the Mapbox app via software WebGL / SwiftShader
+# and asserts layers actually PAINT — the road backbone, settlement points, and
+# the STRESS dots incl. the scenario recolor — guarding the invisible-render bug
+# class). Auto-starts the static server.
 npx playwright test --config=playwright.visual.config.ts
 ```
 
-**Test coverage: 563 unit tests + 37 Mapbox E2E + 16 Streamlit E2E + roads/settlements
-download integration + WebGL visual smoke tests (roads + settlements), 100% unit coverage**
+**Test coverage: ~760 unit tests (99% coverage) + 57 Mapbox DOM E2E + 8 SwiftShader
+visual guards + 16 Streamlit E2E + a real-Geofabrik download integration test.
+Correctness-critical modules (scoring, validation) also get periodic mutation
+audits — see `docs/TDD_CONTRACT.md` ("Green ≠ Verified").**
 
 > Note: two bug classes escape the unit/DOM suites — external-format assumptions
 > (e.g. a data source's layer name) and WebGL visual rendering. Both are now
@@ -296,7 +326,7 @@ download integration + WebGL visual smoke tests (roads + settlements), 100% unit
 | PyDeck dark map with species icons | ✅ Done |
 | Hero banner + dark theme | ✅ Done |
 | Playwright E2E tests (16 tests) | ✅ Done |
-| 100% unit test coverage | ✅ Done |
+| ~99% unit test coverage | ✅ Done |
 | Deploy to Streamlit Community Cloud | ✅ Live |
 | Year distribution chart (COVID story) | ✅ Done |
 | CI/CD pipeline (GitHub Actions) | ✅ Done |
@@ -317,8 +347,18 @@ download integration + WebGL visual smoke tests (roads + settlements), 100% unit
 | Visual smoke test via software WebGL (render guard) | ✅ Done |
 | Human pressure layer — settlements (ingest → scoring → export) | ✅ Done |
 | Settlement threat visualization (🏘 SETTLEMENTS view) | ✅ Done |
-| Multi-species overlay mode | 📋 Planned |
-| Data confidence layer | 📋 Planned |
+| Generic kind-aware scoring engine + noisy-OR aggregation (cutover) | ✅ Done |
+| Species & stressor **types** as JSON plugins | ✅ Done |
+| ⚑ STRESS view — cumulative stress + per-stressor "colour by" | ✅ Done |
+| Scenario tools — include/exclude + weight a stressor, live re-aggregate | ✅ Done |
+| UI overhaul — time scrubber, searchable/grouped species, 0=green dots | ✅ Done |
+| HydroRIVERS water accuracy (obligate-aquatic false-red fixed) | ✅ Done |
+| Ecologist guide (`docs/USER_GUIDE.md`) | ✅ Done |
+| Mutation-testing audit of scoring + validation | ✅ Done |
+| Full continental settlement fetch (settlement dimension) | 📋 Planned |
+| Multi-species compare mode | 📋 Planned |
+| Data confidence layer (surface coverage on the map) | 📋 Planned |
+| MapLibre + PMTiles (drop Mapbox token; scale data delivery) | 📋 Planned |
 | QGIS plugin | 📋 Planned |
 | Human pressure — fences | 📋 Blocked (no reliable continental fence dataset) |
 | Phase 2 — Predict (climate modeling) | 📋 Future |
