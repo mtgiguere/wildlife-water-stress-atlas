@@ -19,13 +19,15 @@ in a later increment, once the frontend consumes this generic output.
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 
 from wildlife_water_stress_atlas.analytics.overlap import (
     add_distance_to_road,
     add_distance_to_settlement,
     add_distance_to_water,
 )
-from wildlife_water_stress_atlas.analytics.stress_engine import score_species_stress
+from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
+from wildlife_water_stress_atlas.analytics.stress_engine import score_species_stress, score_stressor
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity, Score, aggregate_stress
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
@@ -37,6 +39,36 @@ AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 # stress_aggregate for the headline layer and the per-stressor columns for the
 # breakdown/toggle.
 _OUTPUT_COLS = ["species", "year", "stress_water", "stress_roads", "stress_settlements", "stress_aggregate"]
+
+
+def rescore_water_with_added_source(
+    stress_scores: gpd.GeoDataFrame,
+    added_distance_m,
+    species: str,
+) -> gpd.GeoDataFrame:
+    """
+    Fold an ADDITIONAL accessible water source into an existing per-occurrence
+    water-stress table (row-aligned).
+
+    Adding water can only shorten the distance to nearest water, so the new
+    distance is the elementwise min of the current distance and the distance to
+    the new source; stress_score + stress_level are then recomputed via the
+    engine. This lets us add HydroRIVERS to the existing stress_scores exports
+    without reloading the whole water stack — and it preserves the occurrence
+    alignment those files already share with roads/settlements.
+
+    Raises:
+        ValueError: if added_distance_m isn't the same length as stress_scores.
+    """
+    added = np.asarray(list(added_distance_m), dtype=float)
+    if len(added) != len(stress_scores):
+        raise ValueError(f"added_distance_m length {len(added)} != stress_scores length {len(stress_scores)}")
+
+    out = stress_scores.copy()
+    out["distance_m"] = np.minimum(out["distance_m"].to_numpy(dtype=float), added)
+    out["stress_score"] = [score_stressor(species, "water", FeatureProximity(float(d), None)) for d in out["distance_m"]]
+    out["stress_level"] = out["stress_score"].apply(classify_stress_level)
+    return out
 
 
 def build_stress_from_scores(
