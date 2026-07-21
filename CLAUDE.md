@@ -42,35 +42,48 @@ The RED step is not optional. Skipping it means you are doing TAD, not TDD.
 
 ## Architecture
 
+POST-CUTOVER (2026-07): the generic kind-aware engine is the SOLE scoring path.
+`threat_scoring.py` and `scoring.water_stress_score` are DELETED; `scoring.py`
+keeps only `classify_stress_level`. Species + stressor TYPES are JSON plugins; the
+`stressors` list is the single config shape (no flat road_*/settlement_*/water_* keys).
+
 ```
 src/wildlife_water_stress_atlas/   # Core library
-├── config/species.py              # Single source of truth: all 11 species params
-│                                  #   (water, road-threat AND settlement-threat fields;
-│                                  #   KNOWN_ROAD_CLASSES, KNOWN_SETTLEMENT_CLASSES)
-├── analytics/                     # overlap, scoring, spatial, water_access, trends,
-│                                  #   apply, threat_scoring (road + settlement proximity)
-├── ingest/                        # gbif.py, water.py, threats.py (OSMRoads + OSMSettlements)
+├── config/
+│   ├── species.py                 # Loads/validates the registry; get_stressor_params()
+│   ├── species_loader.py          # Discovers species_plugins/*.json
+│   ├── species_plugins/*.json     # One file per species (metadata + `stressors` list)
+│   └── stressor_plugins/*.json    # One file per stressor TYPE ({stressor_id, name, kind})
+├── analytics/
+│   ├── stressors.py               # StressorKind + Hazard/Resource/AmbientStressor + aggregate_stress (noisy-OR)
+│   ├── stress_engine.py           # score_stressor / score_species_stress (the engine); stressor_type_loader
+│   ├── overlap.py                 # distance-to-water/road/settlement (all sjoin_nearest)
+│   ├── scoring.py                 # classify_stress_level ONLY (score → low/mod/high)
+│   ├── water_access.py, spatial.py, trends.py, apply.py
+├── ingest/                        # gbif.py, water.py (incl. HydroRivers source), threats.py (OSMRoads/OSMSettlements)
 ├── visualization/maps.py
 └── utils/generic_threader.py
 
 apps/
 ├── streamlit/                     # Python/PyDeck interactive app
 └── mapbox/                        # Vanilla JS + static GeoJSON (no server required)
-                                   #   Views: POINTS (stress), COUNTRIES, ROADS (road threat),
-                                   #   SETTLEMENTS (settlement threat)
+                                   #   Views: POINTS (water stress), COUNTRIES, ROADS,
+                                   #   SETTLEMENTS, STRESS (cumulative + colour-by + scenario)
 
 scripts/                           # Data processing and export (run once)
-                                   #   fetch_road_data.py (downloads roads + settlements in one
-                                   #   pass), export_road_threats.py, export_settlement_threats.py
-tests/                             # unit test files + e2e/ (Playwright)
-docs/TDD_CONTRACT.md               # Read this before coding (has a road-threat addendum)
+                                   #   fetch_road_data.py, export_road_threats.py,
+                                   #   export_settlement_threats.py, export_stress.py
+                                   #   (build_stress_from_scores / rescore_water_with_added_source)
+tests/                             # unit test files + e2e/ (Playwright DOM + SwiftShader visual)
+docs/TDD_CONTRACT.md               # Read before coding (addenda: road-threat + "Green ≠ Verified")
+docs/USER_GUIDE.md                 # Plain-language guide for ecologists (species/stressors/algorithm)
 ```
 
 ---
 
 ## Key Conventions
 
-- **`config/species.py`** is the single source of truth for all species parameters. Never hardcode species data elsewhere.
+- **Species/stressor config lives in JSON plugins** (`config/species_plugins/`, `config/stressor_plugins/`); `config/species.py` discovers + validates them into the registry (read via `get_stressor_params`). Never hardcode species/stressor data elsewhere.
 - **Water source types** use a normalized schema across all ingest paths.
 - **Integration tests** are marked `@pytest.mark.integration` and skipped in CI (require real data files on disk).
 - **Mathematical/algorithmic functions** use Hypothesis property-based tests, not seed-based assertions.
