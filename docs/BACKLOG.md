@@ -211,10 +211,45 @@ guards — see docs/TDD_CONTRACT.md "Green ≠ Verified").**
       also needn't multiply: the STRESS view + colour-by already subsumes them.)
 - [ ] **UI-6 — settlements are an unlabeled purple blob.** Current data
       (`settlements_points.geojson`, 1351 pts) carries **only `settlement_class` —
-      no names** → a name tooltip is impossible without a data re-fetch. Two parts:
+      no names** → no name tooltip. Two parts:
       (a) treat like the roads *backbone* — show only cities/towns, size/opacity by
-      class so majors anchor and small recede; (b) **re-fetch settlements WITH names**
-      (bundle with the continental deploy-data fetch) then hover-label / label majors.
+      class so majors anchor and small recede; (b) hover-label / label majors,
+      which needs names in the data — see the corrected diagnosis below.
+  - [x] **UI-6b code path — names now survive ingestion (2026-07-30).**
+        ⚠️ **The earlier premise here was WRONG.** This item claimed names were
+        unavailable without a re-fetch, implying the upstream source lacked them.
+        It does not: Geofabrik's `gis_osm_places_free` ships **`name` (100%
+        populated — 5271/5271 in Lesotho, 393/393 in São Tomé) and `population`**.
+        **We were discarding it ourselves, at three independent prune sites:**
+        `_filter_settlements` (fetch), `OSMSettlements.load` (ingest normalize),
+        and `build_settlement_points` (display subset) — each keeping a hardcoded
+        2-column list. A test even *pinned the bug* (`test_osm_settlements_drops_
+        non_schema_columns` asserted `name not in columns`); it was deliberately
+        rewritten. `name` is now part of the settlements normalized schema
+        (null-safe when the source omits it, so the current gpkg still loads).
+        Guarded by 9 tests incl. a cross-seam contract test through a real
+        GeoPackage and an `@pytest.mark.integration` test pinning the *external*
+        Geofabrik fact (TDD_CONTRACT Blind spot A — a self-authored fixture could
+        never have caught this). Verified end-to-end on a real download: 8/8
+        display settlements labeled, Unicode intact ("São Tomé", "Santo António").
+  - [ ] **UI-6b data — re-fetch to populate names.** Still required, but now it is
+        **purely a data refresh, no code work**: the persisted
+        `africa_settlements.gpkg` was written before name capture (its columns are
+        just `[place, geometry]`), so names only appear after re-running the fetch.
+        ⚠️ **Cost + risk, measured:** per-country Geofabrik extracts are far bigger
+        than the filtered output suggests (Lesotho alone = **302 MB**; 26 countries
+        in `TARGET_COUNTRIES`) → multi-GB and hours. `fetch_all_osm_data` writes
+        **both** outputs, so it would **overwrite the good 345 MB
+        `africa_roads.gpkg`** as well; a partial failure (which is how settlements
+        ended up regional in the first place — current bounds are lon 16.5–41.9,
+        lat −46.9–4.6, i.e. eastern/southern only, missing Nigeria/Ghana/Ivory
+        Coast/Cameroon/CAR/Chad/Sudan/South Sudan/Somalia/Ethiopia) could leave the
+        repo worse off than today. **Fetch to a temp path and swap on success, or
+        back both gpkgs up first.** Then re-run the settlement export **and
+        regenerate `stress_gbif_*`** (ties to the continental data caveat above).
+  - Note: `population` is also available upstream if class-based tiering proves too
+    coarse for (a) — but it is unreliable (frequently 0 even for real towns), so
+    `settlement_class` stays the tiering signal. Not carried through (JIT scope).
 
 ## Phase D — Range + grid scoring
 

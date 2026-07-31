@@ -14,12 +14,14 @@ NORMALIZED SCHEMA:
 Each source produces geometry + source_id + region plus a class column
 specific to the pressure type:
     OSMRoads       → geometry (LineString), source_id, road_class, region
-    OSMSettlements → geometry (Point),      source_id, settlement_class, region
+    OSMSettlements → geometry (Point),      source_id, settlement_class, name, region
 
     geometry         : in EPSG:4326
     source_id        : str — unique identifier per feature
     road_class       : str — one of KNOWN_ROAD_CLASSES (roads)
     settlement_class : str — one of KNOWN_SETTLEMENT_CLASSES (settlements)
+    name             : str | None — settlement name; None when the source file
+                       predates name capture (settlements only)
     region           : str — geographic region label (default "africa")
 
 ADDING A NEW THREAT SOURCE TYPE:
@@ -182,7 +184,7 @@ class OSMSettlements:
 
         Returns:
             GeoDataFrame with normalized schema:
-            geometry, source_id, settlement_class, region — all in EPSG:4326.
+            geometry, source_id, settlement_class, name, region — all in EPSG:4326.
         """
         raw = gpd.read_file(self.filepath)
 
@@ -197,7 +199,7 @@ class OSMSettlements:
 
         if raw.empty:
             return gpd.GeoDataFrame(
-                columns=["geometry", "source_id", "settlement_class", "region"],
+                columns=["geometry", "source_id", "settlement_class", "name", "region"],
                 geometry="geometry",
                 crs="EPSG:4326",
             )
@@ -207,6 +209,9 @@ class OSMSettlements:
             raw = raw[raw.geometry.intersects(bbox_polygon)].copy()
 
         result = raw[["geometry", "settlement_class"]].copy()
+        # Carried by index so each name stays with its own row through bbox
+        # clipping. Optional: files written before names were captured omit it.
+        result["name"] = raw["name"] if "name" in raw.columns else None
         result["source_id"] = [f"settlement_{i}" for i in range(len(result))]
         result["region"] = self.region
 

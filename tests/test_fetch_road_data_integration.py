@@ -89,6 +89,23 @@ def test_extract_settlements_from_real_download_is_nonempty_wgs84(real_gpkg_zip)
 
 
 @pytest.mark.integration
+def test_real_geofabrik_places_layer_carries_a_name_column(real_gpkg_zip):
+    """PREMISE GUARD for labelled settlements: the upstream places layer must
+    actually ship a `name`.
+
+    The whole labelled-settlements feature rests on this external fact. A
+    self-authored fixture asserting `name` survives our pipeline proves only that
+    our code is self-consistent — exactly the Blind spot A trap. This reads the
+    real download instead. If Geofabrik ever stops shipping names, this fails
+    loudly rather than silently exporting a map of unlabeled dots.
+    """
+    result = extract_settlements_from_zip(real_gpkg_zip)
+
+    assert "name" in result.columns, f"Geofabrik places layer no longer ships 'name'; real columns are {list(result.columns)}"
+    assert result["name"].notna().any(), "Real download produced places but zero non-null names"
+
+
+@pytest.mark.integration
 def test_extract_roads_from_real_download_is_nonempty_wgs84(real_gpkg_zip):
     """extract_roads_from_zip on a REAL download returns roads (not empty),
     renames Geofabrik's 'fclass' to 'highway', and reprojects to WGS84.

@@ -159,6 +159,24 @@ def test_fetch_country_osm_filters_settlement_place_tags(tmp_path, monkeypatch):
     assert len(result["settlements"]) == 2  # city + town
 
 
+def test_fetch_country_osm_settlements_carry_names(tmp_path, monkeypatch):
+    """Settlement names survive the fetch into the persisted layer.
+
+    Geofabrik ships a `name` for every place, and the SETTLEMENTS map view labels
+    settlements by name. If the fetch filter prunes it, the name is unrecoverable
+    without a fresh multi-GB continental download — so it must be captured here.
+    """
+    from scripts.fetch_road_data import fetch_country_osm
+
+    zip_bytes = make_two_layer_zip(tmp_path, ["motorway"], ["city", "town"])
+    monkeypatch.setattr(REQUESTS_GET, lambda url, **kw: mock_response(zip_bytes))
+
+    result = fetch_country_osm("kenya")
+
+    assert "name" in result["settlements"].columns, f"fetch dropped the settlement name column; got {list(result['settlements'].columns)}"
+    assert set(result["settlements"]["name"]) == {"Place 0", "Place 1"}
+
+
 # ---------------------------------------------------------------------------
 # fetch_all_osm_data — writes BOTH output files from ONE pass
 # ---------------------------------------------------------------------------

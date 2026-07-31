@@ -100,9 +100,14 @@ def build_settlement_points(
         classes     : Classes to keep. Default DISPLAY_SETTLEMENT_CLASSES.
 
     Returns:
-        GeoDataFrame with settlement_class + geometry, display classes only.
+        GeoDataFrame with settlement_class + name + geometry, display classes only.
+        `name` is omitted when the input lacks it (settlement files written before
+        names were captured).
     """
-    return settlements[settlements["settlement_class"].isin(classes)][["settlement_class", "geometry"]].copy()
+    cols = ["settlement_class", "geometry"]
+    if "name" in settlements.columns:
+        cols.insert(1, "name")
+    return settlements[settlements["settlement_class"].isin(classes)][cols].copy()
 
 
 def export_settlement_points(

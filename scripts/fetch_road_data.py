@@ -111,6 +111,11 @@ _PLACES_LAYER = "gis_osm_places_free"
 _HIGHWAY_COL = "highway"
 _PLACE_COL = "place"
 _FCLASS_COL = "fclass"
+# Geofabrik's places layer ships a populated 'name' for every settlement. It is
+# captured here because it is otherwise unrecoverable without repeating the
+# multi-GB continental download. ('population' is also present but unreliable —
+# frequently 0 even for towns — so settlement_class remains the tiering signal.)
+_NAME_COL = "name"
 
 
 def get_geofabrik_url(country_slug: str) -> str:
@@ -256,13 +261,16 @@ def _filter_major_roads(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def _filter_settlements(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Keep only real settlement classes (SETTLEMENT_PLACE_TAGS); return geometry + place."""
+    """Keep only real settlement classes (SETTLEMENT_PLACE_TAGS); return geometry + place + name."""
     if gdf.empty or _PLACE_COL not in gdf.columns:
         return _empty_gdf()
     gdf = gdf[gdf[_PLACE_COL].isin(SETTLEMENT_PLACE_TAGS)].copy()
     if gdf.empty:
         return _empty_gdf()
-    return gdf[["geometry", _PLACE_COL]].copy().to_crs(epsg=4326)
+    cols = ["geometry", _PLACE_COL]
+    if _NAME_COL in gdf.columns:
+        cols.append(_NAME_COL)
+    return gdf[cols].copy().to_crs(epsg=4326)
 
 
 def fetch_country_roads(country_slug: str) -> gpd.GeoDataFrame:
