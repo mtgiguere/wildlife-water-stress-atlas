@@ -145,3 +145,89 @@ def test_build_search_params_omits_continent_only_when_none(continent):
         assert "continent" not in params
     else:
         assert params["continent"] == "AFRICA"
+
+
+# ---------------------------------------------------------------------------
+# The cache builder refuses to write a truncated species layer
+# ---------------------------------------------------------------------------
+
+
+def _oversized_query_mock(page_budget):
+    """A GBIF that reports more records than paging can reach.
+
+    Bounded deliberately: without the guard this loop pages forever (that is
+    the defect), and an unbounded fixture would hang the suite instead of
+    failing it. The budget is far above the 1 page a correct implementation
+    needs, so it cannot mask a late-firing guard.
+    """
+    from wildlife_water_stress_atlas.ingest.gbif import GBIF_MAX_OFFSET
+
+    pages = {"n": 0}
+
+    def mock_get(url, params=None, timeout=None):
+        pages["n"] += 1
+        return make_gbif_response(
+            sample_records(300),
+            count=GBIF_MAX_OFFSET + 1,
+            end_of_records=pages["n"] >= page_budget,
+        )
+
+    return mock_get, pages
+
+
+def test_prefetch_raises_when_query_exceeds_offset_cap(monkeypatch, tmp_path):
+    """Specifies: the loop that actually built the 99,900-record flamingo cache
+    now refuses. Returning 18% of a species as a finished layer is the bug."""
+    from wildlife_water_stress_atlas.ingest.gbif import GBIFTruncationError
+
+    mock_get, _ = _oversized_query_mock(page_budget=5)
+    monkeypatch.setattr(PREFETCH_REQUESTS_GET, mock_get)
+
+    with pytest.raises(GBIFTruncationError):
+        fetch_all_with_checkpoint("Phoenicopterus roseus", tmp_path / "cache.gpkg")
+
+
+def test_prefetch_stops_at_the_first_page_of_an_oversized_query(monkeypatch, tmp_path):
+    """Fail fast: the count arrives with page 1, so there is no reason to keep
+    paging a query that can never complete."""
+    from wildlife_water_stress_atlas.ingest.gbif import GBIFTruncationError
+
+    mock_get, pages = _oversized_query_mock(page_budget=5)
+    monkeypatch.setattr(PREFETCH_REQUESTS_GET, mock_get)
+
+    with pytest.raises(GBIFTruncationError):
+        fetch_all_with_checkpoint("Phoenicopterus roseus", tmp_path / "cache.gpkg")
+
+    assert pages["n"] == 1
+
+
+def test_prefetch_does_not_write_a_cache_file_for_a_truncated_query(monkeypatch, tmp_path):
+    """The failure must leave no half-species GeoPackage behind for a later run
+    to mistake for real data."""
+    from scripts.prefetch_gbif import prefetch_species
+    from wildlife_water_stress_atlas.ingest.gbif import GBIFTruncationError
+
+    cache_path = tmp_path / "gbif_phoenicopterus_roseus.gpkg"
+
+    mock_get, _ = _oversized_query_mock(page_budget=5)
+    monkeypatch.setattr(PREFETCH_REQUESTS_GET, mock_get)
+    monkeypatch.setattr("scripts.prefetch_gbif.CACHE_DIR", tmp_path)
+
+    with pytest.raises(GBIFTruncationError):
+        prefetch_species("Phoenicopterus roseus")
+
+    assert not cache_path.exists()
+
+
+def test_prefetch_allows_a_query_that_fits_under_the_cap(monkeypatch, tmp_path):
+    """Regression guard: the cap must not disturb an ordinary fetch."""
+    from wildlife_water_stress_atlas.ingest.gbif import GBIF_MAX_OFFSET
+
+    def mock_get(url, params=None, timeout=None):
+        return make_gbif_response(sample_records(50), count=GBIF_MAX_OFFSET)
+
+    monkeypatch.setattr(PREFETCH_REQUESTS_GET, mock_get)
+
+    records = fetch_all_with_checkpoint("Loxodonta africana", tmp_path / "cache.gpkg")
+
+    assert len(records) == 50

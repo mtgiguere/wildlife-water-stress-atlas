@@ -24,6 +24,8 @@ import pytest
 import requests
 
 from wildlife_water_stress_atlas.ingest.gbif import (
+    GBIF_MAX_OFFSET,
+    GBIFTruncationError,
     fetch_all_occurrences,
     fetch_occurrence_count,
     fetch_occurrences_page,
@@ -707,3 +709,100 @@ def test_gbif_continent_filter_leaves_endemic_species_intact():
     africa_count = fetch_occurrence_count("Loxodonta africana", continent="AFRICA")
 
     assert africa_count > 0.95 * global_count, f"African elephant should be ~entirely African, got {africa_count:,} of {global_count:,}"
+
+
+# ---------------------------------------------------------------------------
+# Paging-wall truncation must be loud
+#
+# WHY: GBIF refuses offsets at/beyond GBIF_MAX_OFFSET, so a plain offset walk
+# silently stops there. That is how the cached Phoenicopterus roseus layer
+# froze at 99,900 records — 18% of the 554,418 available, in GBIF's own
+# ordering rather than a random sample — while presenting itself as a complete
+# species layer. Silently returning a biased fifth of a dataset is worse than
+# failing: nothing downstream can tell the difference.
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_all_occurrences_raises_when_result_set_exceeds_offset_cap(monkeypatch):
+    """Specifies: a query too broad to page through fails, and does not return
+    a truncated set that looks complete."""
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=GBIF_MAX_OFFSET + 1)
+        return make_mock_response(make_sample_records(300), count=GBIF_MAX_OFFSET + 1)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    with pytest.raises(GBIFTruncationError):
+        fetch_all_occurrences("Phoenicopterus roseus")
+
+
+def test_truncation_error_names_the_count_the_cap_and_the_remedy(monkeypatch):
+    """An operator hitting this must be able to act on it without reading the
+    source. The remedy is to narrow the query, not to retry."""
+
+    def mock_get(url, params=None, timeout=None):
+        return make_mock_response([], count=554418)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    with pytest.raises(GBIFTruncationError) as excinfo:
+        fetch_all_occurrences("Phoenicopterus roseus")
+
+    message = str(excinfo.value)
+    assert "554,418" in message
+    assert f"{GBIF_MAX_OFFSET:,}" in message
+    assert "narrow" in message.lower()
+    assert "Phoenicopterus roseus" in message
+
+
+def test_fetch_all_occurrences_fails_before_fetching_any_pages(monkeypatch):
+    """Fail fast: the count is known up front, so an unpageable query must not
+    walk 333 pages before admitting it cannot finish."""
+    page_requests = []
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=GBIF_MAX_OFFSET + 1)
+        page_requests.append(params.get("offset"))
+        return make_mock_response(make_sample_records(300), count=GBIF_MAX_OFFSET + 1)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    with pytest.raises(GBIFTruncationError):
+        fetch_all_occurrences("Phoenicopterus roseus")
+
+    assert page_requests == [], "no page should be fetched for an unpageable query"
+
+
+def test_fetch_all_occurrences_allows_a_result_set_exactly_at_the_cap(monkeypatch):
+    """Boundary: GBIF_MAX_OFFSET records are reachable (offsets 0..cap-1).
+    Off-by-one here would reject a perfectly pageable query."""
+    served = {"n": 0}
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=GBIF_MAX_OFFSET)
+        served["n"] += 1
+        return make_mock_response(make_sample_records(2), count=GBIF_MAX_OFFSET)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    result = fetch_all_occurrences("Loxodonta africana")
+
+    assert served["n"] == 1
+    assert len(result) == 2
+
+
+def test_fetch_all_occurrences_unaffected_for_normal_result_sets(monkeypatch):
+    """Regression guard: the cap must not disturb the ordinary path."""
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=42)
+        return make_mock_response(make_sample_records(42), count=42)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    assert len(fetch_all_occurrences("Loxodonta africana")) == 42

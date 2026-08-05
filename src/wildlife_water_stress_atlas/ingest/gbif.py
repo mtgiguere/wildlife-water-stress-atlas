@@ -39,6 +39,17 @@ GBIF_PAGE_SIZE = 300
 GBIF_MAX_OFFSET = 100_000
 
 
+class GBIFTruncationError(RuntimeError):
+    """A query returns more records than offset paging can reach.
+
+    Raised instead of returning a partial set. A truncated fetch is
+    indistinguishable downstream from a complete one — the cached
+    Phoenicopterus roseus layer sat at 99,900 of 554,418 records (18%, in
+    GBIF's own ordering rather than a random sample) and presented itself as a
+    whole species. The remedy is always to narrow the query, never to retry.
+    """
+
+
 def build_search_params(
     scientific_name: str,
     limit: int,
@@ -65,6 +76,21 @@ def build_search_params(
     if continent is not None:
         params["continent"] = continent
     return params
+
+
+def raise_if_unpageable(scientific_name: str, total: int) -> None:
+    """Fail a query that offset paging cannot finish, before fetching anything.
+
+    Shared by the library fetch and the checkpointing prefetch loop so both
+    refuse truncation on the same terms.
+    """
+    if total <= GBIF_MAX_OFFSET:
+        return
+    raise GBIFTruncationError(
+        f"{scientific_name}: {total:,} records exceeds GBIF's {GBIF_MAX_OFFSET:,} offset cap, "
+        f"so paging would silently return only the first {GBIF_MAX_OFFSET:,} in GBIF's ordering. "
+        f"Narrow the query (continent, country or year) until it fits."
+    )
 
 
 def fetch_occurrence_count(scientific_name: str, continent: str | None = None) -> int:
@@ -95,6 +121,7 @@ def fetch_all_occurrences(
     total = fetch_occurrence_count(scientific_name, continent=continent)
     if total == 0:
         return []
+    raise_if_unpageable(scientific_name, total)
 
     all_records = []
     offset = 0
