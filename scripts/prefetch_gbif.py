@@ -43,10 +43,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
-from wildlife_water_stress_atlas.ingest.gbif import occurrences_to_gdf
+from wildlife_water_stress_atlas.ingest.gbif import build_search_params, occurrences_to_gdf
 
 GBIF_API_URL = "https://api.gbif.org/v1/occurrence/search"
 GBIF_PAGE_SIZE = 300
+
+# The atlas scores against Africa-only water/road/settlement layers, so a
+# global result set is not merely wasteful — an out-of-extent occurrence gets a
+# distance measured to a layer that does not cover it. Filtering here also
+# keeps wide-ranging species under GBIF's 100k offset cap.
+TARGET_CONTINENT = "AFRICA"
 
 CACHE_DIR = Path("data/processed")
 
@@ -77,16 +83,16 @@ def delete_checkpoint(cache_path: Path) -> None:
         cp.unlink()
 
 
-def fetch_all_with_checkpoint(scientific_name: str, cache_path: Path) -> list[dict]:
+def fetch_all_with_checkpoint(scientific_name: str, cache_path: Path, continent: str | None = TARGET_CONTINENT) -> list[dict]:
     offset, all_records = load_checkpoint(cache_path)
 
     while True:
-        params = {
-            "scientificName": scientific_name,
-            "hasCoordinate": "true",
-            "limit": GBIF_PAGE_SIZE,
-            "offset": offset,
-        }
+        params = build_search_params(
+            scientific_name,
+            limit=GBIF_PAGE_SIZE,
+            offset=offset,
+            continent=continent,
+        )
 
         try:
             response = requests.get(GBIF_API_URL, params=params, timeout=REQUEST_TIMEOUT)

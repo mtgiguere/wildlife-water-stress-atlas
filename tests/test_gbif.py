@@ -566,3 +566,144 @@ def test_fetch_all_occurrences_stops_on_empty_page_regardless_of_flag(monkeypatc
     result = fetch_all_occurrences("Loxodonta africana")
 
     assert len(result) == 300
+
+
+# ---------------------------------------------------------------------------
+# continent filter
+#
+# WHY: the atlas scores against Africa-only water/road/settlement layers, but
+# the unfiltered GBIF query returns global records. Out-of-extent occurrences
+# were being SCORED rather than marked uncovered (a Palearctic flamingo 2,163km
+# from the nearest African river read as near-maximum water stress), and for
+# wide-ranging species the global result set also blew past GBIF's offset cap.
+# Restricting the query at the source fixes both.
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_occurrence_count_passes_continent_when_provided(monkeypatch):
+    captured_params = {}
+
+    def mock_get(url, params=None, timeout=None):
+        captured_params.update(params or {})
+        return make_mock_response(results=[], count=100)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_occurrence_count("Phoenicopterus roseus", continent="AFRICA")
+
+    assert captured_params.get("continent") == "AFRICA"
+
+
+def test_fetch_occurrence_count_omits_continent_when_not_provided(monkeypatch):
+    captured_params = {}
+
+    def mock_get(url, params=None, timeout=None):
+        captured_params.update(params or {})
+        return make_mock_response(results=[], count=100)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_occurrence_count("Loxodonta africana")
+
+    assert "continent" not in captured_params
+
+
+def test_fetch_occurrences_page_passes_continent_when_provided(monkeypatch):
+    captured_params = {}
+
+    def mock_get(url, params=None, timeout=None):
+        captured_params.update(params or {})
+        return make_mock_response(make_sample_records(5))
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_occurrences_page("Phoenicopterus roseus", limit=5, offset=0, continent="AFRICA")
+
+    assert captured_params.get("continent") == "AFRICA"
+
+
+def test_fetch_occurrences_page_omits_continent_when_not_provided(monkeypatch):
+    captured_params = {}
+
+    def mock_get(url, params=None, timeout=None):
+        captured_params.update(params or {})
+        return make_mock_response(make_sample_records(5))
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_occurrences_page("Loxodonta africana", limit=5, offset=0)
+
+    assert "continent" not in captured_params
+
+
+def test_fetch_all_occurrences_passes_continent_on_every_page(monkeypatch):
+    """Specifies: EVERY page request carries the continent filter, not just the
+    first. A filter dropped on page 2 would silently readmit global records."""
+    page_continents = []
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            return make_mock_response([], count=600)
+        offset = params.get("offset", 0)
+        page_continents.append(params.get("continent"))
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "endOfRecords": offset >= 300,
+            "count": 600,
+            "results": make_sample_records(300),
+        }
+        return mock_resp
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_all_occurrences("Phoenicopterus roseus", continent="AFRICA")
+
+    assert len(page_continents) == 2, "fixture must exercise more than one page"
+    assert page_continents == ["AFRICA", "AFRICA"]
+
+
+def test_fetch_all_occurrences_passes_continent_to_the_count_request(monkeypatch):
+    """Specifies: the up-front count is ALSO filtered. An unfiltered count would
+    describe a different population than the one actually fetched."""
+    count_continents = []
+
+    def mock_get(url, params=None, timeout=None):
+        if params.get("limit") == 1:
+            count_continents.append(params.get("continent"))
+            return make_mock_response([], count=10)
+        return make_mock_response(make_sample_records(10), count=10)
+
+    monkeypatch.setattr(GBIF_MODULE, mock_get)
+
+    fetch_all_occurrences("Phoenicopterus roseus", continent="AFRICA")
+
+    assert count_continents == ["AFRICA"]
+
+
+@pytest.mark.integration
+def test_gbif_continent_filter_brings_flamingo_under_the_offset_cap():
+    """Pins the EXTERNAL fact this fix depends on (TDD_CONTRACT Blind spot A).
+
+    A self-authored mock proves only that we send a parameter named
+    'continent' — never that GBIF honours it, nor that the filtered result set
+    actually fits under the offset cap. Only a real call can show that.
+    """
+    from wildlife_water_stress_atlas.ingest.gbif import GBIF_MAX_OFFSET
+
+    global_count = fetch_occurrence_count("Phoenicopterus roseus")
+    africa_count = fetch_occurrence_count("Phoenicopterus roseus", continent="AFRICA")
+
+    assert africa_count < global_count, "continent=AFRICA must actually filter"
+    assert africa_count < GBIF_MAX_OFFSET, f"African flamingos ({africa_count:,}) must fit under GBIF's {GBIF_MAX_OFFSET:,} offset cap"
+
+
+@pytest.mark.integration
+def test_gbif_continent_filter_leaves_endemic_species_intact():
+    """Guards the other direction: the filter must not throw away records for a
+    species that is already African. A too-aggressive filter would look like a
+    'fix' while quietly shrinking every layer."""
+    global_count = fetch_occurrence_count("Loxodonta africana")
+    africa_count = fetch_occurrence_count("Loxodonta africana", continent="AFRICA")
+
+    assert africa_count > 0.95 * global_count, f"African elephant should be ~entirely African, got {africa_count:,} of {global_count:,}"
