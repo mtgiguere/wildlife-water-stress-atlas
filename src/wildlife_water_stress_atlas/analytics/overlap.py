@@ -70,9 +70,19 @@ def add_distance_to_water(
     occurrences_projected = occurrences.to_crs(epsg=3857)
     water_projected = water.to_crs(epsg=3857)
 
+    # Carry the nearest source's type through, exactly as add_distance_to_road
+    # carries road_class. Every species config sets expert `type_weights` over
+    # water types (an elephant's pan is 0.4 against a river's 1.0); discarding
+    # the type here is what made an ephemeral pan score like a permanent lake.
+    # Older water layers predate the column, so its absence is not an error.
+    if "water_type" in water_projected.columns:
+        right = water_projected[["water_type", "geometry"]]
+    else:
+        right = water_projected[["geometry"]].assign(water_type=None)
+
     joined = gpd.sjoin_nearest(
         occurrences_projected,
-        water_projected[["geometry"]],
+        right,
         how="left",
         distance_col="distance_to_water",
     )

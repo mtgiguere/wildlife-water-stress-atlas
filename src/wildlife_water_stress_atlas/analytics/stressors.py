@@ -148,9 +148,35 @@ class HazardStressor:
 
 
 class ResourceStressor:
-    """Closer = better (a resource). Stress rises with distance:
-    score = sensitivity × min(dist/threshold, 1.0). With sensitivity 1.0 this is
-    the legacy water_stress_score."""
+    """Closer = better (a resource), discounted by how dependable the source is.
+
+        score = sensitivity × min(dist / (weight × threshold), 1.0)
+
+    `weight` is the optional per-class `type_weights` entry — how reliably that
+    kind of source supplies the species (elephant: river 1.0, wetland 0.7,
+    pan 0.4). A less dependable source is modelled as being effectively
+    FURTHER AWAY: it shrinks the usable threshold, so stress rises faster with
+    distance and saturates sooner. An elephant's pan at 0.4 hits maximum water
+    stress at 40% of the distance a river would.
+
+    Deliberately NOT a floor (`1 − weight × (1 − scarcity)`), which was the
+    other candidate. A floor makes zero water stress unreachable: 74% of the
+    continental layer's nearest sources are class `permanent_water`, weighted
+    0.8, so every elephant occurrence — including ones sitting in a lake —
+    would carry ≥ 0.2 stress and the mean would move 0.100 → 0.233. Floor
+    semantics genuinely do fit an EPHEMERAL source (a dry pan is not water for
+    months at a time), but the honest input for that is the per-feature
+    `permanence` / `months_water` the water schema already carries, not a
+    per-type weight that also encodes suitability. Left as an expert decision
+    rather than assumed here.
+
+    weight 1.0 collapses to sensitivity × min(dist/threshold, 1) — the legacy
+    water_stress_score — so unweighted configs and fully-reliable sources are
+    unchanged, and adjacency always scores 0 regardless of type. An unlisted
+    class scores unweighted rather than crashing: the water layer is not
+    filtered to accessible_types before scoring, and inventing a penalty for an
+    unrecognised type would be worse than declining to weight it.
+    """
 
     kind = StressorKind.RESOURCE
 
@@ -159,7 +185,14 @@ class ResourceStressor:
             return Score(None, False)
 
         threshold = cfg.params["threshold_m"]
-        scarcity = min(measurement.distance_m / threshold, 1.0)
+
+        weights = cfg.params.get("type_weights") or {}
+        weight = weights.get(measurement.feature_class, 1.0)
+        # Config validation constrains type_weights to (0.0, 1.0]; guard anyway
+        # so a hand-edited plugin cannot divide by zero.
+        usable_threshold = threshold * weight if weight > 0 else threshold
+
+        scarcity = min(measurement.distance_m / usable_threshold, 1.0)
         return Score(cfg.sensitivity * scarcity, True)
 
 

@@ -528,3 +528,75 @@ def test_present_scores_still_aggregate_exactly_as_before():
 
     for i, (w, r, s) in enumerate(triples):
         assert out["stress_aggregate"].iloc[i] == pytest.approx(1.0 - (1 - w) * (1 - r) * (1 - s))
+
+
+# ---------------------------------------------------------------------------
+# The nearest water source's TYPE reaches the scorer
+#
+# compute_species_stress passed FeatureProximity(distance, None) for water, so
+# the expert type_weights in every species config — validated by species.py,
+# read by get_water_type_weights, and consumed by nothing — never applied.
+# A reed frog depends on wetlands (1.0) far more than rivers (0.6); an elephant
+# is the other way round. None of that reached a score.
+# ---------------------------------------------------------------------------
+
+
+def _one_typed_water(water_type):
+    """One nearby source of the given type, plus a distant anchor so the layer's
+    extent covers the occurrence (see the fixture note above)."""
+    return gpd.GeoDataFrame(
+        {"water_type": [water_type, water_type]},
+        geometry=[Point(0.0, 0.0), Point(2.0, 2.0)],
+        crs="EPSG:4326",
+    )
+
+
+# ~222m from the source at (0, 0) — comfortably inside the frog's 2,000m water
+# threshold. This matters: beyond the threshold every source saturates at
+# maximum scarcity and the weighting becomes unobservable, so a far-away
+# occurrence would make these tests pass no matter what the code did.
+_NEAR_WATER = Point(0.002, 0)
+
+
+def _frog_at_near_water():
+    return gpd.GeoDataFrame({"species": [_FROG], "year": [2020]}, geometry=[_NEAR_WATER], crs="EPSG:4326")
+
+
+def test_water_score_depends_on_the_nearest_source_type(wide_roads, wide_settlements):
+    """Identical geometry, different water type — the score must differ.
+
+    For Hyperolius marmoratus a lake (0.5) is a far less dependable resource
+    than a wetland (1.0), so the lake must be strictly more stressful.
+    """
+    occ = _frog_at_near_water()
+
+    wetland = compute_species_stress(occ, water=_one_typed_water("wetland"), roads=wide_roads, settlements=wide_settlements, species=_FROG)
+    lake = compute_species_stress(occ, water=_one_typed_water("lake"), roads=wide_roads, settlements=wide_settlements, species=_FROG)
+
+    assert lake["stress_water"].iloc[0] > wetland["stress_water"].iloc[0]
+
+
+def test_water_type_weighting_matches_the_species_config(wide_roads, wide_settlements):
+    """Pin the arithmetic to the configured weight, not just an ordering.
+
+    An ordering-only assertion would survive the weight being applied with the
+    wrong magnitude, or to the wrong stressor.
+    """
+    from wildlife_water_stress_atlas.analytics.water_access import get_water_type_weights
+    from wildlife_water_stress_atlas.config.species import get_stressor_params
+
+    occ = _frog_at_near_water()
+    result = compute_species_stress(occ, water=_one_typed_water("lake"), roads=wide_roads, settlements=wide_settlements, species=_FROG)
+
+    params = get_stressor_params(_FROG, "water")
+    weight = get_water_type_weights(_FROG)["lake"]
+    sensitivity = next(s["sensitivity"] for s in SPECIES_CONFIG[_FROG]["stressors"] if s["stressor_id"] == "water")
+
+    distance = result["distance_to_water"].iloc[0]
+    scarcity = min(distance / (params["threshold_m"] * weight), 1.0)
+    assert scarcity < 1.0, "fixture must sit inside the usable threshold or weighting is unobservable"
+
+    expected = sensitivity * scarcity
+
+    assert result["stress_water"].iloc[0] == pytest.approx(expected)
+    assert weight < 1.0, "fixture must use a discounted type or this asserts nothing"

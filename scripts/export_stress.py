@@ -179,7 +179,7 @@ def compute_species_stress(
     water_s, road_s, settle_s, agg_s = [], [], [], []
     for i, (_, row) in enumerate(occ.iterrows()):
         measurements = {
-            "water": FeatureProximity(row["distance_to_water"], None) if covered["water"][i] else None,
+            "water": FeatureProximity(row["distance_to_water"], row.get("water_type")) if covered["water"][i] else None,
             "roads": FeatureProximity(row["distance_to_road_m"], row["road_class"]) if covered["roads"][i] else None,
             "settlements": FeatureProximity(row["distance_to_settlement_m"], row["settlement_class"]) if covered["settlements"][i] else None,
         }

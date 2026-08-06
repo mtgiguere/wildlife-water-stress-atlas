@@ -231,3 +231,60 @@ def test_verdicts_are_aligned_to_the_input_index():
     assert list(result.index) == [7, 9]
     assert result.loc[7]
     assert not result.loc[9]
+
+
+# ---------------------------------------------------------------------------
+# The nearest water source's TYPE must survive the join
+#
+# WHY: every species config carries expert-set `type_weights` for water — an
+# elephant's pan is 0.4, its wetland 0.7, its river 1.0 — and species.py
+# validates that those keys exactly match accessible_types. Nothing consumed
+# them: add_distance_to_water selected [["geometry"]] and threw the type away,
+# so a 2-month ephemeral pan scored identically to a permanent lake at the same
+# distance. add_distance_to_road already keeps road_class; this is the same.
+# ---------------------------------------------------------------------------
+
+
+def test_add_distance_to_water_reports_the_nearest_source_type():
+    from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
+
+    occurrences = gpd.GeoDataFrame({"species": ["X"]}, geometry=[Point(0.1, 0)], crs="EPSG:4326")
+    water = gpd.GeoDataFrame(
+        {"water_type": ["pan", "river"]},
+        geometry=[Point(0.0, 0.0), Point(5.0, 0.0)],
+        crs="EPSG:4326",
+    )
+
+    result = add_distance_to_water(occurrences, water)
+
+    assert result["water_type"].iloc[0] == "pan"
+
+
+def test_add_distance_to_water_type_tracks_which_source_is_nearest():
+    """Not just 'a type column exists' — the RIGHT one. Same fixture, occurrence
+    moved so the river is now nearest."""
+    from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
+
+    occurrences = gpd.GeoDataFrame({"species": ["X"]}, geometry=[Point(4.9, 0)], crs="EPSG:4326")
+    water = gpd.GeoDataFrame(
+        {"water_type": ["pan", "river"]},
+        geometry=[Point(0.0, 0.0), Point(5.0, 0.0)],
+        crs="EPSG:4326",
+    )
+
+    result = add_distance_to_water(occurrences, water)
+
+    assert result["water_type"].iloc[0] == "river"
+
+
+def test_add_distance_to_water_tolerates_a_layer_without_types():
+    """Older water GeoPackages predate the column; they must still score."""
+    from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_water
+
+    occurrences = gpd.GeoDataFrame({"species": ["X"]}, geometry=[Point(0.1, 0)], crs="EPSG:4326")
+    water = gpd.GeoDataFrame(geometry=[Point(0.0, 0.0)], crs="EPSG:4326")
+
+    result = add_distance_to_water(occurrences, water)
+
+    assert "distance_to_water" in result.columns
+    assert result["water_type"].isna().all()
