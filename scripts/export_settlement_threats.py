@@ -41,12 +41,13 @@ from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_settle
 from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.ingest.gbif import OCCURRENCE_COLS
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
 # Bounding box covering continental Africa (lon_min, lat_min, lon_max, lat_max)
 AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 
-_OUTPUT_COLS = ["species", "year", "distance_to_settlement_m", "settlement_class", "settlement_threat_score"]
+_OUTPUT_COLS = [*OCCURRENCE_COLS, "distance_to_settlement_m", "settlement_class", "settlement_threat_score"]
 
 # Settlement classes drawn on the map (SETTLEMENTS view). Only the larger,
 # sparser classes are shown — villages and hamlets number in the hundreds of

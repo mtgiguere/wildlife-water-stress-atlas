@@ -34,6 +34,17 @@ import requests
 GBIF_API_URL = "https://api.gbif.org/v1/occurrence/search"
 GBIF_PAGE_SIZE = 300
 
+# The per-occurrence identity/temporal columns every export carries through to
+# the map layer. ONE definition on purpose: five export scripts previously kept
+# their own hardcoded lists, which is how `month` was silently dropped despite
+# being present on ~all GBIF records and in every cached GeoPackage — the same
+# way `name` went missing from settlements at three independent prune sites.
+#
+# `month` is the key the seasonal-water work needs: water availability swings
+# hard within a year, so a dry-season record scored against an annual water
+# layer understates precisely the stress this atlas measures.
+OCCURRENCE_COLS = ("species", "year", "month")
+
 # GBIF's occurrence search refuses offsets at or beyond this value, so a plain
 # offset walk can never retrieve more than this many records for one query.
 GBIF_MAX_OFFSET = 100_000

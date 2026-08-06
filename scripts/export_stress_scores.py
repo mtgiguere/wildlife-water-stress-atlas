@@ -38,6 +38,7 @@ from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
 from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.ingest.gbif import OCCURRENCE_COLS
 from wildlife_water_stress_atlas.utils.generic_threader import GenericThreader
 
 DB_URL = os.environ.get(
@@ -102,7 +103,7 @@ def export_stress_scores(engine, scientific_name: str, output_path: Path) -> Non
 
     gdf = compute_stress_scores(engine, scientific_name)
 
-    cols = [c for c in ["species", "year", "distance_m", "stress_score", "stress_level"] if c in gdf.columns]
+    cols = [c for c in [*OCCURRENCE_COLS, "distance_m", "stress_score", "stress_level"] if c in gdf.columns]
     gdf[cols + ["geometry"]].to_file(output_path, driver="GeoJSON")
 
 

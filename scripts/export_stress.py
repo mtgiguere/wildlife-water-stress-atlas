@@ -31,6 +31,7 @@ from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
 from wildlife_water_stress_atlas.analytics.stress_engine import score_species_stress, score_stressor
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity, Score, aggregate_stress
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.ingest.gbif import OCCURRENCE_COLS
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
 # Bounding box covering continental Africa (lon_min, lat_min, lon_max, lat_max)
@@ -39,7 +40,7 @@ AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 # Columns written to the per-species stress GeoJSON. The generic frontend reads
 # stress_aggregate for the headline layer and the per-stressor columns for the
 # breakdown/toggle.
-_OUTPUT_COLS = ["species", "year", "stress_water", "stress_roads", "stress_settlements", "stress_aggregate"]
+_OUTPUT_COLS = [*OCCURRENCE_COLS, "stress_water", "stress_roads", "stress_settlements", "stress_aggregate"]
 
 
 def rescore_water_with_added_source(
@@ -117,7 +118,7 @@ def build_stress_from_scores(
     # noisy-OR rather than entering it as a fabricated 0.0.
     aggregate = [aggregate_stress([_as_score(w), _as_score(r), _as_score(s)]).value for w, r, s in zip(water, roads, setts, strict=True)]
 
-    out = roads_gdf[["species", "year"]].copy()
+    out = roads_gdf[[c for c in OCCURRENCE_COLS if c in roads_gdf.columns]].copy()
     out["stress_water"] = water
     out["stress_roads"] = roads
     out["stress_settlements"] = setts
