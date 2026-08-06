@@ -38,16 +38,42 @@ def occurrences():
     )
 
 
+# Each layer below carries a deliberately DISTANT extra feature (suffix "_far").
+#
+# Do not delete these as dead weight. Scoring now asks whether an occurrence
+# falls inside the layer's extent, and a layer built from one line has a
+# degenerate bounding box — a single north-south river spans zero width in x,
+# so every occurrence beside it would read as "no water data here". Real
+# continental layers span the occurrences they are scored against; these
+# anchors give the fixtures that same property.
+#
+# Every anchor is placed far enough away that it is never the nearest feature
+# to any occurrence, so all measured distances — and therefore every golden
+# comparison against the legacy pipeline — are exactly what they were.
+
+
 @pytest.fixture
 def water():
-    return gpd.GeoDataFrame({"type": ["river"]}, geometry=[LineString([(0, -1), (0, 1)])], crs="EPSG:4326")
+    return gpd.GeoDataFrame(
+        {"type": ["river", "river_far"]},
+        geometry=[LineString([(0, -1), (0, 1)]), LineString([(0, -2), (2, -2)])],
+        crs="EPSG:4326",
+    )
 
 
 @pytest.fixture
 def roads():
     return gpd.GeoDataFrame(
-        {"road_class": ["motorway", "primary"], "source_id": ["r0", "r1"], "region": ["africa", "africa"]},
-        geometry=[LineString([(0.1, -1), (0.1, 1)]), LineString([(0.6, -1), (0.6, 1)])],
+        {
+            "road_class": ["motorway", "primary", "primary"],
+            "source_id": ["r0", "r1", "r_far"],
+            "region": ["africa", "africa", "africa"],
+        },
+        geometry=[
+            LineString([(0.1, -1), (0.1, 1)]),
+            LineString([(0.6, -1), (0.6, 1)]),
+            LineString([(0, -3), (2, -3)]),
+        ],
         crs="EPSG:4326",
     )
 
@@ -55,8 +81,12 @@ def roads():
 @pytest.fixture
 def settlements():
     return gpd.GeoDataFrame(
-        {"settlement_class": ["city", "town"], "source_id": ["s0", "s1"], "region": ["africa", "africa"]},
-        geometry=[Point(0.2, 0), Point(0.8, 0.5)],
+        {
+            "settlement_class": ["city", "town", "town", "town"],
+            "source_id": ["s0", "s1", "s_far_a", "s_far_b"],
+            "region": ["africa", "africa", "africa", "africa"],
+        },
+        geometry=[Point(0.2, 0), Point(0.8, 0.5), Point(0.0, 2.0), Point(2.0, 2.0)],
         crs="EPSG:4326",
     )
 
@@ -308,3 +338,193 @@ def test_rescore_water_with_added_source_rejects_length_mismatch():
     )
     with pytest.raises(ValueError):
         rescore_water_with_added_source(stress, [1.0, 2.0], "X")
+
+
+# ---------------------------------------------------------------------------
+# Out-of-extent occurrences are UNCOVERED, not scored
+#
+# WHY: sjoin_nearest always returns a distance, so an occurrence the layer does
+# not cover still gets scored — against whatever sits at the edge of the data.
+# For a HAZARD that reads as a confident 0.0 ("verified safe"); for a RESOURCE
+# it inverts into near-maximum stress. Both are fabrications. The shipped
+# flamingo layer averaged 0.660 aggregate stress outside Africa vs 0.045 inside
+# purely from this.
+#
+# Score(covered=False) already exists for exactly this and the engine already
+# excludes uncovered scores from the noisy-OR — compute_species_stress just
+# never passed None.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def wide_roads():
+    """A layer whose extent comfortably contains the far-away occurrence."""
+    return gpd.GeoDataFrame(
+        {"road_class": ["motorway"], "source_id": ["r0"], "region": ["africa"]},
+        geometry=[LineString([(0, 0), (10, 10)])],
+        crs="EPSG:4326",
+    )
+
+
+@pytest.fixture
+def wide_settlements():
+    return gpd.GeoDataFrame(
+        {"settlement_class": ["city", "town"], "source_id": ["s0", "s1"], "region": ["africa", "africa"]},
+        geometry=[Point(1, 1), Point(9, 9)],
+        crs="EPSG:4326",
+    )
+
+
+@pytest.fixture
+def narrow_water():
+    """Water mapped only near the origin — bounds (0, 0, 0, 1)."""
+    return gpd.GeoDataFrame({"type": ["river"]}, geometry=[LineString([(0, 0), (0, 1)])], crs="EPSG:4326")
+
+
+@pytest.fixture
+def far_occurrence():
+    """At (5, 5): inside the road and settlement extents, far outside water's."""
+    return gpd.GeoDataFrame(
+        {"species": [_FROG], "year": [2021]},
+        geometry=[Point(5, 5)],
+        crs="EPSG:4326",
+    )
+
+
+def test_occurrence_outside_the_water_extent_reports_no_water_score(far_occurrence, narrow_water, wide_roads, wide_settlements):
+    """Specifies: absent water data reads as unknown, never as scarcity."""
+    result = _stress(far_occurrence, narrow_water, wide_roads, wide_settlements)
+
+    assert result["stress_water"].iloc[0] is None
+
+
+def test_uncovered_water_is_excluded_from_the_aggregate(far_occurrence, narrow_water, wide_roads, wide_settlements):
+    """THE case that makes this a correctness bug rather than a labelling one.
+
+    A RESOURCE inverts distance, so an out-of-extent point looks maximally
+    water-stressed and saturates the noisy-OR. The aggregate must be the union
+    of the covered stressors ONLY.
+    """
+    result = _stress(far_occurrence, narrow_water, wide_roads, wide_settlements)
+    row = result.iloc[0]
+
+    expected = 1.0 - (1.0 - row["stress_roads"]) * (1.0 - row["stress_settlements"])
+
+    assert row["stress_aggregate"] == pytest.approx(expected)
+    assert row["stress_aggregate"] < 0.99, "a fabricated water score would saturate the union"
+
+
+def test_occurrence_outside_the_settlement_extent_reports_no_settlement_score(narrow_water, wide_roads):
+    """The regional-subset case: the shipped settlements layer covers only
+    eastern/southern Africa, so West African occurrences of every species sit
+    outside it and were being scored a confident 0.0."""
+    settlements_east_only = gpd.GeoDataFrame(
+        {"settlement_class": ["city"], "source_id": ["s0"], "region": ["africa"]},
+        geometry=[Point(30, -10)],
+        crs="EPSG:4326",
+    )
+    west_african = gpd.GeoDataFrame(
+        {"species": [_FROG], "year": [2021]},
+        geometry=[Point(-5, 6)],
+        crs="EPSG:4326",
+    )
+
+    result = compute_species_stress(west_african, water=narrow_water, roads=wide_roads, settlements=settlements_east_only, species=_FROG)
+
+    assert result["stress_settlements"].iloc[0] is None
+
+
+def test_aggregate_is_none_when_every_stressor_is_uncovered(far_occurrence, narrow_water):
+    """No-data must propagate all the way up. An aggregate of 0.0 here would
+    render as 'measured, unstressed' — the exact confusion Score.covered and
+    the grey/green legend split exist to prevent."""
+    empty_roads = gpd.GeoDataFrame({"road_class": [], "source_id": [], "region": []}, geometry=[], crs="EPSG:4326")
+    empty_settlements = gpd.GeoDataFrame({"settlement_class": [], "source_id": [], "region": []}, geometry=[], crs="EPSG:4326")
+
+    result = compute_species_stress(far_occurrence, water=narrow_water, roads=empty_roads, settlements=empty_settlements, species=_FROG)
+
+    assert result["stress_aggregate"].iloc[0] is None
+
+
+def test_fully_covered_occurrences_are_unaffected(occurrences, water, roads, settlements):
+    """Regression guard: coverage must not disturb scoring where data exists.
+    Every stressor here spans the occurrences, so every score stays a number."""
+    covering_water = gpd.GeoDataFrame({"type": ["river"]}, geometry=[LineString([(-1, -1), (2, 2)])], crs="EPSG:4326")
+    covering_roads = gpd.GeoDataFrame(
+        {"road_class": ["motorway"], "source_id": ["r0"], "region": ["africa"]},
+        geometry=[LineString([(-1, -1), (2, 2)])],
+        crs="EPSG:4326",
+    )
+    covering_settlements = gpd.GeoDataFrame(
+        {"settlement_class": ["city", "town"], "source_id": ["s0", "s1"], "region": ["africa", "africa"]},
+        geometry=[Point(-1, -1), Point(2, 2)],
+        crs="EPSG:4326",
+    )
+
+    result = compute_species_stress(occurrences, water=covering_water, roads=covering_roads, settlements=covering_settlements, species=_FROG)
+
+    for col in ("stress_water", "stress_roads", "stress_settlements", "stress_aggregate"):
+        assert result[col].notna().all(), f"{col} should be fully covered here"
+
+
+# ---------------------------------------------------------------------------
+# build_stress_from_scores must not certify coverage it cannot know
+#
+# This is the FAST path that actually produced the shipped stress_gbif_* files:
+# it re-aggregates the already-computed per-stressor exports instead of
+# recomputing distances. It wrapped every input in Score(value, True), so a
+# missing per-stressor score would enter the noisy-OR as a measured 0.0.
+# ---------------------------------------------------------------------------
+
+
+def _scores_frame(col, values, pts):
+    return gpd.GeoDataFrame(
+        {"species": ["X"] * len(values), "year": [2019, 2020, 2021][: len(values)], col: values},
+        geometry=pts,
+        crs="EPSG:4326",
+    )
+
+
+def test_missing_per_stressor_score_is_excluded_from_the_aggregate():
+    """A null water score means the water export had no reading there. The
+    aggregate must be the union of what IS known, not of a fabricated zero."""
+    from scripts.export_stress import build_stress_from_scores
+
+    pts = [Point(0, 0)]
+    water = _scores_frame("stress_score", [None], pts)
+    roads = _scores_frame("road_threat_score", [0.5], pts)
+    setts = _scores_frame("settlement_threat_score", [0.2], pts)
+
+    out = build_stress_from_scores(water, roads, setts)
+
+    assert out["stress_water"].iloc[0] is None
+    assert out["stress_aggregate"].iloc[0] == pytest.approx(1.0 - (1 - 0.5) * (1 - 0.2))
+
+
+def test_all_missing_per_stressor_scores_give_an_uncovered_aggregate():
+    from scripts.export_stress import build_stress_from_scores
+
+    pts = [Point(0, 0)]
+    water = _scores_frame("stress_score", [None], pts)
+    roads = _scores_frame("road_threat_score", [None], pts)
+    setts = _scores_frame("settlement_threat_score", [None], pts)
+
+    out = build_stress_from_scores(water, roads, setts)
+
+    assert out["stress_aggregate"].iloc[0] is None
+
+
+def test_present_scores_still_aggregate_exactly_as_before():
+    """Regression guard: honouring nulls must not perturb the ordinary path."""
+    from scripts.export_stress import build_stress_from_scores
+
+    pts = [Point(0, 0), Point(1, 1), Point(2, 2)]
+    triples = [(0.0, 0.2, 0.1), (0.5, 0.0, 0.4), (1.0, 0.3, 0.0)]
+    water = _scores_frame("stress_score", [t[0] for t in triples], pts)
+    roads = _scores_frame("road_threat_score", [t[1] for t in triples], pts)
+    setts = _scores_frame("settlement_threat_score", [t[2] for t in triples], pts)
+
+    out = build_stress_from_scores(water, roads, setts)
+
+    for i, (w, r, s) in enumerate(triples):
+        assert out["stress_aggregate"].iloc[i] == pytest.approx(1.0 - (1 - w) * (1 - r) * (1 - s))

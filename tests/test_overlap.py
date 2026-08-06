@@ -141,3 +141,93 @@ def test_add_distance_to_water_distance_is_in_meters():
     distance = result.loc[0, "distance_to_water"]
     assert distance > 10_000, f"Distance {distance}m looks like degrees, not meters"
     assert distance < 200_000, f"Distance {distance}m is implausibly large for a 1-degree separation"
+
+
+# ---------------------------------------------------------------------------
+# within_layer_extent — is a measurement against this layer meaningful at all?
+#
+# WHY: distance-to-nearest-feature always returns a number, even when the layer
+# does not cover the point. That number is not a measurement, it is an artifact
+# of where the data happens to stop. The shipped flamingo layer scored records
+# in Spain against Africa-only hydrography: 2,163km to the "nearest" river read
+# as near-maximum water stress (mean stress_aggregate 0.660 outside Africa vs
+# 0.045 inside). The settlements layer is a regional subset, so the same hole
+# exists for West African occurrences of every species.
+# ---------------------------------------------------------------------------
+
+
+def test_point_inside_the_layer_extent_is_covered():
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[Point(0.5, 0.5)], crs="EPSG:4326")
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    assert list(within_layer_extent(points, layer)) == [True]
+
+
+def test_point_outside_the_layer_extent_is_not_covered():
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[Point(50.0, 40.0)], crs="EPSG:4326")
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    assert list(within_layer_extent(points, layer)) == [False]
+
+
+def test_point_exactly_on_the_extent_boundary_is_covered():
+    """Boundary case stated explicitly: the edge is inside. An off-by-one here
+    would strip coverage from occurrences at the very edge of a regional
+    subset — precisely the records the caller most needs to reason about."""
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[Point(1.0, 1.0)], crs="EPSG:4326")
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    assert list(within_layer_extent(points, layer)) == [True]
+
+
+def test_mixed_points_are_classified_independently():
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(
+        geometry=[Point(0.5, 0.5), Point(50.0, 40.0), Point(0.1, 0.9)],
+        crs="EPSG:4326",
+    )
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    assert list(within_layer_extent(points, layer)) == [True, False, True]
+
+
+def test_an_empty_layer_covers_nothing():
+    """A layer that failed to load must not silently certify every point as
+    covered — that would turn a missing file into universal zero stress."""
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[Point(0.5, 0.5), Point(2, 2)], crs="EPSG:4326")
+    layer = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+
+    assert list(within_layer_extent(points, layer)) == [False, False]
+
+
+def test_no_points_yields_no_verdicts():
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    assert len(within_layer_extent(points, layer)) == 0
+
+
+def test_verdicts_are_aligned_to_the_input_index():
+    """The caller uses this to select rows, so a reset index would silently
+    misattribute coverage to the wrong occurrences."""
+    from wildlife_water_stress_atlas.analytics.overlap import within_layer_extent
+
+    points = gpd.GeoDataFrame(geometry=[Point(0.5, 0.5), Point(50.0, 40.0)], crs="EPSG:4326", index=[7, 9])
+    layer = gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+
+    result = within_layer_extent(points, layer)
+
+    assert list(result.index) == [7, 9]
+    assert result.loc[7]
+    assert not result.loc[9]

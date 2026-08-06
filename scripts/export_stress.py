@@ -25,6 +25,7 @@ from wildlife_water_stress_atlas.analytics.overlap import (
     add_distance_to_road,
     add_distance_to_settlement,
     add_distance_to_water,
+    within_layer_extent,
 )
 from wildlife_water_stress_atlas.analytics.scoring import classify_stress_level
 from wildlife_water_stress_atlas.analytics.stress_engine import score_species_stress, score_stressor
@@ -71,6 +72,16 @@ def rescore_water_with_added_source(
     return out
 
 
+def _as_score(value) -> Score:
+    """One per-stressor export value as a Score, honouring "no reading here".
+
+    None/NaN is uncovered, never 0.0 — see Score.covered.
+    """
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return Score(None, False)
+    return Score(float(value), True)
+
+
 def build_stress_from_scores(
     water_gdf: gpd.GeoDataFrame,
     roads_gdf: gpd.GeoDataFrame,
@@ -100,9 +111,11 @@ def build_stress_from_scores(
     roads = roads_gdf["road_threat_score"].to_numpy()
     setts = settlements_gdf["settlement_threat_score"].to_numpy()
 
-    # All three are covered (a real 0 means "no stress", not "no data"), so the
-    # noisy-OR runs over all three. aggregate_stress is the engine's one formula.
-    aggregate = [aggregate_stress([Score(float(w), True), Score(float(r), True), Score(float(s), True)]).value for w, r, s in zip(water, roads, setts, strict=True)]
+    # A present score is covered — a real 0 means "measured, no stress". A
+    # MISSING one means the per-stressor export had no reading there (the
+    # occurrence fell outside that layer's extent), and must stay out of the
+    # noisy-OR rather than entering it as a fabricated 0.0.
+    aggregate = [aggregate_stress([_as_score(w), _as_score(r), _as_score(s)]).value for w, r, s in zip(water, roads, setts, strict=True)]
 
     out = roads_gdf[["species", "year"]].copy()
     out["stress_water"] = water
@@ -151,12 +164,23 @@ def compute_species_stress(
     occ = add_distance_to_road(occ, roads)
     occ = add_distance_to_settlement(occ, settlements)
 
+    # An occurrence outside a layer's extent has no measurement for it, only a
+    # distance to wherever that layer's data happens to stop. Passing None
+    # instead makes the engine mark the stressor uncovered and drop it from the
+    # noisy-OR, rather than inventing a score: absent hazard data would read as
+    # a confident 0.0, and absent RESOURCE data inverts into maximum scarcity.
+    covered = {
+        "water": within_layer_extent(occ, water).to_numpy(),
+        "roads": within_layer_extent(occ, roads).to_numpy(),
+        "settlements": within_layer_extent(occ, settlements).to_numpy(),
+    }
+
     water_s, road_s, settle_s, agg_s = [], [], [], []
-    for _, row in occ.iterrows():
+    for i, (_, row) in enumerate(occ.iterrows()):
         measurements = {
-            "water": FeatureProximity(row["distance_to_water"], None),
-            "roads": FeatureProximity(row["distance_to_road_m"], row["road_class"]),
-            "settlements": FeatureProximity(row["distance_to_settlement_m"], row["settlement_class"]),
+            "water": FeatureProximity(row["distance_to_water"], None) if covered["water"][i] else None,
+            "roads": FeatureProximity(row["distance_to_road_m"], row["road_class"]) if covered["roads"][i] else None,
+            "settlements": FeatureProximity(row["distance_to_settlement_m"], row["settlement_class"]) if covered["settlements"][i] else None,
         }
         result = score_species_stress(species, measurements)
         water_s.append(result.breakdown["water"].value)

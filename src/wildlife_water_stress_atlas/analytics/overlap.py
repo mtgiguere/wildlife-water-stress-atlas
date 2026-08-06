@@ -5,6 +5,39 @@ Spatial analytics for species and water relationships.
 """
 
 import geopandas as gpd
+import pandas as pd
+
+
+def within_layer_extent(points: gpd.GeoDataFrame, layer: gpd.GeoDataFrame) -> pd.Series:
+    """
+    Which points fall inside the area a layer actually describes.
+
+    Distance-to-nearest-feature always returns a number, so a point the layer
+    does not cover still gets one — measured to whatever lies at the edge of
+    the data. That number says where the dataset stops, not where the feature
+    is, and feeding it to a scorer manufactures stress: occurrences outside
+    Africa scored 0.660 mean aggregate against Africa-only hydrography purely
+    because the nearest mapped river was thousands of km away.
+
+    Coverage is the layer's bounding box (inclusive). Deliberately coarse — it
+    cannot see holes *within* the box — but it is honest about the failure mode
+    that actually bites: whole regions absent from a layer, like the settlements
+    subset that covers only eastern/southern Africa. An empty layer covers
+    nothing, so a file that failed to load cannot certify universal zero stress.
+
+    Returns:
+        Boolean Series aligned to `points.index`.
+    """
+    if len(points) == 0:
+        return pd.Series([], dtype=bool, index=points.index)
+
+    if len(layer) == 0:
+        return pd.Series(False, index=points.index)
+
+    min_x, min_y, max_x, max_y = layer.total_bounds
+    x = points.geometry.x
+    y = points.geometry.y
+    return (x >= min_x) & (x <= max_x) & (y >= min_y) & (y <= max_y)
 
 
 def add_distance_to_water(
