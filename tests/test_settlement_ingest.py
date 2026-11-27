@@ -12,6 +12,7 @@ NORMALIZED SCHEMA:
     geometry         : Point in EPSG:4326
     source_id        : unique str per settlement
     settlement_class : one of KNOWN_SETTLEMENT_CLASSES (mapped from OSM place tag)
+    name             : str | None — OSM place name, None when the source omits it
     region           : str (default "africa")
 """
 
@@ -30,7 +31,7 @@ from wildlife_water_stress_atlas.ingest.threats import (
 
 THREATS_READ_FILE = "wildlife_water_stress_atlas.ingest.threats.gpd.read_file"
 
-REQUIRED_SCHEMA_COLUMNS = {"geometry", "source_id", "settlement_class", "region"}
+REQUIRED_SCHEMA_COLUMNS = {"geometry", "source_id", "settlement_class", "name", "region"}
 
 
 def make_mock_places_gdf(place_values: list[str]) -> gpd.GeoDataFrame:
@@ -83,11 +84,61 @@ def test_osm_settlements_produces_normalized_schema(monkeypatch, mock_places_gdf
 
 
 def test_osm_settlements_drops_non_schema_columns(monkeypatch, mock_places_gdf):
+    """osm_id and the raw OSM `place` tag are not part of the normalized schema.
+
+    NOTE: `name` used to be asserted here as dropped. It is now part of the schema
+    — see test_osm_settlements_carries_name_into_normalized_schema.
+    """
     monkeypatch.setattr(THREATS_READ_FILE, lambda _: mock_places_gdf)
     result = OSMSettlements("dummy/places.gpkg").load()
-    assert "name" not in result.columns
     assert "osm_id" not in result.columns
     assert "place" not in result.columns
+
+
+def test_osm_settlements_carries_name_into_normalized_schema(monkeypatch, mock_places_gdf):
+    """The settlement name survives normalization, aligned row-for-row.
+
+    The SETTLEMENTS map view labels cities/towns by name, so `name` is part of the
+    normalized contract — not incidental source metadata to be pruned.
+    """
+    monkeypatch.setattr(THREATS_READ_FILE, lambda _: mock_places_gdf)
+    result = OSMSettlements("dummy/places.gpkg").load()
+    assert list(result["name"]) == ["Place 0", "Place 1", "Place 2", "Place 3"]
+
+
+def test_osm_settlements_name_is_null_when_source_has_no_name_column(monkeypatch):
+    """A source file without a `name` column still produces the full schema.
+
+    The settlements GeoPackage on disk predates name capture and ships only
+    [place, geometry]. A missing OPTIONAL column must yield null names, not a
+    KeyError — the empty/missing-column crash pattern from TDD_CONTRACT Bug #2.
+    """
+    gdf = gpd.GeoDataFrame(
+        {"place": ["city", "town"]},
+        geometry=[Point(0, 0), Point(1, 0)],
+        crs="EPSG:4326",
+    )
+    monkeypatch.setattr(THREATS_READ_FILE, lambda _: gdf)
+    result = OSMSettlements("dummy/places.gpkg").load()
+    assert "name" in result.columns
+    assert result["name"].isna().all()
+    assert len(result) == 2
+
+
+def test_osm_settlements_name_survives_bbox_clipping(monkeypatch):
+    """Clipping keeps each surviving row's own name — not a shifted/reindexed one.
+
+    bbox filtering drops rows mid-frame; a name column rebuilt by position rather
+    than carried with the row would silently mislabel every settlement.
+    """
+    gdf = gpd.GeoDataFrame(
+        {"place": ["city", "city", "city"], "name": ["Outside", "Inside", "AlsoOutside"]},
+        geometry=[Point(105, 50), Point(22, -10), Point(-120, 40)],
+        crs="EPSG:4326",
+    )
+    monkeypatch.setattr(THREATS_READ_FILE, lambda _: gdf)
+    result = OSMSettlements("dummy/places.gpkg", bbox=(10, -30, 40, 10)).load()
+    assert list(result["name"]) == ["Inside"]
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +185,19 @@ def test_osm_settlements_returns_empty_when_no_known_classes(monkeypatch):
     result = OSMSettlements("dummy/places.gpkg").load()
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == 0
+
+
+def test_osm_settlements_empty_result_still_has_the_full_schema(monkeypatch):
+    """An empty result carries the schema COLUMNS, not zero columns.
+
+    A zero-row frame that also has zero columns is the TDD_CONTRACT Bug #2 crash:
+    downstream code doing result["name"] raises KeyError instead of seeing an empty
+    series. Every consumer must be able to treat an empty result like a full one.
+    """
+    gdf = make_mock_places_gdf(["suburb", "locality", "farm"])
+    monkeypatch.setattr(THREATS_READ_FILE, lambda _: gdf)
+    result = OSMSettlements("dummy/places.gpkg").load()
+    assert REQUIRED_SCHEMA_COLUMNS.issubset(result.columns), f"Missing columns on empty result: {REQUIRED_SCHEMA_COLUMNS - set(result.columns)}"
 
 
 # ---------------------------------------------------------------------------

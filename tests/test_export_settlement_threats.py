@@ -124,6 +124,21 @@ def mixed_class_settlements():
     )
 
 
+@pytest.fixture
+def named_settlements():
+    """Normalized settlements carrying names, as OSMSettlements.load() produces."""
+    return gpd.GeoDataFrame(
+        {
+            "settlement_class": ["city", "town", "village"],
+            "name": ["Nairobi", "Naivasha", "Tiny Village"],
+            "source_id": ["settlement_0", "settlement_1", "settlement_2"],
+            "region": ["africa"] * 3,
+        },
+        geometry=[Point(i, 0) for i in range(3)],
+        crs="EPSG:4326",
+    )
+
+
 def test_build_settlement_points_keeps_only_display_classes(mixed_class_settlements):
     """Only city/town are shown on the map — village/hamlet would clutter it."""
     from scripts.export_settlement_threats import build_settlement_points
@@ -136,6 +151,76 @@ def test_build_settlement_points_keeps_class_column(mixed_class_settlements):
     from scripts.export_settlement_threats import build_settlement_points
 
     assert "settlement_class" in build_settlement_points(mixed_class_settlements).columns
+
+
+def test_build_settlement_points_keeps_name_column(named_settlements):
+    """The SETTLEMENTS view labels its points, so the display layer carries `name`
+    with each point's own value — the display subset must not shuffle labels."""
+    from scripts.export_settlement_threats import build_settlement_points
+
+    result = build_settlement_points(named_settlements)
+    assert "name" in result.columns, f"display layer dropped the name column; got {list(result.columns)}"
+    assert dict(zip(result["settlement_class"], result["name"], strict=True)) == {"city": "Nairobi", "town": "Naivasha"}
+
+
+def test_export_settlement_points_geojson_carries_names(tmp_path, named_settlements):
+    """Names reach the on-disk GeoJSON the map actually reads."""
+    from scripts.export_settlement_threats import export_settlement_points
+
+    out = tmp_path / "settlements_points.geojson"
+    with patch("scripts.export_settlement_threats.load_all_threats", return_value=named_settlements):
+        export_settlement_points(settlements_path=tmp_path / "s.gpkg", output_path=out)
+
+    data = json.load(open(out))
+    assert {f["properties"]["name"] for f in data["features"]} == {"Nairobi", "Naivasha"}
+
+
+def test_settlement_names_survive_the_whole_fetch_to_geojson_chain(tmp_path):
+    """CONTRACT TEST across every stage that independently prunes columns.
+
+    Names were dropped at three separate points — the fetch filter, the ingest
+    normalizer, and the display-layer subset. Each stage's own unit test can pass
+    while the pipeline still yields unlabeled dots, because no single test spans
+    the seams (TDD_CONTRACT Bug #1: column-name drift between two individually
+    green functions). This runs the real chain through a real GeoPackage on disk
+    with no mocking, so a name lost at ANY stage — including the gpkg write —
+    fails here.
+    """
+    from scripts.export_settlement_threats import build_settlement_points, export_settlement_points
+    from scripts.fetch_road_data import _filter_settlements
+    from wildlife_water_stress_atlas.ingest.threats import load_all_threats
+
+    # Stage 1: a Geofabrik-shaped places layer, post-fclass-rename.
+    raw_places = gpd.GeoDataFrame(
+        {
+            "place": ["city", "town", "village", "suburb"],
+            "name": ["Nairobi", "Naivasha", "Tiny Village", "Some Suburb"],
+            "osm_id": [1, 2, 3, 4],
+        },
+        geometry=[Point(20 + i, -10) for i in range(4)],
+        crs="EPSG:4326",
+    )
+    filtered = _filter_settlements(raw_places)
+    assert "name" in filtered.columns, "stage 1 (fetch filter) dropped the name"
+
+    # Stage 2: persist exactly as the continental fetch does, then re-read it.
+    gpkg = tmp_path / "africa_settlements.gpkg"
+    filtered.to_file(gpkg, driver="GPKG")
+    normalized = load_all_threats(
+        {"sources": {"osm_settlements": {"path": str(gpkg)}}},
+        bbox=(-20.0, -35.0, 55.0, 38.0),
+    )
+    assert "name" in normalized.columns, "stage 2 (ingest normalize) dropped the name"
+
+    # Stage 3 + 4: display subset and GeoJSON export.
+    out = tmp_path / "settlements_points.geojson"
+    export_settlement_points(settlements_path=gpkg, output_path=out, settlements=normalized)
+
+    props = [f["properties"] for f in json.load(open(out))["features"]]
+    assert {p["name"] for p in props} == {"Nairobi", "Naivasha"}, f"names lost between normalize and GeoJSON: {props}"
+    assert {p["settlement_class"] for p in props} == {"city", "town"}
+    assert "Tiny Village" not in {p["name"] for p in props}, "village leaked into the display layer"
+    assert build_settlement_points(normalized)["name"].notna().all()
 
 
 def test_export_settlement_points_writes_geojson(tmp_path, mixed_class_settlements):

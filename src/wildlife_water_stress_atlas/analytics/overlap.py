@@ -5,6 +5,39 @@ Spatial analytics for species and water relationships.
 """
 
 import geopandas as gpd
+import pandas as pd
+
+
+def within_layer_extent(points: gpd.GeoDataFrame, layer: gpd.GeoDataFrame) -> pd.Series:
+    """
+    Which points fall inside the area a layer actually describes.
+
+    Distance-to-nearest-feature always returns a number, so a point the layer
+    does not cover still gets one — measured to whatever lies at the edge of
+    the data. That number says where the dataset stops, not where the feature
+    is, and feeding it to a scorer manufactures stress: occurrences outside
+    Africa scored 0.660 mean aggregate against Africa-only hydrography purely
+    because the nearest mapped river was thousands of km away.
+
+    Coverage is the layer's bounding box (inclusive). Deliberately coarse — it
+    cannot see holes *within* the box — but it is honest about the failure mode
+    that actually bites: whole regions absent from a layer, like the settlements
+    subset that covers only eastern/southern Africa. An empty layer covers
+    nothing, so a file that failed to load cannot certify universal zero stress.
+
+    Returns:
+        Boolean Series aligned to `points.index`.
+    """
+    if len(points) == 0:
+        return pd.Series([], dtype=bool, index=points.index)
+
+    if len(layer) == 0:
+        return pd.Series(False, index=points.index)
+
+    min_x, min_y, max_x, max_y = layer.total_bounds
+    x = points.geometry.x
+    y = points.geometry.y
+    return (x >= min_x) & (x <= max_x) & (y >= min_y) & (y <= max_y)
 
 
 def add_distance_to_water(
@@ -37,9 +70,19 @@ def add_distance_to_water(
     occurrences_projected = occurrences.to_crs(epsg=3857)
     water_projected = water.to_crs(epsg=3857)
 
+    # Carry the nearest source's type through, exactly as add_distance_to_road
+    # carries road_class. Every species config sets expert `type_weights` over
+    # water types (an elephant's pan is 0.4 against a river's 1.0); discarding
+    # the type here is what made an ephemeral pan score like a permanent lake.
+    # Older water layers predate the column, so its absence is not an error.
+    if "water_type" in water_projected.columns:
+        right = water_projected[["water_type", "geometry"]]
+    else:
+        right = water_projected[["geometry"]].assign(water_type=None)
+
     joined = gpd.sjoin_nearest(
         occurrences_projected,
-        water_projected[["geometry"]],
+        right,
         how="left",
         distance_col="distance_to_water",
     )

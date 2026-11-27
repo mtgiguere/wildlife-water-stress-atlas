@@ -3,6 +3,7 @@ import json
 import geopandas as gpd
 
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.ingest.gbif import OCCURRENCE_COLS
 
 
 def export_water(input_path, output_path):
@@ -14,7 +15,7 @@ def export_water(input_path, output_path):
 def export_occurrences(input_path, output_path):
     gdf = gpd.read_file(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    cols = [c for c in ["species", "year"] if c in gdf.columns]
+    cols = [c for c in OCCURRENCE_COLS if c in gdf.columns]
     gdf[cols + ["geometry"]].to_file(output_path, driver="GeoJSON")
 
 

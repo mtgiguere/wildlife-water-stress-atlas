@@ -43,6 +43,9 @@ select = ["E", "F", "B", "I"]
 ignore = []
 
 [tool.ruff.format]
+# ruff >= 0.17 also formats code blocks inside Markdown. Our design docs use
+# hand-aligned illustrative snippets (not runnable code) — leave them alone.
+exclude = ["*.md"]
 quote-style = "double"
 indent-style = "space"
 

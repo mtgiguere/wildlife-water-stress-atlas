@@ -41,12 +41,13 @@ from wildlife_water_stress_atlas.analytics.overlap import add_distance_to_settle
 from wildlife_water_stress_atlas.analytics.stress_engine import score_stressor
 from wildlife_water_stress_atlas.analytics.stressors import FeatureProximity
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
+from wildlife_water_stress_atlas.ingest.gbif import OCCURRENCE_COLS
 from wildlife_water_stress_atlas.ingest.threats import load_all_threats
 
 # Bounding box covering continental Africa (lon_min, lat_min, lon_max, lat_max)
 AFRICA_BBOX = (-20.0, -35.0, 55.0, 38.0)
 
-_OUTPUT_COLS = ["species", "year", "distance_to_settlement_m", "settlement_class", "settlement_threat_score"]
+_OUTPUT_COLS = [*OCCURRENCE_COLS, "distance_to_settlement_m", "settlement_class", "settlement_threat_score"]
 
 # Settlement classes drawn on the map (SETTLEMENTS view). Only the larger,
 # sparser classes are shown — villages and hamlets number in the hundreds of
@@ -100,9 +101,14 @@ def build_settlement_points(
         classes     : Classes to keep. Default DISPLAY_SETTLEMENT_CLASSES.
 
     Returns:
-        GeoDataFrame with settlement_class + geometry, display classes only.
+        GeoDataFrame with settlement_class + name + geometry, display classes only.
+        `name` is omitted when the input lacks it (settlement files written before
+        names were captured).
     """
-    return settlements[settlements["settlement_class"].isin(classes)][["settlement_class", "geometry"]].copy()
+    cols = ["settlement_class", "geometry"]
+    if "name" in settlements.columns:
+        cols.insert(1, "name")
+    return settlements[settlements["settlement_class"].isin(classes)][cols].copy()
 
 
 def export_settlement_points(

@@ -43,10 +43,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from wildlife_water_stress_atlas.config.species import SPECIES_CONFIG
-from wildlife_water_stress_atlas.ingest.gbif import occurrences_to_gdf
+from wildlife_water_stress_atlas.ingest.gbif import (
+    GBIFTruncationError,
+    build_search_params,
+    occurrences_to_gdf,
+    raise_if_unpageable,
+)
 
 GBIF_API_URL = "https://api.gbif.org/v1/occurrence/search"
 GBIF_PAGE_SIZE = 300
+
+# The atlas scores against Africa-only water/road/settlement layers, so a
+# global result set is not merely wasteful — an out-of-extent occurrence gets a
+# distance measured to a layer that does not cover it. Filtering here also
+# keeps wide-ranging species under GBIF's 100k offset cap.
+TARGET_CONTINENT = "AFRICA"
 
 CACHE_DIR = Path("data/processed")
 
@@ -77,16 +88,16 @@ def delete_checkpoint(cache_path: Path) -> None:
         cp.unlink()
 
 
-def fetch_all_with_checkpoint(scientific_name: str, cache_path: Path) -> list[dict]:
+def fetch_all_with_checkpoint(scientific_name: str, cache_path: Path, continent: str | None = TARGET_CONTINENT) -> list[dict]:
     offset, all_records = load_checkpoint(cache_path)
 
     while True:
-        params = {
-            "scientificName": scientific_name,
-            "hasCoordinate": "true",
-            "limit": GBIF_PAGE_SIZE,
-            "offset": offset,
-        }
+        params = build_search_params(
+            scientific_name,
+            limit=GBIF_PAGE_SIZE,
+            offset=offset,
+            continent=continent,
+        )
 
         try:
             response = requests.get(GBIF_API_URL, params=params, timeout=REQUEST_TIMEOUT)
@@ -96,10 +107,16 @@ def fetch_all_with_checkpoint(scientific_name: str, cache_path: Path) -> list[di
             save_checkpoint(cache_path, offset, all_records)
             raise
 
+        total = data.get("count", "?")
+        if isinstance(total, int):
+            # Before accumulating anything: a query bigger than the offset cap
+            # can only ever yield its first GBIF_MAX_OFFSET records, and this
+            # loop would otherwise walk to the wall and stop as if finished.
+            raise_if_unpageable(scientific_name, total)
+
         page = data.get("results", [])
         all_records.extend(page)
 
-        total = data.get("count", "?")
         print(f"   📄 offset={offset:>6,}  page={len(page):>3}  total so far={len(all_records):>6,}  of ~{total:,}")
 
         save_checkpoint(cache_path, offset + GBIF_PAGE_SIZE, all_records)
@@ -153,6 +170,13 @@ def prefetch_species(scientific_name: str, force: bool = False) -> None:
 
     except requests.Timeout:
         print("   ⏱️  Timed out — checkpoint saved. Re-run to resume from where it stopped.")
+    except GBIFTruncationError:
+        # Deliberately NOT swallowed like other errors. A truncated species is
+        # not a per-species hiccup to log and move past — it means the query
+        # itself is wrong, and continuing would build a cache whose gaps are
+        # invisible downstream.
+        delete_checkpoint(cache_path)
+        raise
     except Exception as e:
         print(f"   ❌ Failed: {e}")
 
@@ -160,7 +184,13 @@ def prefetch_species(scientific_name: str, force: bool = False) -> None:
 def finalize_from_checkpoint(scientific_name: str) -> None:
     """
     Write a GeoPackage from an existing checkpoint file without fetching
-    any more pages. Use when GBIF's 100k offset limit has been hit.
+    any more pages.
+
+    ⚠️ This is a RESUME-AFTER-INTERRUPTION tool (a timeout, a killed run) —
+    NOT a way around the offset cap. Using it for that is how the flamingo
+    cache came to hold 99,900 of 554,418 records while looking complete. If a
+    query is too big to page, narrow it (see TARGET_CONTINENT) and re-fetch;
+    the resulting file is a real species layer rather than a prefix of one.
     """
     cfg = SPECIES_CONFIG[scientific_name]
     emoji = cfg["emoji"]

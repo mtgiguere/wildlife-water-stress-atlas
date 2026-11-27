@@ -8,6 +8,93 @@
 
 ---
 
+## ⚠️ Current status — 2026-08 (data-honesty pass; **shipped data is now STALE**)
+
+Branch `feat/settlement-names`. Five fixes landed, all RED-first, 829 tests /
+99% coverage / lint clean. They came out of a review of whether it is valid to
+score a historic occurrence against present-day layers — the answer turned up
+several larger problems in the same family: **we were scoring things we had no
+data for.**
+
+1. **GBIF fetch restricted to Africa** (`continent=AFRICA`). The query was
+   global while every layer is Africa-only. Also brings wide-ranging species
+   under the offset cap: *Phoenicopterus roseus* is 554,418 records globally
+   but 53,073 in Africa. `prefetch_gbif.py` and `ingest/gbif.py` now build
+   queries through one shared `build_search_params`.
+2. **Paging-wall truncation now raises** (`GBIFTruncationError`). GBIF refuses
+   offsets ≥ 100,000, so both loops silently stopped there — this is how the
+   flamingo cache froze at 99,900 (18%) while looking complete.
+   `finalize_from_checkpoint` documented that workaround; it is now marked
+   resume-after-interruption only.
+3. **Out-of-extent occurrences are UNCOVERED, not scored** (`within_layer_extent`).
+   Measured on the shipped layers: **water 81.7% covered** (flamingo 65.9%,
+   clawed frog 32.1%), **settlements 50.9%** (buffalo 77.3%, elephant 87.4%,
+   flamingo 7.7%). So roughly half of every `settlement_threat_score` ever
+   exported was an invented zero, and the two non-endemic species' aggregates
+   were driven by invented water scarcity.
+4. **`month` carried through to the map layer.** GBIF ships it on ~all records
+   and it was already in every cached gpkg; five export scripts each dropped it
+   via their own hardcoded column list. Now one `OCCURRENCE_COLS` with a drift
+   guard. This is the temporal key the seasonal-water work needs.
+5. **Water scored by source dependability.** Every plugin already had expert
+   `type_weights` (elephant: river 1.0, pan 0.4; frog inverts it — wetland 1.0,
+   river 0.6), validated and read by `get_water_type_weights`, and consumed by
+   nothing. Now `add_distance_to_water` carries `water_type` (as roads always
+   carried `road_class`) and `ResourceStressor` shrinks the usable threshold:
+   `min(dist / (weight × threshold), 1)`.
+
+### 🔴 Blocking follow-ups (do these before trusting any number on the map)
+
+- [ ] **Re-fetch GBIF** (`python scripts/prefetch_gbif.py --force`). Every cache
+      predates the Africa filter AND the truncation guard. Expect flamingo to go
+      99,900 → ~53k *complete* instead of 18% of a global slice, and clawed frog
+      to shed its European/American invasive range.
+- [ ] **Regenerate all exports + `stress_gbif_*`.** The committed GeoJSON was
+      produced by the old pipeline and reflects NONE of the five fixes.
+      Every published stress figure is currently stale.
+- [ ] **STRESS view must render a null `stress_aggregate` as grey.** Per-stressor
+      nulls are already handled (`to-number` coerces them out of the client-side
+      noisy-OR), but a fully-uncovered occurrence now yields a null aggregate and
+      would hit `stressRamp`'s interpolate. Grey is already reserved for exactly
+      this (UI-2); it finally has real nulls to show.
+
+### 🟡 Open expert decision (do not guess — see ResourceStressor docstring)
+
+Water reliability is applied as **effective distance**, not as a **floor**.
+Measured both against the real layer: the floor form `1 − w(1 − scarcity)` makes
+zero water stress *unreachable*, because 74% of nearest sources are class
+`permanent_water` at weight 0.8 — every elephant, including one standing in a
+lake, would carry ≥ 0.2 stress and the mean moves 0.100 → 0.233. The shipped
+form moves it 0.100 → 0.120 and keeps the zero-stress share at 0.1%.
+**Floor semantics genuinely do fit an EPHEMERAL source**, but the honest input
+for that is the per-feature `permanence` / `months_water` the water schema
+already carries (and still does not use), not a per-type weight that also
+encodes suitability. An ecologist should decide.
+
+### Also worth knowing
+
+- **Seasonality is unused but nearly free.** `permanence`, `reliability` and
+  `months_water` are ingested into the water schema (GLWD classes are coded
+  12/8/6/4/2 months) and never reach a scorer. `month` is accepted by every
+  water source class and does nothing (`water.py:40-43`). With #4 done, both
+  halves of the seasonal join now exist.
+- **Pseudo-replication in the aggregates.** Unique-coordinate share: clawed frog
+  28.6%, flamingo 33.4% (one location repeated 1,164×), giraffe 56.9%; elephant
+  is fine at 96.7%. The map is unaffected (co-located dots overplot) but any
+  "% of population under high stress" statistic is dominated by a few
+  well-birded ponds. Fix is to summarise over unique locations, not raw records.
+- **Sampling bias.** 85% of elephant records are iNaturalist research-grade —
+  i.e. tourists with phones, on roads, in parks. Distance-to-road is partly
+  measuring where observers went.
+- **Anachronism is real but small.** Pre-2000 records: elephant 0%, croc 2.0%,
+  lion 4.5% — but painted reed frog 16.9% and clawed frog 19.6%. Historical
+  layers are worth pulling for the *trend* story (Phase E / "Predict"), not to
+  correct the past. Note GHSL gives settlements 1975→ in 5-year epochs and JRC
+  Global Surface Water gives monthly water 1984–2021; **roads have no usable
+  African history** (GRIP is a single ~2018 snapshot).
+
+---
+
 ## Current status — 2026-07 (Phase C essentially done; cutover complete)
 
 **All merged to `main`:** Phase-1 prototype (11 species; water/road/settlement;
@@ -211,10 +298,45 @@ guards — see docs/TDD_CONTRACT.md "Green ≠ Verified").**
       also needn't multiply: the STRESS view + colour-by already subsumes them.)
 - [ ] **UI-6 — settlements are an unlabeled purple blob.** Current data
       (`settlements_points.geojson`, 1351 pts) carries **only `settlement_class` —
-      no names** → a name tooltip is impossible without a data re-fetch. Two parts:
+      no names** → no name tooltip. Two parts:
       (a) treat like the roads *backbone* — show only cities/towns, size/opacity by
-      class so majors anchor and small recede; (b) **re-fetch settlements WITH names**
-      (bundle with the continental deploy-data fetch) then hover-label / label majors.
+      class so majors anchor and small recede; (b) hover-label / label majors,
+      which needs names in the data — see the corrected diagnosis below.
+  - [x] **UI-6b code path — names now survive ingestion (2026-07-30).**
+        ⚠️ **The earlier premise here was WRONG.** This item claimed names were
+        unavailable without a re-fetch, implying the upstream source lacked them.
+        It does not: Geofabrik's `gis_osm_places_free` ships **`name` (100%
+        populated — 5271/5271 in Lesotho, 393/393 in São Tomé) and `population`**.
+        **We were discarding it ourselves, at three independent prune sites:**
+        `_filter_settlements` (fetch), `OSMSettlements.load` (ingest normalize),
+        and `build_settlement_points` (display subset) — each keeping a hardcoded
+        2-column list. A test even *pinned the bug* (`test_osm_settlements_drops_
+        non_schema_columns` asserted `name not in columns`); it was deliberately
+        rewritten. `name` is now part of the settlements normalized schema
+        (null-safe when the source omits it, so the current gpkg still loads).
+        Guarded by 9 tests incl. a cross-seam contract test through a real
+        GeoPackage and an `@pytest.mark.integration` test pinning the *external*
+        Geofabrik fact (TDD_CONTRACT Blind spot A — a self-authored fixture could
+        never have caught this). Verified end-to-end on a real download: 8/8
+        display settlements labeled, Unicode intact ("São Tomé", "Santo António").
+  - [ ] **UI-6b data — re-fetch to populate names.** Still required, but now it is
+        **purely a data refresh, no code work**: the persisted
+        `africa_settlements.gpkg` was written before name capture (its columns are
+        just `[place, geometry]`), so names only appear after re-running the fetch.
+        ⚠️ **Cost + risk, measured:** per-country Geofabrik extracts are far bigger
+        than the filtered output suggests (Lesotho alone = **302 MB**; 26 countries
+        in `TARGET_COUNTRIES`) → multi-GB and hours. `fetch_all_osm_data` writes
+        **both** outputs, so it would **overwrite the good 345 MB
+        `africa_roads.gpkg`** as well; a partial failure (which is how settlements
+        ended up regional in the first place — current bounds are lon 16.5–41.9,
+        lat −46.9–4.6, i.e. eastern/southern only, missing Nigeria/Ghana/Ivory
+        Coast/Cameroon/CAR/Chad/Sudan/South Sudan/Somalia/Ethiopia) could leave the
+        repo worse off than today. **Fetch to a temp path and swap on success, or
+        back both gpkgs up first.** Then re-run the settlement export **and
+        regenerate `stress_gbif_*`** (ties to the continental data caveat above).
+  - Note: `population` is also available upstream if class-based tiering proves too
+    coarse for (a) — but it is unreliable (frequently 0 even for real towns), so
+    `settlement_class` stays the tiering signal. Not carried through (JIT scope).
 
 ## Phase D — Range + grid scoring
 
